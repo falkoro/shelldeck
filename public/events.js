@@ -145,6 +145,7 @@ document.addEventListener('drop', (event) => {
     handleImageFiles(event.dataTransfer?.files, card.dataset.shellCard || '').catch((error) => toast(error.message));
 });
 q('#refreshBtn').addEventListener('click', () => refresh().catch((error) => toast(error.message)));
+q('#guideBtn').addEventListener('click', () => showOnboarding());
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error) => toast(error.message)));
 q('#agentsBtn').addEventListener('click', () => loadAgents().catch((error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
@@ -190,7 +191,8 @@ document.addEventListener('submit', (event) => {
 });
 render(initialModel);
 buildLegend();
-queueMicrotask(() => loadSummary().catch((error) => { q('#summaryBody').textContent = error.message; }));
+maybeShowOnboarding();
+queueMicrotask(() => loadSummary().catch(() => { }));
 queueMicrotask(() => loadShells().then(startShellStream).catch((error) => toast(error.message)));
 queueMicrotask(() => loadAgents().catch(() => { }));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => { }), 30000);

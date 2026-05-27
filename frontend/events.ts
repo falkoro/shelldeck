@@ -134,6 +134,7 @@ document.addEventListener('drop', (event: DragEvent) => {
 });
 
 q('#refreshBtn').addEventListener('click', () => refresh().catch((error: Error) => toast(error.message)));
+q('#guideBtn').addEventListener('click', () => showOnboarding());
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error: Error) => toast(error.message)));
 q('#agentsBtn').addEventListener('click', () => loadAgents().catch((error: Error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
@@ -173,7 +174,8 @@ document.addEventListener('submit', (event: Event) => {
 
 render(initialModel);
 buildLegend();
-queueMicrotask(() => loadSummary().catch((error: Error) => { q('#summaryBody').textContent = error.message; }));
+maybeShowOnboarding();
+queueMicrotask(() => loadSummary().catch(() => {}));
 queueMicrotask(() => loadShells().then(startShellStream).catch((error: Error) => toast(error.message)));
 queueMicrotask(() => loadAgents().catch(() => {}));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => {}), 30000);
