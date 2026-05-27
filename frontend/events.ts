@@ -136,7 +136,6 @@ document.addEventListener('drop', (event: DragEvent) => {
 q('#refreshBtn').addEventListener('click', () => refresh().catch((error: Error) => toast(error.message)));
 q('#guideBtn').addEventListener('click', () => showOnboarding());
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error: Error) => toast(error.message)));
-q('#agentsBtn').addEventListener('click', () => loadAgents().catch((error: Error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
 q('#densityToggle').addEventListener('click', toggleDensity);
 q('#followToggle').addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
@@ -185,19 +184,3 @@ setInterval(() => loadSummary().catch(() => {}), 60000);
 // Live tickers (if any configured)
 queueMicrotask(() => loadTickers().catch(() => {}));
 setInterval(() => loadTickers().catch(() => {}), 60000);
-
-// Quick-links dropdown (only present if links are configured)
-const linksBtn = document.getElementById('linksBtn');
-if (linksBtn) {
-  const menu = document.getElementById('linksMenu');
-  linksBtn.addEventListener('click', (event: MouseEvent) => {
-    event.stopPropagation();
-    if (menu) { menu.hidden = !menu.hidden; linksBtn.setAttribute('aria-expanded', String(!menu.hidden)); }
-  });
-  document.addEventListener('click', (event: MouseEvent) => {
-    if (menu && !menu.hidden && !(event.target instanceof Element && event.target.closest('.links-dd'))) {
-      menu.hidden = true;
-      linksBtn.setAttribute('aria-expanded', 'false');
-    }
-  });
-}

@@ -155,12 +155,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .agent-badge.active,.agent-badge.waiting{display:inline-flex}
 .terminal-card.agent-waiting{border-color:rgba(255,200,87,.5)}
 @media (min-width:1700px){
-  .workspace{grid-template-columns:300px minmax(0,1fr) 360px}
-  .sidebar{grid-column:1;grid-row:1}
-  .main-stack{grid-column:2;grid-row:1}
-  .agents-col{grid-column:3;grid-row:1}
-  .agents-panel{position:sticky;top:14px;max-height:calc(100vh - 28px)}
+  .workspace{grid-template-columns:330px minmax(0,1fr)}
 }
+/* Quick links panel (sidebar, under Sessions) */
+.links-panel .panel-header{margin-bottom:10px}
+.links-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:6px}
+.link-item{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid rgba(139,246,255,.18);border-radius:7px;background:#071017;color:var(--text);text-decoration:none;font-size:12.5px;min-width:0}
+.link-item:hover{border-color:var(--cyan);background:#102331}
+.link-item .ic{color:var(--cyan);flex:0 0 auto}
+.link-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Button legend */
 .legend{margin:0 0 8px;border:1px solid rgba(139,246,255,.18);border-radius:8px;background:#0b121a;font-size:12.5px}
 .legend>summary{cursor:pointer;padding:8px 10px;color:var(--muted);font-weight:600;list-style:none}
