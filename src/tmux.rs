@@ -55,7 +55,6 @@ pub struct Pane {
     pub index: String,
     pub cwd: String,
     pub command: String,
-    pub tty: String,
 }
 
 async fn tmux_output(args: &[&str]) -> Result<String, String> {
@@ -129,7 +128,7 @@ pub async fn session_names() -> Vec<String> {
 }
 
 pub async fn list_panes() -> Vec<Pane> {
-    let Ok(stdout) = tmux_output(&["list-panes", "-a", "-F", "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_path}|#{pane_current_command}|#{pane_pid}|#{pane_tty}"]).await else {
+    let Ok(stdout) = tmux_output(&["list-panes", "-a", "-F", "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_path}|#{pane_current_command}"]).await else {
         return Vec::new();
     };
     stdout.lines().filter_map(|line| {
@@ -140,7 +139,6 @@ pub async fn list_panes() -> Vec<Pane> {
             index: parts.get(2)?.to_string(),
             cwd: parts.get(3).unwrap_or(&"").to_string(),
             command: parts.get(4).unwrap_or(&"").to_string(),
-            tty: parts.get(6).unwrap_or(&"").to_string(),
         })
     }).collect()
 }

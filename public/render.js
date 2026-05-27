@@ -167,10 +167,6 @@ function setShellAgentBadge(card, name) {
     }
     card.classList.toggle('agent-waiting', status === 'waiting');
 }
-// Refresh agent badges on all shell cards without a full shell re-render (used on agent poll).
-function applyAgentBadges() {
-    document.querySelectorAll('[data-shell-card]').forEach((card) => setShellAgentBadge(card, card.dataset.shellCard || ''));
-}
 function setWorkTitle(card, name) {
     const el = card.querySelector('[data-role="worktitle"]');
     if (!el)
@@ -235,37 +231,6 @@ function renderTickers(list) {
         const price = t.price >= 1000 ? Math.round(t.price).toLocaleString() : t.price.toFixed(2);
         return `<span class="tick ${up ? 'up' : 'down'}"><b>${escapeHtml(t.symbol)}</b> ${price} <i>${up ? '▲' : '▼'}${Math.abs(t.changePct).toFixed(2)}%</i></span>`;
     }).join('');
-}
-function renderAgents() {
-    const list = document.getElementById('agentsList');
-    const summary = document.getElementById('agentsSummary');
-    if (!list || !summary)
-        return;
-    if (!shellUnlocked) {
-        list.innerHTML = '<div class="agents-empty">Unlock shells to view agent activity.</div>';
-        summary.textContent = 'locked';
-        return;
-    }
-    // Session-bound agents take their state from the live pane (reliable); others from agent-office.
-    const agentWaiting = (a) => (a.session ? !shellWorking(a.session) : a.status === 'waiting');
-    const running = latestAgents.filter((a) => !agentWaiting(a)).length;
-    const waiting = latestAgents.filter((a) => agentWaiting(a)).length;
-    summary.textContent = `${running} running · ${waiting} waiting`;
-    if (!latestAgents.length) {
-        list.innerHTML = '<div class="agents-empty">No agents detected.</div>';
-        return;
-    }
-    // session-bound first, then waiting before active within each group
-    const rank = (a) => (a.session ? 0 : 2) + (agentWaiting(a) ? 0 : 1);
-    const sorted = latestAgents.slice().sort((a, b) => rank(a) - rank(b));
-    const prevScroll = list.scrollTop;
-    list.innerHTML = sorted.map((agent) => {
-        const waitingState = agentWaiting(agent);
-        const tag = waitingState ? 'waiting' : 'active';
-        const name = agent.provider.charAt(0).toUpperCase() + agent.provider.slice(1);
-        return `<div class="agent-row ${tag}"><span class="dot ${waitingState ? 'wait' : 'on'}"></span><div class="agent-main"><b>${escapeHtml(name)}${agent.session ? ` · ${escapeHtml(agent.session)}` : ''}</b><small>${escapeHtml(agent.activity || tag)}</small></div><span class="agent-tag ${tag}">${waitingState ? 'waiting' : 'running'}</span></div>`;
-    }).join('');
-    list.scrollTop = prevScroll;
 }
 function renderShellImages(name) {
     const card = document.querySelector(`[data-shell-card="${selectorEscape(name)}"]`);

@@ -32,7 +32,6 @@ pub fn router(state: AppState) -> Router {
         .route("/api/unlock", post(api_unlock))
         .route("/api/summary", get(api_summary))
         .route("/api/shells", get(api_shells))
-        .route("/api/agents", get(api_agents))
         .route("/api/tickers", get(api_tickers))
         .route("/api/shells/stream", get(stream::api_shell_stream))
         .route("/api/term", get(term::term_ws))
@@ -171,7 +170,17 @@ async fn api_summary(State(state): State<AppState>, headers: HeaderMap, connect:
     if let Err(response) = require_unlock(&state, &headers) {
         return response;
     }
-    webutil::json_response(StatusCode::OK, &summary::get(state.config.clone(), state.client.clone()).await)
+    let fresh = summary::get(state.config.clone(), state.client.clone()).await;
+    // Cache the last real (non-local) summary; if this turn fell back to `local` (a bridge blip),
+    // serve the cached good one so per-shell titles stay meaningful.
+    if fresh.provider.starts_with("local") {
+        if let Some(cached) = state.summary_cache.lock().ok().and_then(|c| c.clone()) {
+            return webutil::json_response(StatusCode::OK, &cached);
+        }
+    } else if let Ok(mut cache) = state.summary_cache.lock() {
+        *cache = Some(fresh.clone());
+    }
+    webutil::json_response(StatusCode::OK, &fresh)
 }
 
 async fn api_shells(State(state): State<AppState>, headers: HeaderMap, connect: ConnectInfo<SocketAddr>, Query(query): Query<LinesQuery>) -> Response {
@@ -205,53 +214,6 @@ async fn api_tickers(State(state): State<AppState>, headers: HeaderMap, connect:
     });
     let tickers: Vec<serde_json::Value> = futures_util::future::join_all(fetches).await.into_iter().flatten().collect();
     webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": tickers }))
-}
-
-async fn api_agents(State(state): State<AppState>, headers: HeaderMap, connect: ConnectInfo<SocketAddr>) -> Response {
-    if let Some(response) = guard(&state, &headers, &connect) {
-        return response;
-    }
-    if let Err(response) = require_unlock(&state, &headers) {
-        return response;
-    }
-    let url = format!("{}/api/agents", state.config.agents_url.trim_end_matches('/'));
-    let mut payload = match state.client.get(&url).send().await {
-        Ok(resp) => resp.json::<serde_json::Value>().await.unwrap_or_else(|_| serde_json::json!({ "agents": [] })),
-        Err(error) => return webutil::json_response(StatusCode::OK, &serde_json::json!({ "agents": [], "error": error.to_string() })),
-    };
-    // Enrich each agent with the tmux session it runs in, matched by controlling tty.
-    let tty_session: std::collections::HashMap<String, String> = tmux::list_panes().await.into_iter().filter(|p| !p.tty.is_empty()).map(|p| (p.tty, p.session)).collect();
-    if let Some(agents) = payload.get_mut("agents").and_then(|v| v.as_array_mut()) {
-        for agent in agents.iter_mut() {
-            if let Some((tty, foreground)) = agent.get("pid").and_then(|v| v.as_u64()).and_then(agent_proc) {
-                if let Some(session) = tty_session.get(&tty) {
-                    agent["session"] = serde_json::json!(session);
-                    agent["foreground"] = serde_json::json!(foreground);
-                }
-            }
-        }
-    }
-    webutil::json_response(StatusCode::OK, &payload)
-}
-
-// From /proc/<pid>/stat: the controlling terminal ("/dev/pts/N") and whether the process is the
-// terminal's *foreground* group (pgrp == tpgid) — i.e. the agent you're actually interacting with.
-fn agent_proc(pid: u64) -> Option<(String, bool)> {
-    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    let rest = &stat[stat.rfind(')')? + 1..];
-    let fields: Vec<&str> = rest.split_whitespace().collect();
-    let pgrp: i64 = fields.get(2)?.parse().ok()?;
-    let tty_nr: i64 = fields.get(4)?.parse().ok()?;
-    let tpgid: i64 = fields.get(5)?.parse().ok()?;
-    if tty_nr == 0 {
-        return None;
-    }
-    let major = (tty_nr >> 8) & 0xfff;
-    let minor = (tty_nr & 0xff) | ((tty_nr >> 12) & 0xfff00);
-    if major != 136 {
-        return None;
-    }
-    Some((format!("/dev/pts/{minor}"), pgrp == tpgid))
 }
 
 async fn api_input(State(state): State<AppState>, headers: HeaderMap, connect: ConnectInfo<SocketAddr>, axum::Json(body): axum::Json<InputBody>) -> Response {

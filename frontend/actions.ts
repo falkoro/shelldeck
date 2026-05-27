@@ -217,20 +217,3 @@ function clearShellPreview(name: string): void {
   if (pre) pre.textContent = '';
 }
 
-async function loadAgents(): Promise<void> {
-  if (!shellUnlocked) {
-    latestAgents = [];
-    renderAgents();
-    return;
-  }
-  const response = await fetch('/api/agents', { cache: 'no-store', credentials: 'same-origin' });
-  if (!response.ok) {
-    latestAgents = [];
-    renderAgents();
-    return;
-  }
-  const payload = await response.json() as { agents?: Agent[] };
-  latestAgents = payload.agents || [];
-  renderAgents();
-  applyAgentBadges();
-}

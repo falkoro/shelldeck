@@ -11,12 +11,17 @@ mod webutil;
 
 use axum::Router;
 use config::Config;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
     pub client: reqwest::Client,
+    // last successful (non-local) work summary, served if the AI backend briefly fails
+    pub summary_cache: Arc<Mutex<Option<summary::WorkSummary>>>,
 }
 
 #[tokio::main]
@@ -30,6 +35,7 @@ async fn main() {
     let state = AppState {
         config: config.clone(),
         client,
+        summary_cache: Arc::new(Mutex::new(None)),
     };
     let app: Router = routes::router(state);
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)

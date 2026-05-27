@@ -30,18 +30,6 @@ interface ShellPreview {
   updatedAt?: string;
 }
 
-interface Agent {
-  id: number;
-  provider: string;
-  pid: number;
-  cwd: string;
-  label: string;
-  status: string; // "active" | "waiting"
-  activity: string;
-  session?: string; // tmux session this agent runs in (matched by tty)
-  foreground?: boolean; // is the terminal's foreground process group (the one you interact with)
-}
-
 interface ApiPayload {
   ok?: boolean;
   error?: string;
@@ -69,7 +57,6 @@ interface RenderOptions {
 const initialModel = JSON.parse(document.getElementById('initial-model')?.textContent || '{}') as DashboardModel;
 let currentModel: DashboardModel = initialModel;
 let latestShells: ShellPreview[] = [];
-let latestAgents: Agent[] = [];
 let latestSummaryText = '';
 let summaryLoading = false;
 
@@ -225,17 +212,6 @@ function noteShellActivity(name: string, output: string): void {
 function shellWorking(name: string): boolean {
   const a = shellActivity[name];
   return !!a && Date.now() - a.at < 3500;
-}
-
-// Per-session badge: a session that hosts an agent shows running while its pane says "esc to
-// interrupt", otherwise waiting (idle at its prompt).
-function sessionAgentStatus(): Record<string, 'active' | 'waiting'> {
-  const out: Record<string, 'active' | 'waiting'> = {};
-  for (const agent of latestAgents) {
-    if (!agent.session) continue;
-    out[agent.session] = shellWorking(agent.session) ? 'active' : 'waiting';
-  }
-  return out;
 }
 
 function targetReady(name: string): boolean {

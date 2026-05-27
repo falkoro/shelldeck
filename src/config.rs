@@ -35,7 +35,6 @@ pub struct Config {
     pub xai_model: String,
     pub xai_auth_file: PathBuf,
     pub xai_client_id: String,
-    pub agents_url: String,
     pub attach_template: String,
     pub quick_links: Vec<(String, String)>,
     pub tickers: Vec<String>,
@@ -91,7 +90,6 @@ impl Config {
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| PathBuf::from(format!("{home}/.local/share/opencode/auth.json"))),
             xai_client_id: env::var("XAI_CLIENT_ID").unwrap_or_else(|_| "b1a00492-073a-47ea-816f-4c329264a828".to_string()),
-            agents_url: env::var("DASHBOARD_AGENTS_URL").unwrap_or_else(|_| "http://127.0.0.1:4627".to_string()),
             attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE").unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
             quick_links: parse_links(&env::var("DASHBOARD_LINKS").unwrap_or_default()),
             tickers: split_env("DASHBOARD_TICKERS"),

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::process::Command;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct WorkSummary {
     pub provider: String,
     pub summary: String,

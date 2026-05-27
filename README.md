@@ -7,14 +7,13 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 ## Features
 
 - **Side-by-side shell previews** — live `tmux capture-pane` of each session, streamed over SSE (~1s), with TUI blank-line noise collapsed.
-- **Running / waiting badges** — detected from the live pane (an agent is "running" while it shows `esc to interrupt`, otherwise "waiting for input"). Reliable even when the agent's own status reporting lags.
+- **Running / waiting badges** — detected from the live pane: a session whose output keeps changing is "running", one that's gone quiet is "waiting for input". Works for any agent or program, with no dependence on a specific status phrase.
 - **Per-shell work titles** — an AI summary names *what each session is working on* (the running/waiting state is the badge's job).
-- **Agents panel** — optional, pulls a `/api/agents` feed and maps each agent to its tmux session by controlling tty.
 - **Real in-browser terminal** — "Shell in" opens an [xterm.js](https://xtermjs.org/) terminal bridged over a WebSocket to a PTY running `tmux attach`. Type, run, Ctrl-C — like actually being in the shell.
 - **Resume button** — when a pane prints a recovery command (e.g. `codex resume <id>`), a one-click button runs it.
 - **Send / Paste / keys** — send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, image paste, and command history.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
-- **Quick links** — configurable top-bar links (`DASHBOARD_LINKS`) to related services (Hermes, agents, etc.).
+- **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`).
 - **Locked down** — primary login + a second "unlock" password to gate shell control, optional IP allowlists, and first-class support for sitting behind **Cloudflare Access** (trusts the verified email).
 
 ## Requirements
@@ -34,7 +33,7 @@ cargo build --release
 
 ## Configure
 
-Copy `.env.example` and set at least `DASHBOARD_PASSWORD`. See that file for every option (login, IP allowlists, Cloudflare Access, the optional AI summary, and the agents feed).
+Copy `.env.example` and set at least `DASHBOARD_PASSWORD`. See that file for every option (login, IP allowlists, Cloudflare Access, the optional AI summary, quick links, and tickers).
 
 ## Run
 

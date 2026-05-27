@@ -2,7 +2,6 @@
 const initialModel = JSON.parse(document.getElementById('initial-model')?.textContent || '{}');
 let currentModel = initialModel;
 let latestShells = [];
-let latestAgents = [];
 let latestSummaryText = '';
 let summaryLoading = false;
 // Pull the one-liner for a given session out of the Current Work summary (lines like
@@ -145,17 +144,6 @@ function noteShellActivity(name, output) {
 function shellWorking(name) {
     const a = shellActivity[name];
     return !!a && Date.now() - a.at < 3500;
-}
-// Per-session badge: a session that hosts an agent shows running while its pane says "esc to
-// interrupt", otherwise waiting (idle at its prompt).
-function sessionAgentStatus() {
-    const out = {};
-    for (const agent of latestAgents) {
-        if (!agent.session)
-            continue;
-        out[agent.session] = shellWorking(agent.session) ? 'active' : 'waiting';
-    }
-    return out;
 }
 function targetReady(name) {
     const shell = shellPreviewByName(name);
