@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "preserve",
+    "moduleDetection": "legacy",
+    "lib": ["DOM", "ES2022"],
+    "rootDir": "frontend",
+    "outDir": "public",
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "removeComments": false,
+    "sourceMap": false
+  },
+  "include": ["frontend/**/*.ts"]
+}

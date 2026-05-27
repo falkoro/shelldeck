@@ -1,0 +1,7 @@
+/target
+/node_modules
+/uploads
+/.a5c
+.env
+*.env
+.DS_Store

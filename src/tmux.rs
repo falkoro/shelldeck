@@ -1,0 +1,240 @@
+use crate::config::Config;
+use serde::Serialize;
+use std::{collections::HashMap, path::PathBuf, process::Stdio, sync::Arc};
+use tokio::{io::AsyncWriteExt, process::Command};
+
+#[derive(Clone, Serialize)]
+pub struct SessionView {
+    pub name: String,
+    pub label: String,
+    pub family: String,
+    pub alias: String,
+    pub badge: String,
+    pub command: String,
+    pub running: bool,
+    pub windows: u32,
+    pub attached: u32,
+    pub created: Option<u64>,
+    pub activity: Option<u64>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct ShellPreview {
+    pub name: String,
+    pub label: String,
+    pub running: bool,
+    pub cwd: String,
+    pub command: String,
+    pub output: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Serialize)]
+pub struct SessionModel {
+    pub hostname: String,
+    pub user: String,
+    pub now: String,
+    pub sessions: Vec<SessionView>,
+    pub unlocked: bool,
+}
+
+#[derive(Clone)]
+struct LiveSession {
+    name: String,
+    windows: u32,
+    attached: u32,
+    created: u64,
+    activity: u64,
+}
+
+#[derive(Clone)]
+pub struct Pane {
+    pub session: String,
+    pub window: String,
+    pub index: String,
+    pub cwd: String,
+    pub command: String,
+    pub tty: String,
+}
+
+async fn tmux_output(args: &[&str]) -> Result<String, String> {
+    let output = Command::new("/usr/bin/tmux").args(args).output().await.map_err(|e| e.to_string())?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+async fn list_tmux_sessions() -> Vec<LiveSession> {
+    let Ok(stdout) = tmux_output(&["list-sessions", "-F", "#{session_name}|#{session_windows}|#{session_attached}|#{session_created}|#{session_activity}"]).await else {
+        return Vec::new();
+    };
+    stdout.lines().filter_map(|line| {
+        let parts: Vec<&str> = line.split('|').collect();
+        Some(LiveSession {
+            name: parts.get(0)?.to_string(),
+            windows: parts.get(1)?.parse().ok()?,
+            attached: parts.get(2)?.parse().ok()?,
+            created: parts.get(3)?.parse().ok()?,
+            activity: parts.get(4)?.parse().ok()?,
+        })
+    }).collect()
+}
+
+pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel {
+    let live = list_tmux_sessions().await;
+    let live_by_name: HashMap<String, LiveSession> = live.iter().cloned().map(|s| (s.name.clone(), s)).collect();
+    let mut sessions = Vec::new();
+    for spec in &config.known_sessions {
+        let found = live_by_name.get(spec.name);
+        sessions.push(SessionView {
+            name: spec.name.to_string(),
+            label: spec.label.to_string(),
+            family: spec.family.to_string(),
+            alias: spec.alias.to_string(),
+            badge: spec.badge.to_string(),
+            command: config.attach_template.replace("{name}", spec.name),
+            running: found.is_some(),
+            windows: found.map(|s| s.windows).unwrap_or(0),
+            attached: found.map(|s| s.attached).unwrap_or(0),
+            created: found.map(|s| s.created),
+            activity: found.map(|s| s.activity),
+        });
+    }
+    for item in live {
+        if config.known_sessions.iter().any(|s| s.name == item.name) {
+            continue;
+        }
+        sessions.push(SessionView {
+            command: config.attach_template.replace("{name}", &item.name),
+            label: item.name.clone(),
+            name: item.name,
+            family: "custom".to_string(),
+            alias: "custom".to_string(),
+            badge: "*".to_string(),
+            running: true,
+            windows: item.windows,
+            attached: item.attached,
+            created: Some(item.created),
+            activity: Some(item.activity),
+        });
+    }
+    SessionModel { hostname: hostname(), user: whoami(), now: iso_now(), sessions, unlocked }
+}
+
+pub async fn session_names() -> Vec<String> {
+    list_tmux_sessions().await.into_iter().map(|s| s.name).collect()
+}
+
+pub async fn list_panes() -> Vec<Pane> {
+    let Ok(stdout) = tmux_output(&["list-panes", "-a", "-F", "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_path}|#{pane_current_command}|#{pane_pid}|#{pane_tty}"]).await else {
+        return Vec::new();
+    };
+    stdout.lines().filter_map(|line| {
+        let parts: Vec<&str> = line.split('|').collect();
+        Some(Pane {
+            session: parts.get(0)?.to_string(),
+            window: parts.get(1)?.to_string(),
+            index: parts.get(2)?.to_string(),
+            cwd: parts.get(3).unwrap_or(&"").to_string(),
+            command: parts.get(4).unwrap_or(&"").to_string(),
+            tty: parts.get(6).unwrap_or(&"").to_string(),
+        })
+    }).collect()
+}
+
+pub async fn capture_pane(pane: &Pane, lines: u32) -> String {
+    let target = format!("{}:{}.{}", pane.session, pane.window, pane.index);
+    tmux_output(&["capture-pane", "-pt", &target, "-S", &format!("-{lines}")]).await.unwrap_or_default().trim_end().to_string()
+}
+
+pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Value {
+    let panes = list_panes().await;
+    let by_session: HashMap<String, Pane> = panes.into_iter().map(|p| (p.session.clone(), p)).collect();
+    let mut shells = Vec::new();
+    for spec in &config.known_sessions {
+        if let Some(pane) = by_session.get(spec.name) {
+            let cwd = pane.cwd.replace(&home_dir().to_string_lossy().to_string(), "~");
+            shells.push(ShellPreview { name: spec.name.to_string(), label: spec.label.to_string(), running: true, cwd, command: pane.command.clone(), output: tidy_output(&capture_pane(pane, clean_lines(lines)).await), updated_at: iso_now() });
+        } else {
+            shells.push(ShellPreview { name: spec.name.to_string(), label: spec.label.to_string(), running: false, cwd: String::new(), command: String::new(), output: String::new(), updated_at: iso_now() });
+        }
+    }
+    serde_json::json!({ "shells": shells, "now": iso_now() })
+}
+
+pub fn clean_lines(lines: u32) -> u32 {
+    match lines { 80 | 200 | 500 => lines, _ => 80 }
+}
+
+// Full-screen TUIs (Claude Code, Codex) capture as huge runs of blank lines. Collapse runs of
+// blanks to one and trim the edges so the preview shows actual content instead of empty space.
+fn tidy_output(raw: &str) -> String {
+    let mut out: Vec<&str> = Vec::new();
+    let mut blank = false;
+    for line in raw.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.is_empty() {
+            if !blank { out.push(""); }
+            blank = true;
+        } else {
+            out.push(trimmed);
+            blank = false;
+        }
+    }
+    while out.first() == Some(&"") { out.remove(0); }
+    while out.last() == Some(&"") { out.pop(); }
+    out.join("\n")
+}
+
+pub async fn start_session(config: Arc<Config>, name: &str) -> Result<String, String> {
+    let spec = config.known_sessions.iter().find(|s| s.name == name).ok_or("Unknown session")?;
+    if Command::new("/usr/bin/tmux").args(["has-session", "-t", name]).status().await.map(|s| s.success()).unwrap_or(false) {
+        return Ok(format!("{name} is already running"));
+    }
+    tmux_output(&["new-session", "-d", "-s", name, spec.start]).await?;
+    Ok(format!("{name} started"))
+}
+
+pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, String> {
+    let spec = config.known_sessions.iter().find(|s| s.name == name).ok_or("Unknown session")?;
+    let _ = Command::new("/usr/bin/tmux").args(["kill-session", "-t", name]).status().await;
+    tmux_output(&["new-session", "-d", "-s", name, spec.start]).await?;
+    Ok(format!("{name} restarted in ~"))
+}
+
+pub async fn paste_text(config: Arc<Config>, name: &str, text: &str, submit: bool) -> Result<String, String> {
+    if text.is_empty() || text.len() > config.max_input_chars {
+        return Err(format!("Input must be 1-{} characters", config.max_input_chars));
+    }
+    let sessions = list_tmux_sessions().await;
+    if !sessions.iter().any(|s| s.name == name) {
+        return Err(format!("{name} is not running"));
+    }
+    let buffer = format!("codex-dashboard-{}", chronoish());
+    let mut child = Command::new("/usr/bin/tmux").args(["load-buffer", "-b", &buffer, "-"]).stdin(Stdio::piped()).spawn().map_err(|e| e.to_string())?;
+    child.stdin.take().unwrap().write_all(text.as_bytes()).await.map_err(|e| e.to_string())?;
+    if !child.wait().await.map_err(|e| e.to_string())?.success() {
+        return Err("Could not load tmux buffer".to_string());
+    }
+    tmux_output(&["paste-buffer", "-b", &buffer, "-t", name]).await?;
+    if submit {
+        tmux_output(&["send-keys", "-t", name, "Enter"]).await?;
+    }
+    let _ = tmux_output(&["delete-buffer", "-b", &buffer]).await;
+    Ok(if submit { format!("Sent input to {name}") } else { format!("Pasted input into {name}") })
+}
+
+pub async fn send_key(name: &str, key: &str) -> Result<String, String> {
+    let (tmux_key, label) = match key { "enter" => ("Enter", "Enter"), "interrupt" => ("C-c", "Ctrl-C"), "clear" => ("C-l", "clear screen"), "escape" => ("Escape", "Escape"), _ => return Err("Unsupported key".to_string()) };
+    tmux_output(&["send-keys", "-t", name, tmux_key]).await?;
+    Ok(format!("Sent {label} to {name}"))
+}
+
+fn hostname() -> String { std::fs::read_to_string("/etc/hostname").unwrap_or_else(|_| "localhost".to_string()).trim().to_string() }
+fn whoami() -> String { std::env::var("USER").unwrap_or_else(|_| "falk".to_string()) }
+fn home_dir() -> PathBuf { std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/home/falk")) }
+fn iso_now() -> String { chrono::Utc::now().to_rfc3339() }
+fn chronoish() -> String { format!("{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()) }

@@ -1,0 +1,21 @@
+[package]
+name = "shelldeck"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8", features = ["ws"] }
+async-stream = "0.3"
+portable-pty = "0.8"
+futures-util = "0.3"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+hmac = "0.12"
+rand = "0.8"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["fs", "macros", "net", "process", "rt-multi-thread", "time"] }
+urlencoding = "2"
