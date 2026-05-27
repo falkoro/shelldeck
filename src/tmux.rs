@@ -217,8 +217,15 @@ pub async fn paste_text(config: Arc<Config>, name: &str, text: &str, submit: boo
     if !child.wait().await.map_err(|e| e.to_string())?.success() {
         return Err("Could not load tmux buffer".to_string());
     }
-    tmux_output(&["paste-buffer", "-b", &buffer, "-t", name]).await?;
+    // `-p` = bracketed paste: the TUI sees one paste event (so embedded newlines don't submit
+    // early) and knows to batch it, instead of treating the bytes as live keystrokes.
+    tmux_output(&["paste-buffer", "-p", "-b", &buffer, "-t", name]).await?;
     if submit {
+        // Let the agent TUI's event loop ingest the paste before the Enter, or the submit can race
+        // ahead of the not-yet-rendered input and get dropped (intermittent "it didn't send").
+        if config.submit_delay_ms > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(config.submit_delay_ms)).await;
+        }
         tmux_output(&["send-keys", "-t", name, "Enter"]).await?;
     }
     let _ = tmux_output(&["delete-buffer", "-b", &buffer]).await;

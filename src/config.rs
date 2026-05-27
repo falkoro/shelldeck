@@ -28,6 +28,7 @@ pub struct Config {
     pub upload_dir: PathBuf,
     pub max_image_bytes: usize,
     pub max_input_chars: usize,
+    pub submit_delay_ms: u64,
     pub summary_command: String,
     pub xai_api_key: String,
     pub xai_base_url: String,
@@ -81,6 +82,9 @@ impl Config {
             upload_dir: env::var("DASHBOARD_UPLOAD_DIR").map(PathBuf::from).unwrap_or_else(|_| root_dir.join("uploads")),
             max_image_bytes: env::var("DASHBOARD_MAX_IMAGE_BYTES").ok().and_then(|v| v.parse().ok()).unwrap_or(8 * 1024 * 1024),
             max_input_chars: env::var("DASHBOARD_MAX_INPUT_CHARS").ok().and_then(|v| v.parse().ok()).unwrap_or(20_000),
+            // Pause between pasting input and pressing Enter, so agent TUIs (Claude Code, Codex)
+            // finish ingesting the paste before the submit lands. Tune up if sends still get dropped.
+            submit_delay_ms: env::var("DASHBOARD_SUBMIT_DELAY_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(200),
             summary_command: env::var("DASHBOARD_SUMMARY_COMMAND").unwrap_or_default(),
             xai_api_key: env::var("XAI_API_KEY").or_else(|_| env::var("GROK_API_KEY")).unwrap_or_default(),
             xai_base_url: env::var("XAI_BASE_URL").unwrap_or_else(|_| "https://api.x.ai/v1".to_string()),
