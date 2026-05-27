@@ -218,6 +218,22 @@ function buildLegend() {
     details.innerHTML = `<summary>Button legend</summary><div class="legend-grid">${rows}${status}</div>`;
     tabs.insertAdjacentElement('afterend', details);
 }
+function renderTickers(list) {
+    const bar = document.getElementById('tickerBar');
+    if (!bar)
+        return;
+    if (!list.length) {
+        bar.innerHTML = '';
+        bar.hidden = true;
+        return;
+    }
+    bar.hidden = false;
+    bar.innerHTML = list.map((t) => {
+        const up = t.changePct >= 0;
+        const price = t.price >= 1000 ? Math.round(t.price).toLocaleString() : t.price.toFixed(2);
+        return `<span class="tick ${up ? 'up' : 'down'}"><b>${escapeHtml(t.symbol)}</b> ${price} <i>${up ? '▲' : '▼'}${Math.abs(t.changePct).toFixed(2)}%</i></span>`;
+    }).join('');
+}
 function renderAgents() {
     const list = document.getElementById('agentsList');
     const summary = document.getElementById('agentsSummary');

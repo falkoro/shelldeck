@@ -1,5 +1,13 @@
 let shellStream: EventSource | null = null;
 
+async function loadTickers(): Promise<void> {
+  if (!document.getElementById('tickerBar')) return;
+  const response = await fetch('/api/tickers', { cache: 'no-store', credentials: 'same-origin' });
+  if (!response.ok) return;
+  const payload = await response.json() as { tickers?: Ticker[] };
+  renderTickers(payload.tickers || []);
+}
+
 async function sessionAction(endpoint: string, name: string): Promise<void> {
   if (!shellUnlocked) throw new Error('Unlock shells first');
   const payload = await postJson(endpoint, { name });

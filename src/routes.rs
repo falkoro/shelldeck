@@ -33,6 +33,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/summary", get(api_summary))
         .route("/api/shells", get(api_shells))
         .route("/api/agents", get(api_agents))
+        .route("/api/tickers", get(api_tickers))
         .route("/api/shells/stream", get(stream::api_shell_stream))
         .route("/api/term", get(term::term_ws))
         .route("/api/input", post(api_input))
@@ -181,6 +182,29 @@ async fn api_shells(State(state): State<AppState>, headers: HeaderMap, connect: 
         return response;
     }
     webutil::json_response(StatusCode::OK, &tmux::shell_previews(state.config.clone(), query.lines.unwrap_or(80)).await)
+}
+
+// Live quotes for DASHBOARD_TICKERS via Yahoo's public chart endpoint (login-gated, not unlock —
+// market data isn't sensitive). Each symbol is fetched concurrently; failures are dropped.
+async fn api_tickers(State(state): State<AppState>, headers: HeaderMap, connect: ConnectInfo<SocketAddr>) -> Response {
+    if !allowed(&state, &headers, &connect) || !signed_in(&state, &headers, &connect) {
+        return webutil::json_response(StatusCode::FORBIDDEN, &serde_json::json!({ "error": "Forbidden" }));
+    }
+    let fetches = state.config.tickers.iter().take(16).cloned().map(|sym| {
+        let client = state.client.clone();
+        async move {
+            let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d", urlencoding::encode(&sym));
+            let resp = client.get(&url).header("User-Agent", "Mozilla/5.0").send().await.ok()?;
+            let body = resp.json::<serde_json::Value>().await.ok()?;
+            let meta = &body["chart"]["result"][0]["meta"];
+            let price = meta["regularMarketPrice"].as_f64()?;
+            let prev = meta["chartPreviousClose"].as_f64().or_else(|| meta["previousClose"].as_f64()).unwrap_or(price);
+            let pct = if prev != 0.0 { (price - prev) / prev * 100.0 } else { 0.0 };
+            Some(serde_json::json!({ "symbol": sym, "price": price, "changePct": pct, "currency": meta["currency"].as_str().unwrap_or("") }))
+        }
+    });
+    let tickers: Vec<serde_json::Value> = futures_util::future::join_all(fetches).await.into_iter().flatten().collect();
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": tickers }))
 }
 
 async fn api_agents(State(state): State<AppState>, headers: HeaderMap, connect: ConnectInfo<SocketAddr>) -> Response {

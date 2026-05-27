@@ -1,5 +1,14 @@
 "use strict";
 let shellStream = null;
+async function loadTickers() {
+    if (!document.getElementById('tickerBar'))
+        return;
+    const response = await fetch('/api/tickers', { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok)
+        return;
+    const payload = await response.json();
+    renderTickers(payload.tickers || []);
+}
 async function sessionAction(endpoint, name) {
     if (!shellUnlocked)
         throw new Error('Unlock shells first');
