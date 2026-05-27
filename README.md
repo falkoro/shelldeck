@@ -14,6 +14,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Resume button** — when a pane prints a recovery command (e.g. `codex resume <id>`), a one-click button runs it.
 - **Send / Paste / keys** — send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, image paste, and command history.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
+- **Quick links** — configurable top-bar links (`DASHBOARD_LINKS`) to related services (Hermes, agents, etc.).
 - **Locked down** — primary login + a second "unlock" password to gate shell control, optional IP allowlists, and first-class support for sitting behind **Cloudflare Access** (trusts the verified email).
 
 ## Requirements

@@ -37,6 +37,7 @@ pub struct Config {
     pub xai_client_id: String,
     pub agents_url: String,
     pub attach_template: String,
+    pub quick_links: Vec<(String, String)>,
     pub known_sessions: Vec<KnownSession>,
     pub image_types: HashMap<String, &'static str>,
 }
@@ -91,6 +92,7 @@ impl Config {
             xai_client_id: env::var("XAI_CLIENT_ID").unwrap_or_else(|_| "b1a00492-073a-47ea-816f-4c329264a828".to_string()),
             agents_url: env::var("DASHBOARD_AGENTS_URL").unwrap_or_else(|_| "http://127.0.0.1:4627".to_string()),
             attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE").unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
+            quick_links: parse_links(&env::var("DASHBOARD_LINKS").unwrap_or_default()),
             known_sessions: known_sessions(),
             image_types: image_types(),
         }
@@ -99,6 +101,17 @@ impl Config {
 
 fn split_env(key: &str) -> Vec<String> {
     env::var(key).unwrap_or_default().split(',').map(str::trim).filter(|v| !v.is_empty()).map(str::to_string).collect()
+}
+
+// Parse DASHBOARD_LINKS into (label, url) quick links. Format: "Label|https://url;Label|https://url".
+fn parse_links(raw: &str) -> Vec<(String, String)> {
+    raw.split(';')
+        .filter_map(|item| {
+            let (label, url) = item.trim().split_once('|')?;
+            let (label, url) = (label.trim(), url.trim());
+            (!label.is_empty() && !url.is_empty()).then(|| (label.to_string(), url.to_string()))
+        })
+        .collect()
 }
 
 fn known_sessions() -> Vec<KnownSession> {

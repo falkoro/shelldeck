@@ -105,7 +105,7 @@ async fn root(State(state): State<AppState>, headers: HeaderMap, connect: Connec
         return response;
     }
     let model = tmux::session_model(state.config.clone(), auth::unlocked(&state.config, &headers)).await;
-    webutil::html_response(StatusCode::OK, pages::dashboard(&model))
+    webutil::html_response(StatusCode::OK, pages::dashboard(&model, &state.config))
 }
 
 async fn manifest() -> Response { webutil::json_response(StatusCode::OK, &pages::manifest()) }
