@@ -193,9 +193,7 @@ buildLegend();
 maybeShowOnboarding();
 queueMicrotask(() => loadSummary().catch(() => { }));
 queueMicrotask(() => loadShells().then(startShellStream).catch((error) => toast(error.message)));
-queueMicrotask(() => loadAgents().catch(() => { }));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => { }), 30000);
-setInterval(() => loadAgents().catch(() => { }), 6000);
 setInterval(() => loadSummary().catch(() => { }), 60000);
 // Live tickers (if any configured)
 queueMicrotask(() => loadTickers().catch(() => { }));

@@ -132,12 +132,19 @@ function focusComposer(name) {
 function shellPreviewByName(name) {
     return latestShells.find((shell) => shell.name === name) || null;
 }
-// Is the agent in this shell actively working? Claude Code and Codex both render "esc to interrupt"
-// only while a turn is running, so the live pane is a far more reliable signal than agent-office's
-// status field (which gets stuck on "working" when a tool's completion event is missed).
-function shellWorking(session) {
-    const shell = latestShells.find((s) => s.name === session);
-    return !!shell && /esc to interrupt/i.test(shell.output);
+// "Running" = the pane is actively changing. Claude Code / Codex animate a spinner with a
+// per-second elapsed timer while a turn runs, so consecutive captures differ; an idle prompt is
+// static. This beats scanning for "esc to interrupt", which also matched the visible conversation
+// (false running) and missed turns whose captured frame lacked the exact phrase (false waiting).
+const shellActivity = {};
+function noteShellActivity(name, output) {
+    const prev = shellActivity[name];
+    if (!prev || prev.out !== output)
+        shellActivity[name] = { out: output, at: Date.now() };
+}
+function shellWorking(name) {
+    const a = shellActivity[name];
+    return !!a && Date.now() - a.at < 3500;
 }
 // Per-session badge: a session that hosts an agent shows running while its pane says "esc to
 // interrupt", otherwise waiting (idle at its prompt).

@@ -123,7 +123,9 @@ async function loadSummary(): Promise<void> {
     const response = await fetch('/api/summary', { cache: 'no-store', credentials: 'same-origin' });
     const payload = await response.json() as ApiPayload;
     if (!response.ok) throw new Error(payload.error || 'Summary failed');
-    latestSummaryText = payload.summary || '';
+    // Ignore the transient `local` fallback (bridge blip) so good titles aren't overwritten with
+    // the bare "command · cwd" local format; keep the last real summary instead.
+    if (!String(payload.provider || '').startsWith('local')) latestSummaryText = payload.summary || '';
   } finally {
     summaryLoading = false;
     applyWorkTitles();
@@ -144,7 +146,7 @@ async function unlockShells(password: string): Promise<void> {
   startShellStream();
   (document.getElementById('currentWork') || q('#shellSection')).scrollIntoView({ block: 'start', behavior: 'smooth' });
   toast(payload.message || 'Unlocked');
-  await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary(), loadAgents()]);
+  await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);
 }
 
 async function loadShells(showLoading = true): Promise<void> {

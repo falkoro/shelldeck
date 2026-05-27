@@ -50,6 +50,7 @@ function updateShellCard(card, shell) {
     setText(card, '[data-role="command"]', `${shell.name} / ${shell.command || 'offline'}`);
     setText(card, '[data-role="cwd"]', shell.cwd || '');
     card.querySelector('[data-role="dot"]').className = `dot ${shell.running ? 'on' : ''}`;
+    noteShellActivity(shell.name, shell.output);
     setShellAgentBadge(card, shell.name);
     setWorkTitle(card, shell.name);
     // Surface a one-click recovery when an agent has exited and printed a resume command
@@ -155,13 +156,14 @@ function renderShellTabs() {
     markSelectedShell();
 }
 function setShellAgentBadge(card, name) {
-    const status = sessionAgentStatus()[name];
+    const shell = latestShells.find((s) => s.name === name);
+    const status = shell && shell.running ? (shellWorking(name) ? 'active' : 'waiting') : '';
     const badge = card.querySelector('[data-role="agent"]');
     if (badge) {
         // visibility is class-driven (CSP forbids inline styles): .agent-badge is display:none
         // by default and shown only when an .active/.waiting status class is present.
         badge.className = `agent-badge${status ? ` ${status}` : ''}`;
-        badge.textContent = status === 'waiting' ? 'waiting' : status === 'active' ? 'running' : '';
+        badge.textContent = status === 'active' ? 'running' : status === 'waiting' ? 'waiting' : '';
     }
     card.classList.toggle('agent-waiting', status === 'waiting');
 }

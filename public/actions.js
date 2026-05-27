@@ -128,7 +128,10 @@ async function loadSummary() {
         const payload = await response.json();
         if (!response.ok)
             throw new Error(payload.error || 'Summary failed');
-        latestSummaryText = payload.summary || '';
+        // Ignore the transient `local` fallback (bridge blip) so good titles aren't overwritten with
+        // the bare "command · cwd" local format; keep the last real summary instead.
+        if (!String(payload.provider || '').startsWith('local'))
+            latestSummaryText = payload.summary || '';
     }
     finally {
         summaryLoading = false;
@@ -151,7 +154,7 @@ async function unlockShells(password) {
     startShellStream();
     (document.getElementById('currentWork') || q('#shellSection')).scrollIntoView({ block: 'start', behavior: 'smooth' });
     toast(payload.message || 'Unlocked');
-    await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary(), loadAgents()]);
+    await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);
 }
 async function loadShells(showLoading = true) {
     const grid = q('#shells');
