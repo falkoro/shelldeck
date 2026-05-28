@@ -44,8 +44,11 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("bind dashboard listener");
-    println!("codex session dashboard listening on http://{}", addr);
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .expect("serve dashboard");
+    println!("ShellDeck listening on http://{}", addr);
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("serve dashboard");
 }

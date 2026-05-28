@@ -1,15 +1,258 @@
-// Live in-browser terminal: opens a modal with an xterm.js terminal bridged over a WebSocket to a
-// PTY that runs `tmux attach -t <name>`, so it behaves like a real shell (agent TUI and all).
+// Live in-browser terminals as floating, draggable, resizable windows (multiple supported).
+// Minimize sends them to a dock at bottom-right. Maximize + reset size/pos also supported.
+// "Shell in" from any session opens or focuses its window.
 declare const Terminal: any;
 declare const FitAddon: any;
 
-let activeTerm: { dispose: () => void } | null = null;
+interface TermWindow {
+  name: string;
+  el: HTMLDivElement;
+  host: HTMLElement;
+  statusEl: HTMLElement;
+  term: any;
+  fitAddon: any;
+  ws: WebSocket | null;
+  ro: ResizeObserver | null;
+  fitTimer: number;
+  lastCols: number;
+  lastRows: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minimized: boolean;
+  maximized: boolean;
+  preMax: { x: number; y: number; w: number; h: number } | null;
+}
 
-function closeTerminal(): void {
-  if (activeTerm) {
-    activeTerm.dispose();
-    activeTerm = null;
-  }
+const termWindows = new Map<string, TermWindow>();
+let dockEl: HTMLDivElement | null = null;
+let nextZ = 75;
+let cascade = 0;
+
+const DEFAULT_W = 880;
+const DEFAULT_H = 540;
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function ensureDock(): HTMLDivElement {
+  if (dockEl) return dockEl;
+  dockEl = document.createElement('div');
+  dockEl.id = 'term-dock';
+  document.body.appendChild(dockEl);
+  return dockEl;
+}
+
+function renderDock(): void {
+  const dock = ensureDock();
+  dock.innerHTML = '';
+  let any = false;
+  termWindows.forEach((tw) => {
+    if (!tw.minimized) return;
+    any = true;
+    const item = document.createElement('div');
+    item.className = 'term-min-item';
+    item.innerHTML = `<span class="tm-name">${escapeHtml(tw.name)}</span><button type="button" class="tm-btn" data-act="restore" title="Restore window">▴</button><button type="button" class="tm-btn tm-close" data-act="close" title="Close">×</button>`;
+    item.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
+      const act = btn.dataset.act!;
+      btn.addEventListener('click', (e) => { e.stopPropagation(); if (act === 'restore') restoreWindow(tw); else closeWindow(tw); });
+    });
+    item.addEventListener('click', () => restoreWindow(tw));
+    dock.appendChild(item);
+  });
+  dock.style.display = any ? 'flex' : 'none';
+}
+
+function bringToFront(tw: TermWindow): void {
+  tw.el.style.zIndex = String(++nextZ);
+}
+
+function applyGeometry(tw: TermWindow): void {
+  tw.el.style.left = `${tw.x}px`;
+  tw.el.style.top = `${tw.y}px`;
+  tw.el.style.width = `${tw.w}px`;
+  tw.el.style.height = `${tw.h}px`;
+}
+
+function posKey(name: string): string { return 'sdTerm:' + name; }
+
+function savePos(tw: TermWindow): void {
+  try { localStorage.setItem(posKey(tw.name), JSON.stringify({ x: tw.x, y: tw.y, w: tw.w, h: tw.h })); } catch {}
+}
+
+function loadSavedPos(name: string): { x: number; y: number; w: number; h: number } | null {
+  try {
+    const raw = localStorage.getItem(posKey(name));
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (typeof p.x === 'number' && typeof p.w === 'number') return p;
+  } catch {}
+  return null;
+}
+
+function doFit(tw: TermWindow): void {
+  if (!tw.fitAddon || !tw.term) return;
+  window.clearTimeout(tw.fitTimer);
+  tw.fitTimer = window.setTimeout(() => {
+    try {
+      tw.fitAddon.fit();
+      const cols = tw.term.cols, rows = tw.term.rows;
+      if (tw.ws && tw.ws.readyState === WebSocket.OPEN && (cols !== tw.lastCols || rows !== tw.lastRows)) {
+        tw.lastCols = cols;
+        tw.lastRows = rows;
+        tw.ws.send(JSON.stringify({ cols, rows }));
+      }
+    } catch { /* transient */ }
+  }, 140);
+}
+
+function makeDraggable(tw: TermWindow, bar: HTMLElement): void {
+  bar.addEventListener('mousedown', (ev: MouseEvent) => {
+    if ((ev.target as HTMLElement).closest('button')) return;
+    bringToFront(tw);
+    const startX = ev.clientX, startY = ev.clientY;
+    const origX = tw.x, origY = tw.y;
+    const move = (e: MouseEvent) => {
+      tw.x = clamp(origX + (e.clientX - startX), 4, window.innerWidth - 220);
+      tw.y = clamp(origY + (e.clientY - startY), 4, window.innerHeight - 140);
+      tw.el.style.left = tw.x + 'px';
+      tw.el.style.top = tw.y + 'px';
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      savePos(tw);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up, { once: true });
+  });
+}
+
+function makeResizable(tw: TermWindow, handle: HTMLElement): void {
+  handle.addEventListener('mousedown', (ev: MouseEvent) => {
+    ev.stopPropagation();
+    bringToFront(tw);
+    const startX = ev.clientX, startY = ev.clientY;
+    const origW = tw.w, origH = tw.h;
+    const move = (e: MouseEvent) => {
+      tw.w = clamp(origW + (e.clientX - startX), 520, Math.min(1600, window.innerWidth - 40));
+      tw.h = clamp(origH + (e.clientY - startY), 320, Math.min(1100, window.innerHeight - 60));
+      applyGeometry(tw);
+      doFit(tw);
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      savePos(tw);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up, { once: true });
+  });
+}
+
+function createTermWindow(name: string): TermWindow {
+  const saved = loadSavedPos(name);
+  const off = (cascade++ % 5) * 28;
+  const baseX = saved?.x ?? (96 + off);
+  const baseY = saved?.y ?? (72 + Math.floor(off / 2));
+  const baseW = saved?.w ?? DEFAULT_W;
+  const baseH = saved?.h ?? DEFAULT_H;
+
+  const el = document.createElement('div');
+  el.className = 'term-window';
+  el.style.left = baseX + 'px';
+  el.style.top = baseY + 'px';
+  el.style.width = baseW + 'px';
+  el.style.height = baseH + 'px';
+
+  el.innerHTML = `
+    <div class="term-titlebar">
+      <span class="term-title">${escapeHtml(name)} · live terminal</span>
+      <span class="term-status" data-role="tstatus">connecting…</span>
+      <div class="term-controls">
+        <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position">↺</button>
+        <button type="button" class="term-btn" data-act="min" title="Minimize to dock">−</button>
+        <button type="button" class="term-btn" data-act="max" title="Maximize / restore">□</button>
+        <button type="button" class="term-btn term-close" data-act="close" title="Close terminal">×</button>
+      </div>
+    </div>
+    <div class="term-host" data-host></div>
+  `;
+
+  const host = el.querySelector<HTMLElement>('[data-host]')!;
+  const status = el.querySelector<HTMLElement>('[data-role="tstatus"]')!;
+  const bar = el.querySelector<HTMLElement>('.term-titlebar')!;
+  const controls = el.querySelector<HTMLElement>('.term-controls')!;
+
+  document.body.appendChild(el);
+
+  const term = new Terminal({
+    fontSize: 13,
+    fontFamily: '"Cascadia Mono","JetBrains Mono",Consolas,monospace',
+    cursorBlink: true,
+    scrollback: 6000,
+    theme: { background: '#03070b', foreground: '#c9fff3' },
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(host);
+  fit.fit();
+
+  const tw: TermWindow = {
+    name, el, host, statusEl: status, term, fitAddon: fit,
+    ws: null, ro: null, fitTimer: 0, lastCols: 0, lastRows: 0,
+    x: baseX, y: baseY, w: baseW, h: baseH,
+    minimized: false, maximized: false, preMax: null,
+  };
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/api/term?name=${encodeURIComponent(name)}&cols=${term.cols}&rows=${term.rows}`);
+  ws.binaryType = 'arraybuffer';
+  const enc = new TextEncoder();
+  tw.ws = ws;
+
+  ws.onopen = () => { status.textContent = 'connected'; term.focus(); };
+  ws.onclose = () => { status.textContent = 'disconnected'; };
+  ws.onerror = () => { status.textContent = 'conn error'; };
+  ws.onmessage = (ev: MessageEvent) => {
+    if (typeof ev.data === 'string') term.write(ev.data);
+    else term.write(new Uint8Array(ev.data as ArrayBuffer));
+  };
+  term.onData((d: string) => { if (ws.readyState === WebSocket.OPEN) ws.send(enc.encode(d)); });
+
+  const ro = new ResizeObserver(() => doFit(tw));
+  ro.observe(host);
+  tw.ro = ro;
+
+  // controls
+  controls.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
+    const act = btn.dataset.act!;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (act === 'min') minimizeWindow(tw);
+      else if (act === 'max') toggleMaximize(tw);
+      else if (act === 'reset') resetWindow(tw);
+      else if (act === 'close') closeWindow(tw);
+    });
+  });
+
+  // interactions
+  el.addEventListener('mousedown', () => bringToFront(tw));
+  bar.addEventListener('dblclick', (e) => { if (!(e.target as HTMLElement).closest('button')) toggleMaximize(tw); });
+
+  makeDraggable(tw, bar);
+  const handle = document.createElement('div');
+  handle.className = 'term-resize-handle';
+  el.appendChild(handle);
+  makeResizable(tw, handle);
+
+  termWindows.set(name, tw);
+  bringToFront(tw);
+  setTimeout(() => doFit(tw), 70);
+
+  return tw;
 }
 
 function openTerminal(name: string): void {
@@ -18,74 +261,96 @@ function openTerminal(name: string): void {
     toast('Terminal failed to load');
     return;
   }
-  closeTerminal();
+  const existing = termWindows.get(name);
+  if (existing) {
+    if (existing.minimized) restoreWindow(existing);
+    bringToFront(existing);
+    existing.term?.focus?.();
+    return;
+  }
+  createTermWindow(name);
+}
 
-  const overlay = document.createElement('div');
-  overlay.className = 'term-modal';
-  overlay.innerHTML = `<div class="term-box"><div class="term-bar"><b>${escapeHtml(name)} · live terminal</b><span class="term-status" data-role="tstatus">connecting…</span><button type="button" class="term-close">${icon('eyeoff')}<span>Close</span></button></div><div class="term-host" data-role="thost"></div></div>`;
-  document.body.appendChild(overlay);
+function minimizeWindow(tw: TermWindow): void {
+  tw.minimized = true;
+  tw.el.style.display = 'none';
+  renderDock();
+}
 
-  const host = overlay.querySelector<HTMLElement>('[data-role="thost"]')!;
-  const status = overlay.querySelector<HTMLElement>('[data-role="tstatus"]')!;
-  const term = new Terminal({
-    fontSize: 13,
-    fontFamily: '"Cascadia Mono","JetBrains Mono",Consolas,monospace',
-    cursorBlink: true,
-    scrollback: 5000,
-    theme: { background: '#03070b', foreground: '#c9fff3' },
-  });
-  const fit = new FitAddon.FitAddon();
-  term.loadAddon(fit);
-  term.open(host);
-  fit.fit();
+function restoreWindow(tw: TermWindow): void {
+  tw.minimized = false;
+  tw.el.style.display = '';
+  if (tw.maximized && tw.preMax) {
+    // keep maximized geometry
+  } else if (tw.maximized) {
+    // fall through to current
+  }
+  applyGeometry(tw);
+  bringToFront(tw);
+  renderDock();
+  setTimeout(() => { doFit(tw); tw.term?.focus?.(); }, 50);
+}
 
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/api/term?name=${encodeURIComponent(name)}&cols=${term.cols}&rows=${term.rows}`);
-  ws.binaryType = 'arraybuffer';
-  const enc = new TextEncoder();
+function closeWindow(tw: TermWindow): void {
+  window.clearTimeout(tw.fitTimer);
+  if (tw.ro) { try { tw.ro.disconnect(); } catch {} }
+  if (tw.ws) { try { tw.ws.close(); } catch {} }
+  try { tw.term?.dispose?.(); } catch {}
+  tw.el.remove();
+  termWindows.delete(tw.name);
+  renderDock();
+}
 
-  ws.onopen = () => { status.textContent = 'connected'; term.focus(); };
-  ws.onclose = () => { status.textContent = 'disconnected'; };
-  ws.onerror = () => { status.textContent = 'connection error'; };
-  ws.onmessage = (event: MessageEvent) => {
-    if (typeof event.data === 'string') term.write(event.data);
-    else term.write(new Uint8Array(event.data as ArrayBuffer));
-  };
-  term.onData((data: string) => { if (ws.readyState === WebSocket.OPEN) ws.send(enc.encode(data)); });
+function toggleMaximize(tw: TermWindow): void {
+  const el = tw.el;
+  if (!tw.maximized) {
+    tw.preMax = { x: tw.x, y: tw.y, w: tw.w, h: tw.h };
+    tw.maximized = true;
+    tw.minimized = false;
+    el.style.display = '';
+    const m = 18;
+    tw.x = m;
+    tw.y = m;
+    tw.w = Math.max(620, window.innerWidth - m * 2);
+    tw.h = Math.max(380, window.innerHeight - m * 2 - 36);
+    applyGeometry(tw);
+    setTimeout(() => doFit(tw), 80);
+  } else {
+    tw.maximized = false;
+    if (tw.preMax) {
+      tw.x = tw.preMax.x; tw.y = tw.preMax.y; tw.w = tw.preMax.w; tw.h = tw.preMax.h;
+      tw.preMax = null;
+    } else {
+      tw.x = 100; tw.y = 80; tw.w = DEFAULT_W; tw.h = DEFAULT_H;
+    }
+    applyGeometry(tw);
+    setTimeout(() => doFit(tw), 50);
+  }
+  renderDock();
+  bringToFront(tw);
+  tw.term?.focus?.();
+}
 
-  // Debounce fits and only push a resize when the size truly changed, so the tmux window (and any
-  // other attached client) isn't reflowed on every pixel nudge.
-  let lastCols = 0;
-  let lastRows = 0;
-  let fitTimer = 0;
-  const doFit = () => {
-    window.clearTimeout(fitTimer);
-    fitTimer = window.setTimeout(() => {
-      try {
-        fit.fit();
-        if (ws.readyState === WebSocket.OPEN && (term.cols !== lastCols || term.rows !== lastRows)) {
-          lastCols = term.cols;
-          lastRows = term.rows;
-          ws.send(JSON.stringify({ cols: term.cols, rows: term.rows }));
-        }
-      } catch { /* ignore transient fit errors */ }
-    }, 150);
-  };
-  const ro = new ResizeObserver(() => doFit());
-  ro.observe(host);
+function resetWindow(tw: TermWindow): void {
+  tw.maximized = false;
+  tw.minimized = false;
+  tw.preMax = null;
+  tw.el.style.display = '';
+  try { localStorage.removeItem(posKey(tw.name)); } catch {}
+  const off = (cascade % 4) * 24;
+  tw.x = 110 + off;
+  tw.y = 78 + Math.floor(off / 2);
+  tw.w = DEFAULT_W;
+  tw.h = DEFAULT_H;
+  applyGeometry(tw);
+  renderDock();
+  bringToFront(tw);
+  setTimeout(() => { doFit(tw); tw.term?.focus?.(); }, 60);
+}
 
-  overlay.querySelector<HTMLButtonElement>('.term-close')!.addEventListener('click', () => closeTerminal());
-  // click on the dark backdrop (not inside the box) closes; ESC is left for the terminal (agents use it)
-  overlay.addEventListener('mousedown', (event: MouseEvent) => { if (event.target === overlay) closeTerminal(); });
-
-  activeTerm = {
-    dispose: () => {
-      window.clearTimeout(fitTimer);
-      ro.disconnect();
-      try { ws.close(); } catch { /* already closed */ }
-      try { term.dispose(); } catch { /* noop */ }
-      overlay.remove();
-    },
-  };
-  setTimeout(doFit, 60);
+// Keep a no-op closeTerminal for any stray callers in the bundle.
+function closeTerminal(): void {
+  // New multi-window model: individual windows manage their own close.
+  // If you really need to nuke all, uncomment:
+  // termWindows.forEach((tw) => closeWindow(tw));
 }
