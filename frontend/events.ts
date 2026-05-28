@@ -156,8 +156,8 @@ q('#densityToggle').addEventListener('click', toggleDensity);
 q('#followToggle').addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
 
 // Restore all minimized shell previews button (injected)
-const shellTools = q('.shell-tools');
-if (shellTools && !q('#restoreAllPreviewsBtn')) {
+const shellTools = document.querySelector<HTMLElement>('.shell-tools');
+if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
   const restoreAllBtn = document.createElement('button');
   restoreAllBtn.id = 'restoreAllPreviewsBtn';
   restoreAllBtn.type = 'button';
