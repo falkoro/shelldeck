@@ -5,8 +5,30 @@ let nextZ = 75;
 let cascade = 0;
 const DEFAULT_W = 880;
 const DEFAULT_H = 540;
+const MOBILE_BREAKPOINT = 760;
 function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
+}
+function viewportSize() {
+    const vv = window.visualViewport;
+    return {
+        width: Math.floor(vv?.width || window.innerWidth),
+        height: Math.floor(vv?.height || window.innerHeight),
+    };
+}
+function compactTerminalViewport() {
+    const width = viewportSize().width;
+    return width <= MOBILE_BREAKPOINT || (width <= 1024 && window.matchMedia('(pointer: coarse)').matches);
+}
+function refreshTerminalViewportMode() {
+    const compact = compactTerminalViewport();
+    termWindows.forEach((tw) => {
+        tw.el.classList.toggle('mobile', compact);
+        if (compact && !tw.minimized) {
+            tw.el.style.display = '';
+        }
+        doFit(tw);
+    });
 }
 function ensureDock() {
     if (dockEl)
@@ -151,12 +173,15 @@ function makeResizable(tw, handle) {
 function createTermWindow(name) {
     const saved = loadSavedPos(name);
     const off = (cascade++ % 5) * 28;
-    const baseX = saved?.x ?? (96 + off);
-    const baseY = saved?.y ?? (72 + Math.floor(off / 2));
-    const baseW = saved?.w ?? DEFAULT_W;
-    const baseH = saved?.h ?? DEFAULT_H;
+    const compact = compactTerminalViewport();
+    const viewport = viewportSize();
+    const baseX = compact ? 0 : saved?.x ?? (96 + off);
+    const baseY = compact ? 0 : saved?.y ?? (72 + Math.floor(off / 2));
+    const baseW = compact ? viewport.width : saved?.w ?? DEFAULT_W;
+    const baseH = compact ? viewport.height : saved?.h ?? DEFAULT_H;
     const el = document.createElement('div');
     el.className = 'term-window';
+    el.classList.toggle('mobile', compact);
     el.style.left = baseX + 'px';
     el.style.top = baseY + 'px';
     el.style.width = baseW + 'px';
@@ -166,10 +191,10 @@ function createTermWindow(name) {
       <span class="term-title">${escapeHtml(name)} · live terminal</span>
       <span class="term-status" data-role="tstatus">connecting…</span>
       <div class="term-controls">
-        <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position">↺</button>
-        <button type="button" class="term-btn" data-act="min" title="Minimize to dock">−</button>
-        <button type="button" class="term-btn" data-act="max" title="Maximize / restore">□</button>
-        <button type="button" class="term-btn term-close" data-act="close" title="Close terminal">×</button>
+        <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
+        <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
+        <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
+        <button type="button" class="term-btn term-close" data-act="close" title="Close terminal" aria-label="Close terminal"><span class="term-close-label">Close</span><span aria-hidden="true">×</span></button>
       </div>
     </div>
     <div class="term-host" data-host></div>
@@ -443,3 +468,6 @@ window.minimizeShellPreview = minimizeShellPreview;
 window.restoreShellPreview = restoreShellPreview;
 window.maximizeShellPreview = maximizeShellPreview;
 window.floatAndResizeShellPreview = floatAndResizeShellPreview;
+window.addEventListener('resize', refreshTerminalViewportMode);
+window.visualViewport?.addEventListener('resize', refreshTerminalViewportMode);
+window.visualViewport?.addEventListener('scroll', refreshTerminalViewportMode);
