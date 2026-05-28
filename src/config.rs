@@ -22,6 +22,7 @@ pub struct Config {
     pub allowed_emails: Vec<String>,
     pub trust_cf_access_email: bool,
     pub allow_cloudflare_login: bool,
+    pub skip_login: bool,
     pub bypass_login_ips: Vec<String>,
     pub unlock_password: String,
     pub root_dir: PathBuf,
@@ -94,6 +95,10 @@ impl Config {
                 == Some("1"),
             allow_cloudflare_login: env::var("DASHBOARD_ALLOW_CLOUDFLARE_LOGIN").ok().as_deref()
                 == Some("1"),
+            // Skip ShellDeck's own login password entirely and trust the network gate
+            // (allowed IP / Cloudflare Access). Only enable when an external layer like
+            // Cloudflare Access already authenticates who can reach the dashboard.
+            skip_login: env::var("DASHBOARD_SKIP_LOGIN").ok().as_deref() == Some("1"),
             bypass_login_ips: split_env("DASHBOARD_BYPASS_LOGIN_IPS"),
             unlock_password: env::var("DASHBOARD_UNLOCK_PASSWORD")
                 .unwrap_or_else(|_| "change-me".to_string()),

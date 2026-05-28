@@ -357,3 +357,7 @@ setInterval(() => (window as any).updateLastActivityTimes?.(), 30000);
 // Live tickers (if any configured)
 queueMicrotask(() => loadTickers().catch(() => {}));
 setInterval(() => loadTickers().catch(() => {}), 60000);
+
+// Live host machine stats (CPU / RAM / temps)
+queueMicrotask(() => loadMetrics().catch(() => {}));
+setInterval(() => loadMetrics().catch(() => {}), 5000);
