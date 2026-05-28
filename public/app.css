@@ -238,4 +238,25 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .links-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;max-height:60vh;overflow:auto;background:#0b121a;border:1px solid rgba(139,246,255,.3);border-radius:8px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:2px}
 .links-menu a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;white-space:nowrap}
 .links-menu a:hover{background:#102331}
+/* Card window controls (− / ⤢ / □) in the shell card header */
+.card-window-controls{display:flex;gap:2px;margin-left:auto;opacity:.65;transition:opacity .14s}
+.terminal-card:hover .card-window-controls{opacity:1}
+.card-win-btn{background:transparent;border:1px solid rgba(139,246,255,.18);color:var(--muted);font-size:12px;line-height:1;padding:1px 6px;border-radius:3px;cursor:pointer;min-height:22px}
+.card-win-btn:hover{background:rgba(139,246,255,.1);color:var(--text);border-color:rgba(139,246,255,.35)}
+/* Drag-to-reorder visual states */
+.terminal-card.reorder-dragging{opacity:.38;border-style:dashed}
+.terminal-card.reorder-target{border-color:rgba(114,247,200,.6);box-shadow:0 0 0 2px rgba(114,247,200,.25);transform:scale(1.015)}
+.terminal-card.reorder-dragging .card-resize-handle{pointer-events:none}
+.reorder-clone{pointer-events:none;position:fixed;z-index:999}
+/* Card resize handle (bottom-right) */
+.terminal-card{position:relative}
+.card-resize-handle{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:se-resize;background:linear-gradient(135deg,transparent 40%,rgba(139,246,255,.28) 41%);z-index:5;border-bottom-right-radius:6px;opacity:0;transition:opacity .14s}
+.terminal-card:hover .card-resize-handle{opacity:1}
+.terminal-card.resizing .card-resize-handle{background:linear-gradient(135deg,transparent 40%,rgba(114,247,200,.45) 41%);opacity:1}
+.terminal-card.resizing{border-color:rgba(114,247,200,.4);user-select:none}
+/* Preview-enlarged state (resize button) */
+.terminal-card.preview-enlarged pre{max-height:560px}
+.terminal-card.preview-enlarged{min-height:620px}
+/* Remove resize handle on mobile (touch has its own resize) */
+@media (max-width:760px){.card-resize-handle{display:none}}
 .links-menu .ic{color:var(--cyan);flex:0 0 auto}

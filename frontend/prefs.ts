@@ -97,3 +97,53 @@ function removeShellImage(name: string, path: string): void {
   shellImages[name] = (shellImages[name] || []).filter((image) => image.path !== path);
   renderShellImages(name);
 }
+
+// --- Shell card order persistence ---
+// Persist the preferred sort order of shell cards so drag-to-reorder survives refresh.
+function shellOrder(): string[] {
+  return storageJson<string[]>('sdShellOrder', []);
+}
+
+function saveShellOrder(names: string[]): void {
+  localStorage.setItem('sdShellOrder', JSON.stringify(names));
+}
+
+// Merge known shells into the saved order: keep any previously-seen names in their
+// saved position, append newly-seen names at the end, and drop stale ones.
+function orderedShellList(shells: ShellPreview[]): ShellPreview[] {
+  const saved = shellOrder();
+  const nameSet = new Set(shells.map((s) => s.name));
+  // Remove names from saved list that are no longer in the shell list
+  const validSaved = saved.filter((n) => nameSet.has(n));
+  // Add shells that are in the current list but not yet in saved order
+  const newNames = shells.map((s) => s.name).filter((n) => !validSaved.includes(n));
+  const merged = [...validSaved, ...newNames];
+  // Update the saved order
+  saveShellOrder(merged);
+  // Reorder shells array to match
+  const byName: Record<string, ShellPreview> = {};
+  shells.forEach((s) => { byName[s.name] = s; });
+  return merged.map((n) => byName[n]).filter(Boolean);
+}
+
+// --- Shell card size persistence ---
+interface CardSize { w: number; h: number }
+
+function shellCardSizes(): Record<string, CardSize> {
+  return storageJson<Record<string, CardSize>>('sdShellSizes', {});
+}
+
+function saveShellCardSize(name: string, size: CardSize): void {
+  const sizes = shellCardSizes();
+  sizes[name] = size;
+  localStorage.setItem('sdShellSizes', JSON.stringify(sizes));
+}
+
+function loadShellCardSize(name: string): CardSize | null {
+  const s = shellCardSizes()[name];
+  if (s && typeof s.w === 'number' && typeof s.h === 'number') return s;
+  return null;
+}
+
+// --- Shell card drag-to-reorder threshold ---
+const DRAG_REORDER_THRESHOLD = 8;

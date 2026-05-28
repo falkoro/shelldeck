@@ -62,6 +62,23 @@ function renderDock(): void {
     item.addEventListener('click', () => restoreWindow(tw));
     dock.appendChild(item);
   });
+  // Also show minimized main-dashboard shell *previews*
+  minimizedPreviews.forEach((name) => {
+    any = true;
+    const item = document.createElement('div');
+    item.className = 'term-min-item shell-preview-min';
+    item.innerHTML = `<span class="tm-name">◻︎ ${escapeHtml(name)}</span><button type="button" class="tm-btn" data-act="restore-preview" title="Restore preview to grid">▴</button><button type="button" class="tm-btn tm-close" data-act="close-preview" title="Hide preview">×</button>`;
+    item.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
+      const act = btn.dataset.act!;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (act === 'restore-preview') restoreShellPreview(name);
+        else if (act === 'close-preview') { minimizedPreviews.delete(name); renderDock(); }
+      });
+    });
+    item.addEventListener('click', () => restoreShellPreview(name));
+    dock.appendChild(item);
+  });
   dock.style.display = any ? 'flex' : 'none';
 }
 
@@ -354,3 +371,82 @@ function closeTerminal(): void {
   // If you really need to nuke all, uncomment:
   // termWindows.forEach((tw) => closeWindow(tw));
 }
+
+// === Main dashboard shell preview minimize-to-dock support ===
+// Lets users minimize the live preview cards (the "shells on the dashboard itself")
+// to the same bottom-right dock used by the full interactive terminals.
+const minimizedPreviews = new Set<string>();
+(window as any).minimizedPreviews = minimizedPreviews;
+
+function minimizeShellPreview(name: string): void {
+  if (!name) return;
+  minimizedPreviews.add(name);
+  // Hide the card in the grid if it's currently rendered there
+  const card = document.querySelector<HTMLElement>(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
+  if (card) card.style.display = 'none';
+  renderDock();
+}
+
+function restoreShellPreview(name: string): void {
+  minimizedPreviews.delete(name);
+  const card = document.querySelector<HTMLElement>(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
+  if (card) {
+    card.style.display = '';
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  } else {
+    // Card not in DOM — ask for a refresh so renderShells recreates it
+    (window as any).loadShells?.().catch(() => {});
+  }
+  renderDock();
+}
+
+function maximizeShellPreview(name: string): void {
+  if (!name) return;
+  // Minimize all other previews
+  const cards = document.querySelectorAll<HTMLElement>('[data-shell-card]');
+  cards.forEach((card) => {
+    const n = card.dataset.shellCard || '';
+    if (n && n !== name && !minimizedPreviews.has(n)) {
+      minimizeShellPreview(n);
+    }
+  });
+  // Make sure this one is visible and prominent
+  restoreShellPreview(name);
+  const thisCard = document.querySelector<HTMLElement>(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
+  if (thisCard) {
+    thisCard.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    // Optional: give it a temporary boost
+    thisCard.style.minHeight = '520px';
+    setTimeout(() => { if (thisCard) thisCard.style.minHeight = ''; }, 8000);
+  }
+}
+
+function floatAndResizeShellPreview(name: string): void {
+  if (!name) return;
+  // For now, a practical "resize bigger" in the grid + hint that full floating drag is available via Shell in
+  const card = document.querySelector<HTMLElement>(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
+  if (!card) return;
+  // Toggle a larger state
+  if (card.classList.contains('preview-enlarged')) {
+    card.classList.remove('preview-enlarged');
+    card.style.minHeight = '';
+  } else {
+    card.classList.add('preview-enlarged');
+    card.style.minHeight = '620px';
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+function restoreAllShellPreviews(): void {
+  minimizedPreviews.clear();
+  document.querySelectorAll<HTMLElement>('[data-shell-card]').forEach(c => c.style.display = '');
+  renderDock();
+}
+
+(window as any).restoreAllShellPreviews = restoreAllShellPreviews;
+
+// Expose for the click delegation in events.ts
+(window as any).minimizeShellPreview = minimizeShellPreview;
+(window as any).restoreShellPreview = restoreShellPreview;
+(window as any).maximizeShellPreview = maximizeShellPreview;
+(window as any).floatAndResizeShellPreview = floatAndResizeShellPreview;

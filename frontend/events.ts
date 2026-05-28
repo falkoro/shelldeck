@@ -28,6 +28,21 @@ document.addEventListener('click', async (event: MouseEvent) => {
       openTerminal(shellinButton.dataset.shellin || '');
       return;
     }
+    const minimizeShellButton = target.closest<HTMLButtonElement>('[data-minimize-shell]');
+    if (minimizeShellButton) {
+      minimizeShellPreview(minimizeShellButton.dataset.minimizeShell || '');
+      return;
+    }
+    const resizePreviewButton = target.closest<HTMLButtonElement>('[data-resize-preview]');
+    if (resizePreviewButton) {
+      floatAndResizeShellPreview(resizePreviewButton.dataset.resizePreview || '');
+      return;
+    }
+    const maximizePreviewButton = target.closest<HTMLButtonElement>('[data-maximize-preview]');
+    if (maximizePreviewButton) {
+      maximizeShellPreview(maximizePreviewButton.dataset.maximizePreview || '');
+      return;
+    }
     if (resumeButton && resumeButton.dataset.resumeCmd) return runCommand(resumeButton.dataset.resume || '', resumeButton.dataset.resumeCmd);
     if (removeImageButton) return removeShellImage(removeImageButton.dataset.shell || '', removeImageButton.dataset.removeImage || '');
     if (tabButton) {
@@ -139,6 +154,26 @@ q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((er
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
 q('#densityToggle').addEventListener('click', toggleDensity);
 q('#followToggle').addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
+
+// Restore all minimized shell previews button (injected)
+const shellTools = q('.shell-tools');
+if (shellTools && !q('#restoreAllPreviewsBtn')) {
+  const restoreAllBtn = document.createElement('button');
+  restoreAllBtn.id = 'restoreAllPreviewsBtn';
+  restoreAllBtn.type = 'button';
+  restoreAllBtn.title = 'Restore all minimized shell previews from the dock';
+  restoreAllBtn.innerHTML = 'Restore all';
+  restoreAllBtn.addEventListener('click', () => {
+    const fn = (window as any).restoreAllShellPreviews || (() => {
+      const set = (window as any).minimizedPreviews;
+      if (set) set.clear();
+      document.querySelectorAll<HTMLElement>('[data-shell-card]').forEach(c => c.style.display = '');
+      (window as any).renderDock?.();
+    });
+    fn();
+  });
+  shellTools.appendChild(restoreAllBtn);
+}
 q<HTMLSelectElement>('#lineCount').addEventListener('change', (event: Event) => setTerminalLines(Number((event.target as HTMLSelectElement).value)));
 imageFile.addEventListener('change', () => {
   handleImageFiles(imageFile.files || undefined, pendingImageTarget).catch((error: Error) => toast(error.message)).finally(() => {
@@ -171,6 +206,141 @@ document.addEventListener('submit', (event: Event) => {
   });
 });
 
+// --- Drag-to-reorder shell cards ---
+// Mousedown on a card header initiates reorder after a drag threshold.
+document.addEventListener('mousedown', (event: MouseEvent) => {
+  const target = event.target instanceof Element ? event.target : null;
+  // Only start reorder if dragging from the card header (not buttons/inputs inside)
+  const header = target?.closest<HTMLElement>('.terminal-card > header');
+  if (!header) return;
+  // Don't initiate drag when clicking buttons, inputs, or the card window controls
+  if ((event.target as HTMLElement)?.closest('button,input,textarea,select,[data-minimize-shell],[data-resize-preview],[data-maximize-shell]')) return;
+  const card = header.closest<HTMLElement>('[data-shell-card]');
+  if (!card) return;
+  const name = card.dataset.shellCard || '';
+  if (!name) return;
+  const grid = card.parentElement;
+  if (!grid) return;
+
+  const startX = event.clientX;
+  const startY = event.clientY;
+  let reorderActive = false;
+  let dragEl: HTMLElement | null = null;
+
+  const onMove = (e: MouseEvent) => {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!reorderActive && Math.abs(dx) + Math.abs(dy) < DRAG_REORDER_THRESHOLD) return;
+    if (!reorderActive) {
+      reorderActive = true;
+      card.classList.add('reorder-dragging');
+      dragEl = card.cloneNode(true) as HTMLElement;
+      dragEl.classList.add('reorder-clone');
+      dragEl.style.position = 'fixed';
+      dragEl.style.pointerEvents = 'none';
+      dragEl.style.zIndex = '999';
+      dragEl.style.width = `${card.offsetWidth}px`;
+      dragEl.style.left = '0';
+      dragEl.style.top = '0';
+      dragEl.style.opacity = '0.85';
+      dragEl.style.transform = 'scale(0.97)';
+      document.body.appendChild(dragEl);
+      card.style.opacity = '0.35';
+    }
+    // Update clone position
+    if (dragEl) {
+      dragEl.style.left = `${e.clientX - 40}px`;
+      dragEl.style.top = `${e.clientY - 14}px`;
+    }
+    // Highlight target position
+    const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-shell-card]:not(.reorder-dragging)'));
+    cards.forEach((c) => c.classList.remove('reorder-target'));
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-shell-card]');
+    if (targetEl && targetEl !== card) targetEl.classList.add('reorder-target');
+  };
+
+  const onUp = (e: MouseEvent) => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    card.classList.remove('reorder-dragging');
+    card.style.opacity = '';
+    if (dragEl) dragEl.remove();
+    grid.querySelectorAll<HTMLElement>('[data-shell-card]').forEach((c) => c.classList.remove('reorder-target'));
+
+    if (!reorderActive) return;
+    // Find the card we dropped on
+    const dropTarget = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-shell-card]');
+    if (!dropTarget || dropTarget === card) return;
+    const targetName = dropTarget.dataset.shellCard || '';
+    if (!targetName) return;
+
+    // Reorder in the saved list
+    const order = shellOrder();
+    const fromIdx = order.indexOf(name);
+    const toIdx = order.indexOf(targetName);
+    if (fromIdx < 0 || toIdx < 0) return;
+    order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, name);
+    saveShellOrder(order);
+
+    // Physically reorder in DOM
+    const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-shell-card]'));
+    const fromCard = cards.find((c) => c.dataset.shellCard === name);
+    const toCard = cards.find((c) => c.dataset.shellCard === targetName);
+    if (fromCard && toCard) {
+      if (fromIdx > toIdx) {
+        toCard.before(fromCard);
+      } else {
+        toCard.after(fromCard);
+      }
+    }
+  };
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp, { once: true });
+});
+
+// --- Drag-to-resize shell cards ---
+document.addEventListener('mousedown', (event: MouseEvent) => {
+  const handle = (event.target as HTMLElement)?.closest<HTMLElement>('.card-resize-handle');
+  if (!handle) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const card = handle.closest<HTMLElement>('[data-shell-card]');
+  if (!card) return;
+  const name = card.dataset.shellCard || '';
+
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const origH = card.offsetHeight;
+  const origW = card.offsetWidth;
+  card.classList.add('resizing');
+
+  const onMove = (e: MouseEvent) => {
+    const newH = Math.max(280, Math.min(1200, origH + (e.clientY - startY)));
+    const newW = Math.max(340, Math.min(window.innerWidth - 40, origW + (e.clientX - startX)));
+    card.style.minHeight = `${newH}px`;
+    if (newW > 340) card.style.maxWidth = `${newW}px`;
+    // Update the pre element's max-height to keep it proportional
+    const pre = card.querySelector<HTMLElement>('[data-role="output"]');
+    if (pre) pre.style.maxHeight = `${Math.max(180, newH - 220)}px`;
+    // Track that this card has been resized
+    card.dataset.sized = '1';
+  };
+
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    card.classList.remove('resizing');
+    if (name) {
+      saveShellCardSize(name, { w: card.offsetWidth, h: card.offsetHeight });
+    }
+  };
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp, { once: true });
+});
+
 render(initialModel);
 buildLegend();
 maybeShowOnboarding();
@@ -178,6 +348,11 @@ queueMicrotask(() => loadSummary().catch(() => {}));
 queueMicrotask(() => loadShells().then(startShellStream).catch((error: Error) => toast(error.message)));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => {}), 30000);
 setInterval(() => loadSummary().catch(() => {}), 60000);
+
+// Live-tick relative last activity labels (the main "add last activity" UX fix for code.falkinator.org)
+// Note: defined in core.ts (loaded before events.js in the page).
+(window as any).updateLastActivityTimes?.();
+setInterval(() => (window as any).updateLastActivityTimes?.(), 30000);
 
 // Live tickers (if any configured)
 queueMicrotask(() => loadTickers().catch(() => {}));

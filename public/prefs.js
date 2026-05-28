@@ -87,3 +87,44 @@ function removeShellImage(name, path) {
     shellImages[name] = (shellImages[name] || []).filter((image) => image.path !== path);
     renderShellImages(name);
 }
+// --- Shell card order persistence ---
+// Persist the preferred sort order of shell cards so drag-to-reorder survives refresh.
+function shellOrder() {
+    return storageJson('sdShellOrder', []);
+}
+function saveShellOrder(names) {
+    localStorage.setItem('sdShellOrder', JSON.stringify(names));
+}
+// Merge known shells into the saved order: keep any previously-seen names in their
+// saved position, append newly-seen names at the end, and drop stale ones.
+function orderedShellList(shells) {
+    const saved = shellOrder();
+    const nameSet = new Set(shells.map((s) => s.name));
+    // Remove names from saved list that are no longer in the shell list
+    const validSaved = saved.filter((n) => nameSet.has(n));
+    // Add shells that are in the current list but not yet in saved order
+    const newNames = shells.map((s) => s.name).filter((n) => !validSaved.includes(n));
+    const merged = [...validSaved, ...newNames];
+    // Update the saved order
+    saveShellOrder(merged);
+    // Reorder shells array to match
+    const byName = {};
+    shells.forEach((s) => { byName[s.name] = s; });
+    return merged.map((n) => byName[n]).filter(Boolean);
+}
+function shellCardSizes() {
+    return storageJson('sdShellSizes', {});
+}
+function saveShellCardSize(name, size) {
+    const sizes = shellCardSizes();
+    sizes[name] = size;
+    localStorage.setItem('sdShellSizes', JSON.stringify(sizes));
+}
+function loadShellCardSize(name) {
+    const s = shellCardSizes()[name];
+    if (s && typeof s.w === 'number' && typeof s.h === 'number')
+        return s;
+    return null;
+}
+// --- Shell card drag-to-reorder threshold ---
+const DRAG_REORDER_THRESHOLD = 8;
