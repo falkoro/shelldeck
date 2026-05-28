@@ -15,6 +15,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Send / Paste / keys** — send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, image paste, and command history.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
 - **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`).
+- **Machine metrics** — a sidebar widget shows live CPU, RAM, load average, and hardware temperatures (read from `/proc` and `/sys/class/hwmon`) for the host ShellDeck runs on.
 - **Locked down** — primary login + a second "unlock" password to gate shell control, optional IP allowlists, and first-class support for sitting behind **Cloudflare Access** (trusts the verified email).
 
 ## Requirements
@@ -56,7 +57,7 @@ ExecStart=%h/shelldeck/target/release/shelldeck
 Restart=always
 ```
 
-Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally a Cloudflare Access policy restricting to your email.
+Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally a Cloudflare Access policy restricting to your email. When such an external layer already authenticates who can reach the dashboard, set `DASHBOARD_SKIP_LOGIN=1` to skip ShellDeck's own login password and let Cloudflare Access (or your proxy) be the front door — the shell unlock (second) password still gates shell control.
 
 ## Security notes
 

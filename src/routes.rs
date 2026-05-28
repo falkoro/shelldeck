@@ -1,4 +1,4 @@
-use crate::{auth, pages, stream, summary, term, tmux, uploads, webutil, AppState};
+use crate::{auth, metrics, pages, stream, summary, term, tmux, uploads, webutil, AppState};
 use axum::{
     extract::{ConnectInfo, Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -51,6 +51,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/unlock", post(api_unlock))
         .route("/api/summary", get(api_summary))
         .route("/api/shells", get(api_shells))
+        .route("/api/metrics", get(api_metrics))
         .route("/api/tickers", get(api_tickers))
         .route("/api/shells/stream", get(stream::api_shell_stream))
         .route("/api/term", get(term::term_ws))
@@ -456,6 +457,19 @@ async fn api_restart(
         return response;
     }
     session_result(tmux::restart_session(state.config.clone(), &body.name).await)
+}
+
+// Live machine stats (CPU / RAM / temps) for the host ShellDeck runs on. Login-gated
+// like the rest of the dashboard, but not behind the shell unlock — they are not sensitive.
+async fn api_metrics(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(StatusCode::OK, &metrics::gather().await)
 }
 
 fn session_result(result: Result<String, String>) -> Response {

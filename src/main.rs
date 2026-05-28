@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod metrics;
 mod pages;
 mod routes;
 mod stream;

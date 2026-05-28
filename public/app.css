@@ -260,3 +260,18 @@ button:disabled{opacity:.48;cursor:not-allowed}
 /* Remove resize handle on mobile (touch has its own resize) */
 @media (max-width:760px){.card-resize-handle{display:none}}
 .links-menu .ic{color:var(--cyan);flex:0 0 auto}
+/* Machine metrics widget (CPU / RAM / temps) — CachyOS-monitor style */
+.metrics-panel .panel-header h2{margin-bottom:2px}
+.metrics{display:flex;flex-direction:column;gap:10px}
+.metric .metric-top{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+.metric .metric-top span:last-child{color:var(--text);font-variant-numeric:tabular-nums}
+.meter{height:7px;border-radius:5px;background:rgba(139,246,255,.1);overflow:hidden}
+.meter i{display:block;height:100%;width:0;border-radius:5px;background:var(--green);transition:width .5s ease,background .3s}
+.meter i.warn{background:var(--amber)}
+.meter i.crit{background:var(--red)}
+.metric-temps{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.temp-chip{font-size:11px;padding:2px 6px;border-radius:6px;background:rgba(139,246,255,.08);border:1px solid rgba(139,246,255,.16);color:var(--muted);white-space:nowrap}
+.temp-chip b{color:var(--text);font-variant-numeric:tabular-nums}
+.temp-chip.warn{border-color:rgba(255,200,87,.4);color:var(--amber)}
+.temp-chip.crit{border-color:rgba(255,106,122,.5);color:var(--red)}
+.metric-load{font-size:11px;font-variant-numeric:tabular-nums}

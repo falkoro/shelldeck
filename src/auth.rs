@@ -70,6 +70,12 @@ pub fn network_allowed(config: &Config, headers: &HeaderMap, remote: Option<&str
 }
 
 pub fn authenticated(config: &Config, headers: &HeaderMap, remote: Option<&str>) -> bool {
+    // When fronted by an external auth layer (e.g. Cloudflare Access / Zero Trust),
+    // skip ShellDeck's own login password — reaching this point already means the
+    // request passed the network gate in `network_allowed`. Shells still need unlock.
+    if config.skip_login {
+        return true;
+    }
     let email = cf_email(headers);
     if config.trust_cf_access_email && !email.is_empty() && config.allowed_emails.contains(&email) {
         return true;
