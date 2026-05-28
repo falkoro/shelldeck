@@ -66,35 +66,67 @@ impl Config {
         let root_dir = env::var("DASHBOARD_ROOT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        let upload_dir = env::var("DASHBOARD_UPLOAD_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| root_dir.join("uploads"));
+        let xai_api_key = env::var("XAI_API_KEY")
+            .or_else(|_| env::var("GROK_API_KEY"))
+            .unwrap_or_default();
+        let xai_base_url =
+            env::var("XAI_BASE_URL").unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
+        let xai_api_style = env::var("XAI_API_STYLE").unwrap_or_else(|_| "openai".to_string());
+        let xai_model = env::var("XAI_MODEL").unwrap_or_else(|_| "grok-4.3".to_string());
         Self {
             host: env::var("DASHBOARD_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
-            port: env::var("DASHBOARD_PORT").ok().and_then(|v| v.parse().ok()).unwrap_or(8787),
+            port: env::var("DASHBOARD_PORT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(8787),
             user: env::var("DASHBOARD_USER").unwrap_or_else(|_| "admin".to_string()),
             password,
             secret,
             allowed_ips: split_env("DASHBOARD_ALLOWED_IPS"),
-            allowed_emails: split_env("DASHBOARD_ALLOWED_EMAILS").into_iter().map(|v| v.to_lowercase()).collect(),
-            trust_cf_access_email: env::var("DASHBOARD_TRUST_CF_ACCESS_EMAIL").ok().as_deref() == Some("1"),
-            allow_cloudflare_login: env::var("DASHBOARD_ALLOW_CLOUDFLARE_LOGIN").ok().as_deref() == Some("1"),
+            allowed_emails: split_env("DASHBOARD_ALLOWED_EMAILS")
+                .into_iter()
+                .map(|v| v.to_lowercase())
+                .collect(),
+            trust_cf_access_email: env::var("DASHBOARD_TRUST_CF_ACCESS_EMAIL").ok().as_deref()
+                == Some("1"),
+            allow_cloudflare_login: env::var("DASHBOARD_ALLOW_CLOUDFLARE_LOGIN").ok().as_deref()
+                == Some("1"),
             bypass_login_ips: split_env("DASHBOARD_BYPASS_LOGIN_IPS"),
-            unlock_password: env::var("DASHBOARD_UNLOCK_PASSWORD").unwrap_or_else(|_| "change-me".to_string()),
+            unlock_password: env::var("DASHBOARD_UNLOCK_PASSWORD")
+                .unwrap_or_else(|_| "change-me".to_string()),
             root_dir: root_dir.clone(),
-            upload_dir: env::var("DASHBOARD_UPLOAD_DIR").map(PathBuf::from).unwrap_or_else(|_| root_dir.join("uploads")),
-            max_image_bytes: env::var("DASHBOARD_MAX_IMAGE_BYTES").ok().and_then(|v| v.parse().ok()).unwrap_or(8 * 1024 * 1024),
-            max_input_chars: env::var("DASHBOARD_MAX_INPUT_CHARS").ok().and_then(|v| v.parse().ok()).unwrap_or(20_000),
+            upload_dir: upload_dir.clone(),
+            max_image_bytes: env::var("DASHBOARD_MAX_IMAGE_BYTES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(8 * 1024 * 1024),
+            max_input_chars: env::var("DASHBOARD_MAX_INPUT_CHARS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20_000),
             // Pause between pasting input and pressing Enter, so agent TUIs (Claude Code, Codex)
             // finish ingesting the paste before the submit lands. Tune up if sends still get dropped.
-            submit_delay_ms: env::var("DASHBOARD_SUBMIT_DELAY_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(200),
+            submit_delay_ms: env::var("DASHBOARD_SUBMIT_DELAY_MS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(200),
             summary_command: env::var("DASHBOARD_SUMMARY_COMMAND").unwrap_or_default(),
-            xai_api_key: env::var("XAI_API_KEY").or_else(|_| env::var("GROK_API_KEY")).unwrap_or_default(),
-            xai_base_url: env::var("XAI_BASE_URL").unwrap_or_else(|_| "https://api.x.ai/v1".to_string()),
-            xai_api_style: env::var("XAI_API_STYLE").unwrap_or_else(|_| "openai".to_string()),
-            xai_model: env::var("XAI_MODEL").unwrap_or_else(|_| "grok-4.3".to_string()),
+            xai_api_key: xai_api_key.clone(),
+            xai_base_url: xai_base_url.clone(),
+            xai_api_style: xai_api_style.clone(),
+            xai_model: xai_model.clone(),
             xai_auth_file: env::var("XAI_AUTH_FILE")
                 .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from(format!("{home}/.local/share/opencode/auth.json"))),
-            xai_client_id: env::var("XAI_CLIENT_ID").unwrap_or_else(|_| "b1a00492-073a-47ea-816f-4c329264a828".to_string()),
-            attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE").unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
+                .unwrap_or_else(|_| {
+                    PathBuf::from(format!("{home}/.local/share/opencode/auth.json"))
+                }),
+            xai_client_id: env::var("XAI_CLIENT_ID")
+                .unwrap_or_else(|_| "b1a00492-073a-47ea-816f-4c329264a828".to_string()),
+            attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE")
+                .unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
             quick_links: parse_links(&env::var("DASHBOARD_LINKS").unwrap_or_default()),
             tickers: split_env("DASHBOARD_TICKERS"),
             known_sessions: known_sessions(),
@@ -104,7 +136,13 @@ impl Config {
 }
 
 fn split_env(key: &str) -> Vec<String> {
-    env::var(key).unwrap_or_default().split(',').map(str::trim).filter(|v| !v.is_empty()).map(str::to_string).collect()
+    env::var(key)
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 // Parse DASHBOARD_LINKS into (label, url) quick links. Format: "Label|https://url;Label|https://url".
@@ -121,13 +159,62 @@ fn parse_links(raw: &str) -> Vec<(String, String)> {
 fn known_sessions() -> Vec<KnownSession> {
     const START: &str = "zsh -lic 'cd ~; exec zsh -l'";
     vec![
-        KnownSession { name: "main", label: "Main Shell", family: "shell", alias: "ta", badge: "sh", start: START },
-        KnownSession { name: "slot1", label: "Shell Slot 1", family: "slot", alias: "ts1", badge: "1", start: START },
-        KnownSession { name: "slot2", label: "Shell Slot 2", family: "slot", alias: "ts2", badge: "2", start: START },
-        KnownSession { name: "slot3", label: "Shell Slot 3", family: "slot", alias: "ts3", badge: "3", start: START },
-        KnownSession { name: "slot4", label: "Shell Slot 4", family: "slot", alias: "ts4", badge: "4", start: START },
-        KnownSession { name: "slot5", label: "Shell Slot 5", family: "slot", alias: "ts5", badge: "5", start: START },
-        KnownSession { name: "slot6", label: "Shell Slot 6", family: "slot", alias: "ts6", badge: "6", start: START },
+        KnownSession {
+            name: "main",
+            label: "Main Shell",
+            family: "shell",
+            alias: "ta",
+            badge: "sh",
+            start: START,
+        },
+        KnownSession {
+            name: "slot1",
+            label: "Shell Slot 1",
+            family: "slot",
+            alias: "ts1",
+            badge: "1",
+            start: START,
+        },
+        KnownSession {
+            name: "slot2",
+            label: "Shell Slot 2",
+            family: "slot",
+            alias: "ts2",
+            badge: "2",
+            start: START,
+        },
+        KnownSession {
+            name: "slot3",
+            label: "Shell Slot 3",
+            family: "slot",
+            alias: "ts3",
+            badge: "3",
+            start: START,
+        },
+        KnownSession {
+            name: "slot4",
+            label: "Shell Slot 4",
+            family: "slot",
+            alias: "ts4",
+            badge: "4",
+            start: START,
+        },
+        KnownSession {
+            name: "slot5",
+            label: "Shell Slot 5",
+            family: "slot",
+            alias: "ts5",
+            badge: "5",
+            start: START,
+        },
+        KnownSession {
+            name: "slot6",
+            label: "Shell Slot 6",
+            family: "slot",
+            alias: "ts6",
+            badge: "6",
+            start: START,
+        },
     ]
 }
 

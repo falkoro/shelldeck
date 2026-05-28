@@ -127,8 +127,15 @@ function icon(name: string): string {
 }
 
 function fmtTime(epoch: number | null | undefined): string {
-  if (!epoch) return 'not yet';
-  return new Date(epoch * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  // Relative "last activity" time for the sessions dashboard (code.falkinator.org).
+  // Much more useful than absolute timestamps for monitoring long-running agents.
+  if (!epoch) return 'never';
+  const secs = Math.floor(Date.now() / 1000) - epoch;
+  if (secs < 45) return 'just now';
+  if (secs < 90) return '1m ago';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
 }
 
 function toast(text: string): void {
@@ -252,6 +259,18 @@ function updateUnlockState(): void {
     input.disabled = !targetReady(input.dataset.command || '');
   });
   setAccessState(shellUnlocked);
+}
+
+function updateLastActivityTimes(): void {
+  // Live-tick the relative last-activity labels so "3m ago" becomes "4m ago" without full refresh.
+  document.querySelectorAll<HTMLElement>('[data-act-epoch]').forEach((el) => {
+    const raw = el.getAttribute('data-act-epoch');
+    const ep = raw ? parseInt(raw, 10) : 0;
+    if (ep > 0) {
+      const rel = fmtTime(ep);
+      if (el.textContent !== rel) el.textContent = rel;
+    }
+  });
 }
 
 function syncTargetUi(): void {

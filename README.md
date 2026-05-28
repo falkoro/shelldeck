@@ -8,6 +8,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 
 - **Side-by-side shell previews** — live `tmux capture-pane` of each session, streamed over SSE (~1s), with TUI blank-line noise collapsed.
 - **Running / waiting badges** — detected from the live pane: a session whose output keeps changing is "running", one that's gone quiet is "waiting for input". Works for any agent or program, with no dependence on a specific status phrase.
+- **Last activity** — tmux `session_activity` timestamps are shown as friendly relative times ("just now", "12m ago", "3h ago") in the session list and detail; they tick live every 30s so you can instantly see which agents have gone quiet.
 - **Per-shell work titles** — an AI summary names *what each session is working on* (the running/waiting state is the badge's job).
 - **Real in-browser terminal** — "Shell in" opens an [xterm.js](https://xtermjs.org/) terminal bridged over a WebSocket to a PTY running `tmux attach`. Type, run, Ctrl-C — like actually being in the shell.
 - **Resume button** — when a pane prints a recovery command (e.g. `codex resume <id>`), a one-click button runs it.

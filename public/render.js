@@ -9,6 +9,11 @@ function createShellCard(shell) {
     article.innerHTML = `<header>
     <div><b data-role="label"></b><span data-role="command"></span></div>
     <div class="terminal-meta"><span class="agent-badge" data-role="agent"></span><span class="dot" data-role="dot"></span><span data-role="cwd"></span></div>
+    <div class="card-window-controls">
+      <button type="button" class="card-win-btn" data-minimize-shell title="Minimize this preview to dock">−</button>
+      <button type="button" class="card-win-btn" data-resize-preview title="Float &amp; resize this preview">⤢</button>
+      <button type="button" class="card-win-btn" data-maximize-preview title="Maximize this (minimize others)">□</button>
+    </div>
   </header>
   <div class="work-title" data-role="worktitle"></div>
   <div class="shell-composer">
@@ -37,11 +42,19 @@ function createShellCard(shell) {
     article.querySelector('[data-history]').dataset.history = shell.name;
     article.querySelector('[data-copy-output]').dataset.copyOutput = shell.name;
     article.querySelector('[data-clear-preview]').dataset.clearPreview = shell.name;
+    article.querySelector('[data-minimize-shell]').dataset.minimizeShell = shell.name;
+    article.querySelector('[data-resize-preview]').dataset.resizePreview = shell.name;
+    article.querySelector('[data-maximize-preview]').dataset.maximizePreview = shell.name;
     article.querySelector('[data-shellin]').dataset.shellin = shell.name;
     article.querySelector('[data-resume]').dataset.resume = shell.name;
     article.querySelectorAll('[data-key]').forEach((button) => {
         button.dataset.shell = shell.name;
     });
+    // Card resize handle (bottom-right corner)
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'card-resize-handle';
+    resizeHandle.title = 'Drag to resize this preview card';
+    article.appendChild(resizeHandle);
     return article;
 }
 function updateShellCard(card, shell) {
@@ -98,21 +111,33 @@ function renderShells(payload) {
     }
     grid.querySelectorAll(':scope > .locked-note, :scope > .unlock-cta').forEach((note) => note.remove());
     const seen = new Set();
-    latestShells.forEach((shell) => {
+    // Use ordered list so drag-reorder persists across refreshes.
+    const ordered = orderedShellList(latestShells);
+    ordered.forEach((shell, idx) => {
         seen.add(shell.name);
         let card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
         if (!card) {
-            // Only append freshly created cards. Re-appending an existing card is a DOM
-            // move that blurs any focused textarea inside it, which on every 1.2s stream
-            // tick yanked the cursor out of the composer (and let Space scroll the page).
             card = createShellCard(shell);
             grid.appendChild(card);
+        }
+        // Apply saved size if available
+        const savedSize = loadShellCardSize(shell.name);
+        if (savedSize) {
+            card.style.minHeight = `${savedSize.h}px`;
+            card.dataset.sized = '1';
         }
         updateShellCard(card, shell);
     });
     grid.querySelectorAll('[data-shell-card]').forEach((card) => {
         if (!seen.has(card.dataset.shellCard || ''))
             card.remove();
+    });
+    // Respect minimized previews (they live in the dock instead of the grid)
+    const minPreviews = window.minimizedPreviews || new Set();
+    latestShells.forEach((shell) => {
+        const card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
+        if (card)
+            card.style.display = minPreviews.has(shell.name) ? 'none' : '';
     });
     markSelectedShell();
     renderShellTabs();
@@ -138,7 +163,8 @@ function renderSessionList() {
     const detail = selected ? sessionDetail(selected) : '';
     q('#sessions').innerHTML = `<div class="session-rail">${sessions().map((session) => {
         const status = session.running ? (session.attached ? 'attached' : 'running') : 'offline';
-        return `<button type="button" class="session-item ${escapeHtml(session.family)}${session.name === selectedSession ? ' selected' : ''}" data-select-session="${escapeHtml(session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><span><b>${escapeHtml(session.label)}</b><small><i class="dot ${session.running ? 'on' : ''}"></i>${escapeHtml(status)}</small></span></button>`;
+        const act = fmtTime(session.activity);
+        return `<button type="button" class="session-item ${escapeHtml(session.family)}${session.name === selectedSession ? ' selected' : ''}" data-select-session="${escapeHtml(session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><span><b>${escapeHtml(session.label)}</b><small><i class="dot ${session.running ? 'on' : ''}"></i>${escapeHtml(status)} <span class="last-act" data-act-epoch="${session.activity ?? ''}">${escapeHtml(act)}</span></small></span></button>`;
     }).join('')}</div>${detail}`;
 }
 function sessionDetail(session) {
