@@ -12,7 +12,8 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Per-shell work titles** — an AI summary names *what each session is working on* (the running/waiting state is the badge's job).
 - **Real in-browser terminal** — "Shell in" opens an [xterm.js](https://xtermjs.org/) terminal bridged over a WebSocket to a PTY running `tmux attach`. Type, run, Ctrl-C — like actually being in the shell.
 - **Resume button** — when a pane prints a recovery command (e.g. `codex resume <id>`), a one-click button runs it.
-- **Send / Paste / keys** — send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, image paste, and command history.
+- **Copy / Send / Paste / keys** — copy attach commands or pane output, send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, image paste, and command history.
+- **Browser memory** — remembers the selected shell, command history, view/density/line preferences, shell order/sizes, onboarding dismissal, and floating terminal window positions in local browser storage.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
 - **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`).
 - **Machine metrics** — a sidebar widget shows live CPU, RAM, load average, and hardware temperatures (read from `/proc` and `/sys/class/hwmon`) for the host ShellDeck runs on.
@@ -58,6 +59,30 @@ Restart=always
 ```
 
 Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally a Cloudflare Access policy restricting to your email. When such an external layer already authenticates who can reach the dashboard, set `DASHBOARD_SKIP_LOGIN=1` to skip ShellDeck's own login password and let Cloudflare Access (or your proxy) be the front door — the shell unlock (second) password still gates shell control.
+
+## Use
+
+1. Sign in, then enter `DASHBOARD_UNLOCK_PASSWORD` in **Shell Unlock**. Until unlocked, pane previews, input, summaries, and live terminals stay gated.
+2. Use **Send** to paste text and press Enter in a pane. Use **Paste** to insert text without pressing Enter. On mobile, plain Enter in the textarea sends; Shift+Enter inserts a newline.
+3. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
+4. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box.
+5. Use **Shell in** to open a real interactive terminal. On mobile, the terminal opens full-screen with a visible **Close x** button in the title bar.
+6. Browser memory is on by default. ShellDeck stores UI preferences and command history in `localStorage`; clear site data in the browser if you want to reset that memory.
+
+## Development
+
+The repository default branch is `master`.
+
+```sh
+bun run check
+cargo test
+```
+
+If you edit files in `frontend/`, rebuild the served JavaScript before committing:
+
+```sh
+bun run build:frontend
+```
 
 ## Security notes
 
