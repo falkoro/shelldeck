@@ -127,6 +127,58 @@ function doFit(tw) {
         catch { /* transient */ }
     }, 140);
 }
+function terminalClipboardImages(event) {
+    return Array.from(event.clipboardData?.items || [])
+        .filter((item) => item.kind === 'file' && String(item.type || '').startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter((file) => Boolean(file));
+}
+function terminalDroppedImages(event) {
+    return Array.from(event.dataTransfer?.files || []).filter((file) => String(file.type || '').startsWith('image/'));
+}
+function sendTerminalText(tw, text) {
+    if (!text || !tw.ws || tw.ws.readyState !== WebSocket.OPEN)
+        return;
+    tw.ws.send(new TextEncoder().encode(text));
+}
+async function insertTerminalImages(tw, files) {
+    const paths = [];
+    for (const file of files) {
+        const result = await uploadImageForShell(file, tw.name, (text) => {
+            tw.statusEl.textContent = text;
+            setShellStatus(tw.name, text);
+        });
+        paths.push(result.image.path);
+    }
+    if (!paths.length)
+        return;
+    sendTerminalText(tw, paths.join(' '));
+    const message = paths.length === 1 ? `Inserted ${paths[0]}` : `Inserted ${paths.length} image paths`;
+    tw.statusEl.textContent = message;
+    toast('Image path inserted in Shell in');
+}
+function handleTerminalPaste(tw, event) {
+    const files = terminalClipboardImages(event);
+    if (!files.length)
+        return;
+    event.preventDefault();
+    event.stopPropagation();
+    insertTerminalImages(tw, files).catch((error) => {
+        tw.statusEl.textContent = 'image paste failed';
+        toast(error.message);
+    });
+}
+function handleTerminalDrop(tw, event) {
+    const files = terminalDroppedImages(event);
+    if (!files.length)
+        return;
+    event.preventDefault();
+    event.stopPropagation();
+    insertTerminalImages(tw, files).catch((error) => {
+        tw.statusEl.textContent = 'image drop failed';
+        toast(error.message);
+    });
+}
 function makeDraggable(tw, bar) {
     bar.addEventListener('mousedown', (ev) => {
         if (ev.target.closest('button'))
@@ -237,6 +289,12 @@ function createTermWindow(name) {
     };
     term.onData((d) => { if (ws.readyState === WebSocket.OPEN)
         ws.send(enc.encode(d)); });
+    el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
+    host.addEventListener('dragover', (event) => {
+        if (terminalDroppedImages(event).length)
+            event.preventDefault();
+    });
+    host.addEventListener('drop', (event) => handleTerminalDrop(tw, event));
     const ro = new ResizeObserver(() => doFit(tw));
     ro.observe(host);
     tw.ro = ro;

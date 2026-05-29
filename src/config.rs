@@ -3,12 +3,12 @@ use std::{collections::HashMap, env, path::PathBuf};
 
 #[derive(Clone)]
 pub struct KnownSession {
-    pub name: &'static str,
-    pub label: &'static str,
-    pub family: &'static str,
-    pub alias: &'static str,
-    pub badge: &'static str,
-    pub start: &'static str,
+    pub name: String,
+    pub label: String,
+    pub family: String,
+    pub alias: String,
+    pub badge: String,
+    pub start: String,
 }
 
 #[derive(Clone)]
@@ -162,65 +162,166 @@ fn parse_links(raw: &str) -> Vec<(String, String)> {
 }
 
 fn known_sessions() -> Vec<KnownSession> {
-    const START: &str = "zsh -lic 'cd ~; exec zsh -l'";
-    vec![
-        KnownSession {
-            name: "main",
-            label: "Main Shell",
-            family: "shell",
-            alias: "ta",
-            badge: "sh",
-            start: START,
-        },
-        KnownSession {
-            name: "slot1",
-            label: "Shell Slot 1",
-            family: "slot",
-            alias: "ts1",
-            badge: "1",
-            start: START,
-        },
-        KnownSession {
-            name: "slot2",
-            label: "Shell Slot 2",
-            family: "slot",
-            alias: "ts2",
-            badge: "2",
-            start: START,
-        },
-        KnownSession {
-            name: "slot3",
-            label: "Shell Slot 3",
-            family: "slot",
-            alias: "ts3",
-            badge: "3",
-            start: START,
-        },
-        KnownSession {
-            name: "slot4",
-            label: "Shell Slot 4",
-            family: "slot",
-            alias: "ts4",
-            badge: "4",
-            start: START,
-        },
-        KnownSession {
-            name: "slot5",
-            label: "Shell Slot 5",
-            family: "slot",
-            alias: "ts5",
-            badge: "5",
-            start: START,
-        },
-        KnownSession {
-            name: "slot6",
-            label: "Shell Slot 6",
-            family: "slot",
-            alias: "ts6",
-            badge: "6",
-            start: START,
-        },
-    ]
+    let default_start = zsh_start_in("~", "zsh -l");
+    let agent_workdir = env::var("DASHBOARD_AGENT_WORKDIR").unwrap_or_else(|_| "~".to_string());
+    let mut sessions = vec![
+        known_session("main", "Main Shell", "shell", "ta", "sh", &default_start),
+        known_session("slot1", "Shell Slot 1", "slot", "ts1", "1", &default_start),
+        known_session("slot2", "Shell Slot 2", "slot", "ts2", "2", &default_start),
+        known_session("slot3", "Shell Slot 3", "slot", "ts3", "3", &default_start),
+        known_session("slot4", "Shell Slot 4", "slot", "ts4", "4", &default_start),
+        known_session("slot5", "Shell Slot 5", "slot", "ts5", "5", &default_start),
+        known_session("slot6", "Shell Slot 6", "slot", "ts6", "6", &default_start),
+    ];
+
+    for session in agent_presets_from_raw(
+        &env::var("DASHBOARD_AGENT_PRESETS").unwrap_or_default(),
+        &agent_workdir,
+    ) {
+        push_unique_session(&mut sessions, session);
+    }
+    for session in parse_custom_sessions(
+        &env::var("DASHBOARD_CUSTOM_SESSIONS").unwrap_or_default(),
+        &agent_workdir,
+    ) {
+        push_unique_session(&mut sessions, session);
+    }
+    sessions
+}
+
+fn known_session(
+    name: &str,
+    label: &str,
+    family: &str,
+    alias: &str,
+    badge: &str,
+    start: &str,
+) -> KnownSession {
+    KnownSession {
+        name: name.to_string(),
+        label: label.to_string(),
+        family: family.to_string(),
+        alias: alias.to_string(),
+        badge: badge.to_string(),
+        start: start.to_string(),
+    }
+}
+
+fn agent_session(
+    name: &str,
+    label: &str,
+    badge: &str,
+    command: &str,
+    workdir: &str,
+) -> KnownSession {
+    known_session(
+        name,
+        label,
+        "agent",
+        name,
+        badge,
+        &zsh_start_in(workdir, command),
+    )
+}
+
+fn push_unique_session(sessions: &mut Vec<KnownSession>, session: KnownSession) {
+    if sessions.iter().any(|item| item.name == session.name) {
+        return;
+    }
+    sessions.push(session);
+}
+
+fn agent_presets_from_raw(raw: &str, workdir: &str) -> Vec<KnownSession> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .filter_map(|item| match item.to_ascii_lowercase().as_str() {
+            "flow" | "iflow" => Some(agent_session("iflow", "iFlow", "if", "iflow", workdir)),
+            "gemini" | "gemini-cli" => Some(agent_session(
+                "gemini",
+                "Gemini CLI",
+                "ge",
+                "gemini",
+                workdir,
+            )),
+            "qwen" | "qwen-code" => Some(agent_session("qwen", "Qwen Code", "qw", "qwen", workdir)),
+            "goose" => Some(agent_session(
+                "goose",
+                "goose",
+                "go",
+                "goose session",
+                workdir,
+            )),
+            "aider" => Some(agent_session("aider", "Aider", "ai", "aider", workdir)),
+            "opencode" => Some(agent_session(
+                "opencode", "OpenCode", "oc", "opencode", workdir,
+            )),
+            "codex" => Some(agent_session("codex", "Codex", "cx", "codex", workdir)),
+            "grok" => Some(agent_session("grok", "Grok", "gx", "grok", workdir)),
+            "claude" | "claude-code" => Some(agent_session(
+                "claude",
+                "Claude Code",
+                "cc",
+                "claude",
+                workdir,
+            )),
+            other => {
+                eprintln!("Ignoring unknown DASHBOARD_AGENT_PRESETS entry: {other}");
+                None
+            }
+        })
+        .collect()
+}
+
+fn parse_custom_sessions(raw: &str, workdir: &str) -> Vec<KnownSession> {
+    raw.split(';')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .filter_map(|item| {
+            let parts: Vec<&str> = item.split('|').map(str::trim).collect();
+            if parts.len() != 4 {
+                eprintln!(
+                    "Ignoring DASHBOARD_CUSTOM_SESSIONS entry with wrong field count: {item}"
+                );
+                return None;
+            }
+            let (name, label, badge, command) = (parts[0], parts[1], parts[2], parts[3]);
+            if !valid_session_name(name)
+                || label.is_empty()
+                || badge.is_empty()
+                || command.is_empty()
+            {
+                eprintln!("Ignoring invalid DASHBOARD_CUSTOM_SESSIONS entry: {item}");
+                return None;
+            }
+            Some(agent_session(name, label, badge, command, workdir))
+        })
+        .collect()
+}
+
+fn valid_session_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+}
+
+fn zsh_start_in(workdir: &str, command: &str) -> String {
+    let cd_target = if workdir == "~" || workdir.starts_with("~/") {
+        workdir.to_string()
+    } else {
+        shell_word(workdir)
+    };
+    shell_command(&format!("cd {cd_target}; exec {command}"))
+}
+
+fn shell_command(script: &str) -> String {
+    format!("zsh -lic {}", shell_word(script))
+}
+
+fn shell_word(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 fn image_types() -> HashMap<String, &'static str> {
@@ -230,4 +331,40 @@ fn image_types() -> HashMap<String, &'static str> {
         ("image/webp".to_string(), ".webp"),
         ("image/gif".to_string(), ".gif"),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agent_presets_include_iflow_aliases_and_open_source_tools() {
+        let sessions =
+            agent_presets_from_raw("flow,gemini,qwen,goose,aider,unknown", "/tmp/project");
+        let names: Vec<&str> = sessions
+            .iter()
+            .map(|session| session.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["iflow", "gemini", "qwen", "goose", "aider"]);
+        assert!(sessions[0].start.contains("exec iflow"));
+        assert!(sessions[0].start.contains("/tmp/project"));
+    }
+
+    #[test]
+    fn custom_sessions_parse_valid_entries_and_ignore_invalid_names() {
+        let sessions = parse_custom_sessions(
+            "openclaw|Open Claw|oc|openclaw;bad:name|Bad|bd|bad",
+            "~/work",
+        );
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].name, "openclaw");
+        assert_eq!(sessions[0].label, "Open Claw");
+        assert_eq!(sessions[0].badge, "oc");
+        assert!(sessions[0].start.contains("cd ~/work; exec openclaw"));
+    }
+
+    #[test]
+    fn shell_word_escapes_single_quotes() {
+        assert_eq!(shell_word("/tmp/falk's repo"), "'/tmp/falk'\"'\"'s repo'");
+    }
 }

@@ -87,14 +87,14 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
     let live_by_name: HashMap<String, LiveSession> = live.iter().cloned().map(|s| (s.name.clone(), s)).collect();
     let mut sessions = Vec::new();
     for spec in &config.known_sessions {
-        let found = live_by_name.get(spec.name);
+        let found = live_by_name.get(&spec.name);
         sessions.push(SessionView {
-            name: spec.name.to_string(),
-            label: spec.label.to_string(),
-            family: spec.family.to_string(),
-            alias: spec.alias.to_string(),
-            badge: spec.badge.to_string(),
-            command: config.attach_template.replace("{name}", spec.name),
+            name: spec.name.clone(),
+            label: spec.label.clone(),
+            family: spec.family.clone(),
+            alias: spec.alias.clone(),
+            badge: spec.badge.clone(),
+            command: config.attach_template.replace("{name}", &spec.name),
             running: found.is_some(),
             windows: found.map(|s| s.windows).unwrap_or(0),
             attached: found.map(|s| s.attached).unwrap_or(0),
@@ -103,7 +103,7 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
         });
     }
     for item in live {
-        if config.known_sessions.iter().any(|s| s.name == item.name) {
+        if config.known_sessions.iter().any(|s| s.name == item.name.as_str()) {
             continue;
         }
         sessions.push(SessionView {
@@ -153,11 +153,11 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
     let by_session: HashMap<String, Pane> = panes.into_iter().map(|p| (p.session.clone(), p)).collect();
     let mut shells = Vec::new();
     for spec in &config.known_sessions {
-        if let Some(pane) = by_session.get(spec.name) {
+        if let Some(pane) = by_session.get(&spec.name) {
             let cwd = pane.cwd.replace(&home_dir().to_string_lossy().to_string(), "~");
-            shells.push(ShellPreview { name: spec.name.to_string(), label: spec.label.to_string(), running: true, cwd, command: pane.command.clone(), output: tidy_output(&capture_pane(pane, clean_lines(lines)).await), updated_at: iso_now() });
+            shells.push(ShellPreview { name: spec.name.clone(), label: spec.label.clone(), running: true, cwd, command: pane.command.clone(), output: tidy_output(&capture_pane(pane, clean_lines(lines)).await), updated_at: iso_now() });
         } else {
-            shells.push(ShellPreview { name: spec.name.to_string(), label: spec.label.to_string(), running: false, cwd: String::new(), command: String::new(), output: String::new(), updated_at: iso_now() });
+            shells.push(ShellPreview { name: spec.name.clone(), label: spec.label.clone(), running: false, cwd: String::new(), command: String::new(), output: String::new(), updated_at: iso_now() });
         }
     }
     serde_json::json!({ "shells": shells, "now": iso_now() })
@@ -192,14 +192,14 @@ pub async fn start_session(config: Arc<Config>, name: &str) -> Result<String, St
     if Command::new("/usr/bin/tmux").args(["has-session", "-t", name]).status().await.map(|s| s.success()).unwrap_or(false) {
         return Ok(format!("{name} is already running"));
     }
-    tmux_output(&["new-session", "-d", "-s", name, spec.start]).await?;
+    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
     Ok(format!("{name} started"))
 }
 
 pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, String> {
     let spec = config.known_sessions.iter().find(|s| s.name == name).ok_or("Unknown session")?;
     let _ = Command::new("/usr/bin/tmux").args(["kill-session", "-t", name]).status().await;
-    tmux_output(&["new-session", "-d", "-s", name, spec.start]).await?;
+    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
     Ok(format!("{name} restarted in ~"))
 }
 

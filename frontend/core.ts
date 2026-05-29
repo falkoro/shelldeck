@@ -50,6 +50,12 @@ interface UploadedImage {
   url: string;
 }
 
+interface ImageUploadResult {
+  image: UploadedImage;
+  optimized: boolean;
+  originalBytes: number;
+}
+
 interface RenderOptions {
   preserveUnlock?: boolean;
 }

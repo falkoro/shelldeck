@@ -149,17 +149,21 @@ async function optimizeImageForAgents(file: File): Promise<File> {
   return file;
 }
 
-async function uploadImageFile(file: File, name: string): Promise<void> {
+async function uploadImageForShell(
+  file: File,
+  name: string,
+  setStatus: (text: string) => void = (text) => setShellStatus(name, text),
+): Promise<ImageUploadResult> {
   if (!shellUnlocked) throw new Error('Unlock shells first');
   if (!name) throw new Error('Choose a shell first');
   if (!String(file.type || '').startsWith('image/')) throw new Error('That file is not an image');
   if (!SUPPORTED_UPLOAD_IMAGE_TYPES.has(String(file.type || '').toLowerCase())) {
     throw new Error('Supported image types are PNG, JPEG, WebP, and GIF');
   }
-  setShellStatus(name, file.size > AGENT_IMAGE_TARGET_BYTES ? 'Optimizing image...' : 'Saving image...');
+  setStatus(file.size > AGENT_IMAGE_TARGET_BYTES ? 'Optimizing image...' : 'Saving image...');
   const uploadFile = await optimizeImageForAgents(file);
   const optimized = uploadFile !== file;
-  setShellStatus(name, `Saving image (${formatBytes(uploadFile.size)})...`);
+  setStatus(`Saving image (${formatBytes(uploadFile.size)})...`);
   const payload = await postJson('/api/upload-image', {
     name: uploadFile.name || 'pasted-image',
     type: uploadFile.type,
@@ -167,9 +171,16 @@ async function uploadImageFile(file: File, name: string): Promise<void> {
   });
   if (!payload.image) throw new Error('Image upload did not return an image');
   addShellImage(name, payload.image);
-  appendInput(payload.image.path, name);
-  const sizeNote = optimized ? `optimized ${formatBytes(file.size)} -> ${formatBytes(payload.image.bytes)}` : formatBytes(payload.image.bytes);
-  setShellStatus(name, `Inserted ${payload.image.path} (${sizeNote})`);
+  renderShellImages(name);
+  return { image: payload.image, optimized, originalBytes: file.size };
+}
+
+async function uploadImageFile(file: File, name: string): Promise<void> {
+  const result = await uploadImageForShell(file, name);
+  const { image, optimized, originalBytes } = result;
+  appendInput(image.path, name);
+  const sizeNote = optimized ? `optimized ${formatBytes(originalBytes)} -> ${formatBytes(image.bytes)}` : formatBytes(image.bytes);
+  setShellStatus(name, `Inserted ${image.path} (${sizeNote})`);
   toast(optimized ? 'Optimized image path inserted' : 'Image path inserted');
 }
 

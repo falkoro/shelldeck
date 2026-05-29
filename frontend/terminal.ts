@@ -150,6 +150,60 @@ function doFit(tw: TermWindow): void {
   }, 140);
 }
 
+function terminalClipboardImages(event: ClipboardEvent): File[] {
+  return Array.from(event.clipboardData?.items || [])
+    .filter((item) => item.kind === 'file' && String(item.type || '').startsWith('image/'))
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+}
+
+function terminalDroppedImages(event: DragEvent): File[] {
+  return Array.from(event.dataTransfer?.files || []).filter((file) => String(file.type || '').startsWith('image/'));
+}
+
+function sendTerminalText(tw: TermWindow, text: string): void {
+  if (!text || !tw.ws || tw.ws.readyState !== WebSocket.OPEN) return;
+  tw.ws.send(new TextEncoder().encode(text));
+}
+
+async function insertTerminalImages(tw: TermWindow, files: File[]): Promise<void> {
+  const paths: string[] = [];
+  for (const file of files) {
+    const result = await uploadImageForShell(file, tw.name, (text) => {
+      tw.statusEl.textContent = text;
+      setShellStatus(tw.name, text);
+    });
+    paths.push(result.image.path);
+  }
+  if (!paths.length) return;
+  sendTerminalText(tw, paths.join(' '));
+  const message = paths.length === 1 ? `Inserted ${paths[0]}` : `Inserted ${paths.length} image paths`;
+  tw.statusEl.textContent = message;
+  toast('Image path inserted in Shell in');
+}
+
+function handleTerminalPaste(tw: TermWindow, event: ClipboardEvent): void {
+  const files = terminalClipboardImages(event);
+  if (!files.length) return;
+  event.preventDefault();
+  event.stopPropagation();
+  insertTerminalImages(tw, files).catch((error: Error) => {
+    tw.statusEl.textContent = 'image paste failed';
+    toast(error.message);
+  });
+}
+
+function handleTerminalDrop(tw: TermWindow, event: DragEvent): void {
+  const files = terminalDroppedImages(event);
+  if (!files.length) return;
+  event.preventDefault();
+  event.stopPropagation();
+  insertTerminalImages(tw, files).catch((error: Error) => {
+    tw.statusEl.textContent = 'image drop failed';
+    toast(error.message);
+  });
+}
+
 function makeDraggable(tw: TermWindow, bar: HTMLElement): void {
   bar.addEventListener('mousedown', (ev: MouseEvent) => {
     if ((ev.target as HTMLElement).closest('button')) return;
@@ -266,6 +320,12 @@ function createTermWindow(name: string): TermWindow {
     else term.write(new Uint8Array(ev.data as ArrayBuffer));
   };
   term.onData((d: string) => { if (ws.readyState === WebSocket.OPEN) ws.send(enc.encode(d)); });
+
+  el.addEventListener('paste', (event: ClipboardEvent) => handleTerminalPaste(tw, event), { capture: true });
+  host.addEventListener('dragover', (event: DragEvent) => {
+    if (terminalDroppedImages(event).length) event.preventDefault();
+  });
+  host.addEventListener('drop', (event: DragEvent) => handleTerminalDrop(tw, event));
 
   const ro = new ResizeObserver(() => doFit(tw));
   ro.observe(host);
