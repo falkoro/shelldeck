@@ -8,9 +8,13 @@ document.addEventListener('click', async (event: MouseEvent) => {
   const sendButton = target.closest<HTMLButtonElement>('[data-send-shell]');
   const pasteButton = target.closest<HTMLButtonElement>('[data-paste-shell]');
   const imageButton = target.closest<HTMLButtonElement>('[data-add-image]');
+  const dictateButton = target.closest<HTMLButtonElement>('[data-dictate-shell]');
   const historyButton = target.closest<HTMLButtonElement>('[data-history]');
   const copyOutputButton = target.closest<HTMLButtonElement>('[data-copy-output]');
   const clearPreviewButton = target.closest<HTMLButtonElement>('[data-clear-preview]');
+  const renameShellButton = target.closest<HTMLButtonElement>('[data-rename-shell]');
+  const resetShellLabelButton = target.closest<HTMLButtonElement>('[data-reset-shell-label]');
+  const renameSensorButton = target.closest<HTMLButtonElement>('[data-rename-sensor]');
   const shellinButton = target.closest<HTMLButtonElement>('[data-shellin]');
   const resumeButton = target.closest<HTMLButtonElement>('[data-resume]');
   const removeImageButton = target.closest<HTMLButtonElement>('[data-remove-image]');
@@ -21,9 +25,30 @@ document.addEventListener('click', async (event: MouseEvent) => {
     if (copyButton) return copyText(copyButton.dataset.copy || '');
     if (sendButton && !sendButton.disabled) return sendInput(sendButton.dataset.sendShell || '', true);
     if (pasteButton && !pasteButton.disabled) return sendInput(pasteButton.dataset.pasteShell || '', false);
+    if (dictateButton && !dictateButton.disabled) {
+      await toggleDictation(dictateButton.dataset.dictateShell || '');
+      return;
+    }
     if (historyButton) return cycleHistory(historyButton.dataset.history || '', 1);
     if (copyOutputButton) return copyShellOutput(copyOutputButton.dataset.copyOutput || '');
     if (clearPreviewButton) return clearShellPreview(clearPreviewButton.dataset.clearPreview || '');
+    if (renameShellButton) {
+      const name = renameShellButton.dataset.renameShell || '';
+      if (name && renameShellLabel(name)) {
+        renderShells({ shells: latestShells });
+        toast('Renamed');
+      }
+      return;
+    }
+    if (resetShellLabelButton) {
+      const name = resetShellLabelButton.dataset.resetShellLabel || '';
+      if (name && resetShellLabel(name)) {
+        renderShells({ shells: latestShells });
+        toast('Using auto title');
+      }
+      return;
+    }
+    if (renameSensorButton) return renameSensorLabel(renameSensorButton.dataset.renameSensor || '');
     if (shellinButton) {
       openTerminal(shellinButton.dataset.shellin || '');
       return;
@@ -33,14 +58,14 @@ document.addEventListener('click', async (event: MouseEvent) => {
       minimizeShellPreview(minimizeShellButton.dataset.minimizeShell || '');
       return;
     }
-    const resizePreviewButton = target.closest<HTMLButtonElement>('[data-resize-preview]');
-    if (resizePreviewButton) {
-      floatAndResizeShellPreview(resizePreviewButton.dataset.resizePreview || '');
-      return;
-    }
     const maximizePreviewButton = target.closest<HTMLButtonElement>('[data-maximize-preview]');
     if (maximizePreviewButton) {
       maximizeShellPreview(maximizePreviewButton.dataset.maximizePreview || '');
+      return;
+    }
+    const resetPreviewButton = target.closest<HTMLButtonElement>('[data-reset-preview]');
+    if (resetPreviewButton) {
+      resetShellPreview(resetPreviewButton.dataset.resetPreview || '');
       return;
     }
     if (resumeButton && resumeButton.dataset.resumeCmd) return runCommand(resumeButton.dataset.resume || '', resumeButton.dataset.resumeCmd);
@@ -82,7 +107,10 @@ document.addEventListener('focusin', (event: FocusEvent) => {
 });
 
 document.addEventListener('input', (event: Event) => {
-  if (event.target instanceof HTMLTextAreaElement && event.target.matches('[data-command]')) updateUnlockState();
+  if (event.target instanceof HTMLTextAreaElement && event.target.matches('[data-command]')) {
+    resetHistoryNavigation(event.target.dataset.command || '');
+    updateUnlockState();
+  }
 });
 
 document.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -96,12 +124,10 @@ document.addEventListener('keydown', (event: KeyboardEvent) => {
     sendInput(input.dataset.command || '', true).catch((error: Error) => toast(error.message));
   }
   if (event.key === 'ArrowUp' && !input.value) {
-    event.preventDefault();
-    cycleHistory(input.dataset.command || '', 1);
+    if (cycleHistory(input.dataset.command || '', 1)) event.preventDefault();
   }
   if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    cycleHistory(input.dataset.command || '', -1);
+    if (cycleHistory(input.dataset.command || '', -1)) event.preventDefault();
   }
 });
 
@@ -149,7 +175,12 @@ document.addEventListener('drop', (event: DragEvent) => {
 });
 
 q('#refreshBtn').addEventListener('click', () => refresh().catch((error: Error) => toast(error.message)));
-q('#guideBtn').addEventListener('click', () => showOnboarding());
+document.getElementById('settingsBtn')?.addEventListener('click', () => openSettingsEditor());
+document.getElementById('editTickersBtn')?.addEventListener('click', () => openSettingsEditor('tickers'));
+document.getElementById('safeShotBtn')?.addEventListener('click', () => createSafeShot().catch((error: Error) => toast(error.message)));
+document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
+document.getElementById('editRemoteHostsBtn')?.addEventListener('click', () => openRemoteHostsEditor().catch((error: Error) => toast(error.message)));
+document.getElementById('refreshSummaryBtn')?.addEventListener('click', () => refreshSummaries().catch((error: Error) => toast(error.message)));
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error: Error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
 q('#densityToggle').addEventListener('click', toggleDensity);
@@ -214,7 +245,7 @@ document.addEventListener('mousedown', (event: MouseEvent) => {
   const header = target?.closest<HTMLElement>('.terminal-card > header');
   if (!header) return;
   // Don't initiate drag when clicking buttons, inputs, or the card window controls
-  if ((event.target as HTMLElement)?.closest('button,input,textarea,select,[data-minimize-shell],[data-resize-preview],[data-maximize-shell]')) return;
+  if ((event.target as HTMLElement)?.closest('button,input,textarea,select,[data-minimize-shell],[data-maximize-shell],[data-reset-preview]')) return;
   const card = header.closest<HTMLElement>('[data-shell-card]');
   if (!card) return;
   const name = card.dataset.shellCard || '';
@@ -342,8 +373,6 @@ document.addEventListener('mousedown', (event: MouseEvent) => {
 });
 
 render(initialModel);
-buildLegend();
-maybeShowOnboarding();
 queueMicrotask(() => loadSummary().catch(() => {}));
 queueMicrotask(() => loadShells().then(startShellStream).catch((error: Error) => toast(error.message)));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => {}), 30000);
@@ -354,10 +383,23 @@ setInterval(() => loadSummary().catch(() => {}), 60000);
 (window as any).updateLastActivityTimes?.();
 setInterval(() => (window as any).updateLastActivityTimes?.(), 30000);
 
-// Live tickers (if any configured)
-queueMicrotask(() => loadTickers().catch(() => {}));
+queueMicrotask(() => {
+  loadDashboardSettings()
+    .catch(() => {})
+    .finally(() => {
+      loadTickers().catch(() => {});
+      loadMetrics().catch(() => {});
+      loadContainers().catch(() => {});
+      loadRemoteHosts().catch(() => {});
+      loadLinks().catch(() => {});
+    });
+});
 setInterval(() => loadTickers().catch(() => {}), 60000);
-
-// Live host machine stats (CPU / RAM / temps)
-queueMicrotask(() => loadMetrics().catch(() => {}));
 setInterval(() => loadMetrics().catch(() => {}), 5000);
+setInterval(() => loadContainers().catch(() => {}), 15000);
+setInterval(() => loadRemoteHosts().catch(() => {}), 20000);
+
+window.addEventListener('resize', () => {
+  shellTabsSignature = '';
+  applyWorkTitles();
+});

@@ -10,9 +10,13 @@ document.addEventListener('click', async (event) => {
     const sendButton = target.closest('[data-send-shell]');
     const pasteButton = target.closest('[data-paste-shell]');
     const imageButton = target.closest('[data-add-image]');
+    const dictateButton = target.closest('[data-dictate-shell]');
     const historyButton = target.closest('[data-history]');
     const copyOutputButton = target.closest('[data-copy-output]');
     const clearPreviewButton = target.closest('[data-clear-preview]');
+    const renameShellButton = target.closest('[data-rename-shell]');
+    const resetShellLabelButton = target.closest('[data-reset-shell-label]');
+    const renameSensorButton = target.closest('[data-rename-sensor]');
     const shellinButton = target.closest('[data-shellin]');
     const resumeButton = target.closest('[data-resume]');
     const removeImageButton = target.closest('[data-remove-image]');
@@ -26,12 +30,34 @@ document.addEventListener('click', async (event) => {
             return sendInput(sendButton.dataset.sendShell || '', true);
         if (pasteButton && !pasteButton.disabled)
             return sendInput(pasteButton.dataset.pasteShell || '', false);
+        if (dictateButton && !dictateButton.disabled) {
+            await toggleDictation(dictateButton.dataset.dictateShell || '');
+            return;
+        }
         if (historyButton)
             return cycleHistory(historyButton.dataset.history || '', 1);
         if (copyOutputButton)
             return copyShellOutput(copyOutputButton.dataset.copyOutput || '');
         if (clearPreviewButton)
             return clearShellPreview(clearPreviewButton.dataset.clearPreview || '');
+        if (renameShellButton) {
+            const name = renameShellButton.dataset.renameShell || '';
+            if (name && renameShellLabel(name)) {
+                renderShells({ shells: latestShells });
+                toast('Renamed');
+            }
+            return;
+        }
+        if (resetShellLabelButton) {
+            const name = resetShellLabelButton.dataset.resetShellLabel || '';
+            if (name && resetShellLabel(name)) {
+                renderShells({ shells: latestShells });
+                toast('Using auto title');
+            }
+            return;
+        }
+        if (renameSensorButton)
+            return renameSensorLabel(renameSensorButton.dataset.renameSensor || '');
         if (shellinButton) {
             openTerminal(shellinButton.dataset.shellin || '');
             return;
@@ -41,14 +67,14 @@ document.addEventListener('click', async (event) => {
             minimizeShellPreview(minimizeShellButton.dataset.minimizeShell || '');
             return;
         }
-        const resizePreviewButton = target.closest('[data-resize-preview]');
-        if (resizePreviewButton) {
-            floatAndResizeShellPreview(resizePreviewButton.dataset.resizePreview || '');
-            return;
-        }
         const maximizePreviewButton = target.closest('[data-maximize-preview]');
         if (maximizePreviewButton) {
             maximizeShellPreview(maximizePreviewButton.dataset.maximizePreview || '');
+            return;
+        }
+        const resetPreviewButton = target.closest('[data-reset-preview]');
+        if (resetPreviewButton) {
+            resetShellPreview(resetPreviewButton.dataset.resetPreview || '');
             return;
         }
         if (resumeButton && resumeButton.dataset.resumeCmd)
@@ -93,8 +119,10 @@ document.addEventListener('focusin', (event) => {
         selectSession(input.dataset.command);
 });
 document.addEventListener('input', (event) => {
-    if (event.target instanceof HTMLTextAreaElement && event.target.matches('[data-command]'))
+    if (event.target instanceof HTMLTextAreaElement && event.target.matches('[data-command]')) {
+        resetHistoryNavigation(event.target.dataset.command || '');
         updateUnlockState();
+    }
 });
 document.addEventListener('keydown', (event) => {
     const input = event.target instanceof HTMLTextAreaElement && event.target.matches('[data-command]') ? event.target : null;
@@ -108,12 +136,12 @@ document.addEventListener('keydown', (event) => {
         sendInput(input.dataset.command || '', true).catch((error) => toast(error.message));
     }
     if (event.key === 'ArrowUp' && !input.value) {
-        event.preventDefault();
-        cycleHistory(input.dataset.command || '', 1);
+        if (cycleHistory(input.dataset.command || '', 1))
+            event.preventDefault();
     }
     if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        cycleHistory(input.dataset.command || '', -1);
+        if (cycleHistory(input.dataset.command || '', -1))
+            event.preventDefault();
     }
 });
 // Backstop: when focus is on the page body (not an editable field, button, link or
@@ -160,7 +188,12 @@ document.addEventListener('drop', (event) => {
     handleImageFiles(event.dataTransfer?.files, card.dataset.shellCard || '').catch((error) => toast(error.message));
 });
 q('#refreshBtn').addEventListener('click', () => refresh().catch((error) => toast(error.message)));
-q('#guideBtn').addEventListener('click', () => showOnboarding());
+document.getElementById('settingsBtn')?.addEventListener('click', () => openSettingsEditor());
+document.getElementById('editTickersBtn')?.addEventListener('click', () => openSettingsEditor('tickers'));
+document.getElementById('safeShotBtn')?.addEventListener('click', () => createSafeShot().catch((error) => toast(error.message)));
+document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
+document.getElementById('editRemoteHostsBtn')?.addEventListener('click', () => openRemoteHostsEditor().catch((error) => toast(error.message)));
+document.getElementById('refreshSummaryBtn')?.addEventListener('click', () => refreshSummaries().catch((error) => toast(error.message)));
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
 q('#densityToggle').addEventListener('click', toggleDensity);
@@ -232,7 +265,7 @@ document.addEventListener('mousedown', (event) => {
     if (!header)
         return;
     // Don't initiate drag when clicking buttons, inputs, or the card window controls
-    if (event.target?.closest('button,input,textarea,select,[data-minimize-shell],[data-resize-preview],[data-maximize-shell]'))
+    if (event.target?.closest('button,input,textarea,select,[data-minimize-shell],[data-maximize-shell],[data-reset-preview]'))
         return;
     const card = header.closest('[data-shell-card]');
     if (!card)
@@ -363,8 +396,6 @@ document.addEventListener('mousedown', (event) => {
     document.addEventListener('mouseup', onUp, { once: true });
 });
 render(initialModel);
-buildLegend();
-maybeShowOnboarding();
 queueMicrotask(() => loadSummary().catch(() => { }));
 queueMicrotask(() => loadShells().then(startShellStream).catch((error) => toast(error.message)));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => { }), 30000);
@@ -373,9 +404,22 @@ setInterval(() => loadSummary().catch(() => { }), 60000);
 // Note: defined in core.ts (loaded before events.js in the page).
 window.updateLastActivityTimes?.();
 setInterval(() => window.updateLastActivityTimes?.(), 30000);
-// Live tickers (if any configured)
-queueMicrotask(() => loadTickers().catch(() => { }));
+queueMicrotask(() => {
+    loadDashboardSettings()
+        .catch(() => { })
+        .finally(() => {
+        loadTickers().catch(() => { });
+        loadMetrics().catch(() => { });
+        loadContainers().catch(() => { });
+        loadRemoteHosts().catch(() => { });
+        loadLinks().catch(() => { });
+    });
+});
 setInterval(() => loadTickers().catch(() => { }), 60000);
-// Live host machine stats (CPU / RAM / temps)
-queueMicrotask(() => loadMetrics().catch(() => { }));
 setInterval(() => loadMetrics().catch(() => { }), 5000);
+setInterval(() => loadContainers().catch(() => { }), 15000);
+setInterval(() => loadRemoteHosts().catch(() => { }), 20000);
+window.addEventListener('resize', () => {
+    shellTabsSignature = '';
+    applyWorkTitles();
+});

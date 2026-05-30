@@ -12,6 +12,7 @@ pub struct Metrics {
     pub hostname: String,
     pub cpu_pct: f64,
     pub cpu_cores: usize,
+    pub cpu_mhz: f64,
     pub load1: f64,
     pub load5: f64,
     pub load15: f64,
@@ -69,6 +70,21 @@ fn meminfo_kb(info: &str, key: &str) -> u64 {
         .unwrap_or(0)
 }
 
+fn cpu_mhz(cpuinfo: &str) -> f64 {
+    let mut values: Vec<f64> = cpuinfo
+        .lines()
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(key, _)| key.trim() == "cpu MHz")
+        .filter_map(|(_, value)| value.trim().parse::<f64>().ok())
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .collect();
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(|a, b| a.total_cmp(b));
+    values[values.len() / 2]
+}
+
 // Read each hwmon's tempN_input (millidegrees) and its tempN_label, falling back to
 // the hwmon `name` so AMD k10temp / Intel coretemp / nvme sensors all show up.
 fn read_temps() -> Vec<Temp> {
@@ -98,11 +114,18 @@ fn read_temps() -> Vec<Temp> {
                 .ok()
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
+                .map(|label| {
+                    if chip.is_empty() || label.to_lowercase().contains(&chip.to_lowercase()) {
+                        label
+                    } else {
+                        format!("{chip} {label}")
+                    }
+                })
                 .unwrap_or_else(|| {
                     if chip.is_empty() {
                         format!("temp{i}")
                     } else {
-                        format!("{chip} {i}")
+                        format!("{chip} temp{i}")
                     }
                 });
             temps.push(Temp { label, celsius });
@@ -118,6 +141,10 @@ pub async fn gather() -> Metrics {
     let cpu_cores = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(0);
+    let cpu_mhz = tokio::fs::read_to_string("/proc/cpuinfo")
+        .await
+        .map(|info| cpu_mhz(&info))
+        .unwrap_or(0.0);
     let load = tokio::fs::read_to_string("/proc/loadavg")
         .await
         .unwrap_or_default();
@@ -159,6 +186,7 @@ pub async fn gather() -> Metrics {
         hostname,
         cpu_pct,
         cpu_cores,
+        cpu_mhz,
         load1,
         load5,
         load15,

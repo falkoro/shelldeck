@@ -1,6 +1,9 @@
-use crate::{auth, metrics, pages, stream, summary, term, tmux, uploads, webutil, AppState};
+use crate::{
+    auth, config, containers, links, metrics, pages, remote, remote_hosts, settings, share, stream,
+    summary, term, tmux, uploads, webutil, AppState,
+};
 use axum::{
-    extract::{ConnectInfo, Path, Query, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::Response,
     routing::{get, post},
@@ -37,7 +40,28 @@ struct LinesQuery {
     lines: Option<u32>,
 }
 
+#[derive(Deserialize)]
+struct LinksBody {
+    links: Vec<links::QuickLink>,
+}
+
+#[derive(Deserialize)]
+struct SettingsBody {
+    tickers: Vec<String>,
+    panels: settings::PanelSettings,
+}
+
+#[derive(Deserialize)]
+struct RemoteHostsBody {
+    hosts: Vec<config::RemoteHostConfig>,
+}
+
 pub fn router(state: AppState) -> Router {
+    // Honor the configured image cap: base64 inflates ~4/3, so size the body limit to the
+    // configured raw cap plus the base64 overhead (axum's 2 MiB default would otherwise
+    // silently reject anything over ~1.5 MB raw, making DASHBOARD_MAX_IMAGE_BYTES a no-op).
+    let upload_limit = state.config.max_image_bytes / 3 * 4 + 4096;
+    let share_limit = 4 * 1024 * 1024 / 3 * 4 + 4096;
     Router::new()
         .route("/", get(root))
         .route("/healthz", get(health))
@@ -52,12 +76,30 @@ pub fn router(state: AppState) -> Router {
         .route("/api/summary", get(api_summary))
         .route("/api/shells", get(api_shells))
         .route("/api/metrics", get(api_metrics))
+        .route("/api/containers", get(api_containers))
+        .route("/api/remote-hosts", get(api_remote_hosts))
+        .route(
+            "/api/remote-hosts/config",
+            get(api_remote_hosts_config).post(api_remote_hosts_save),
+        )
+        .route("/api/links", get(api_links).post(api_links_save))
+        .route(
+            "/api/ui-config",
+            get(api_ui_config).post(api_ui_config_save),
+        )
         .route("/api/tickers", get(api_tickers))
+        .route(
+            "/api/share-shot",
+            post(api_share_shot).layer(DefaultBodyLimit::max(share_limit)),
+        )
         .route("/api/shells/stream", get(stream::api_shell_stream))
         .route("/api/term", get(term::term_ws))
         .route("/api/input", post(api_input))
         .route("/api/key", post(api_key))
-        .route("/api/upload-image", post(api_upload))
+        .route(
+            "/api/upload-image",
+            post(api_upload).layer(DefaultBodyLimit::max(upload_limit)),
+        )
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
         .with_state(state)
@@ -140,7 +182,9 @@ async fn login_post(
     }
     let username = webutil::form_value(&body, "username");
     let password = webutil::form_value(&body, "password");
-    if username == state.config.user && password == state.config.password {
+    if username == state.config.user
+        && webutil::ct_eq(password.as_bytes(), state.config.password.as_bytes())
+    {
         let mut response = webutil::redirect("/");
         auth::set_login_cookie(&mut response, &state.config, &headers, &username);
         return response;
@@ -187,11 +231,14 @@ async fn asset(State(state): State<AppState>, Path(file): Path<String>) -> Respo
     let content_type = match file.rsplit_once('.').map(|(_, ext)| ext) {
         Some("css") => "text/css; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
+        Some("png") => "image/png",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml; charset=utf-8",
         _ => {
             return webutil::json_response(
                 StatusCode::NOT_FOUND,
                 &serde_json::json!({ "error": "Not found" }),
-            )
+            );
         }
     };
     let path = state
@@ -221,11 +268,7 @@ async fn upload(
         return response;
     }
     match uploads::load_image(state.config.clone(), &file).await {
-        Ok((content_type, bytes)) => webutil::text_response(
-            StatusCode::OK,
-            Box::leak(content_type.into_boxed_str()),
-            bytes,
-        ),
+        Ok((content_type, bytes)) => webutil::text_response(StatusCode::OK, content_type, bytes),
         Err(response) => response,
     }
 }
@@ -258,7 +301,9 @@ async fn api_unlock(
     if let Err(response) = require_action(&headers) {
         return response;
     }
-    if body.password.to_lowercase().trim() != state.config.unlock_password.to_lowercase().trim() {
+    let given = body.password.to_lowercase();
+    let want = state.config.unlock_password.to_lowercase();
+    if !webutil::ct_eq(given.trim().as_bytes(), want.trim().as_bytes()) {
         return webutil::json_response(
             StatusCode::UNAUTHORIZED,
             &serde_json::json!({ "error": "Second password did not match" }),
@@ -329,7 +374,11 @@ async fn api_tickers(
             &serde_json::json!({ "error": "Forbidden" }),
         );
     }
-    let fetches = state.config.tickers.iter().take(16).cloned().map(|sym| {
+    let settings = settings::load(state.config.clone()).await;
+    if !settings.panels.tickers {
+        return webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": [] }));
+    }
+    let fetches = settings.tickers.iter().take(16).cloned().map(|sym| {
         let client = state.client.clone();
         async move {
             let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d", urlencoding::encode(&sym));
@@ -470,6 +519,166 @@ async fn api_metrics(
         return response;
     }
     webutil::json_response(StatusCode::OK, &metrics::gather().await)
+}
+
+// Running Docker/Podman containers on the ShellDeck host. Login-gated, not shell-unlock gated.
+async fn api_containers(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(StatusCode::OK, &containers::running().await)
+}
+
+// Remote host checks run from the ShellDeck server, so DNS/VPN/SSH reachability matches
+// what the dashboard backend can actually see.
+async fn api_remote_hosts(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    let hosts = remote_hosts::load(state.config.clone()).await;
+    webutil::json_response(
+        StatusCode::OK,
+        &remote::check_all(hosts, state.config.remote_container_cap).await,
+    )
+}
+
+async fn api_remote_hosts_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    let hosts = remote_hosts::load(state.config.clone()).await;
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "hosts": hosts }))
+}
+
+async fn api_remote_hosts_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<RemoteHostsBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    // Adding a host means the server will SSH to that target, so gate it behind unlock
+    // (same bar as sending shell input), not just login.
+    if let Err(response) = require_unlock(&state, &headers) {
+        return response;
+    }
+    match remote_hosts::save(state.config.clone(), body.hosts).await {
+        Ok(hosts) => webutil::json_response(StatusCode::OK, &serde_json::json!({ "hosts": hosts })),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_links(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    let links = links::load(state.config.clone()).await;
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "links": links }))
+}
+
+async fn api_links_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<LinksBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    match links::save(state.config.clone(), body.links).await {
+        Ok(links) => webutil::json_response(StatusCode::OK, &serde_json::json!({ "links": links })),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_ui_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(StatusCode::OK, &settings::load(state.config.clone()).await)
+}
+
+async fn api_ui_config_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<SettingsBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    let settings = settings::DashboardSettings {
+        tickers: body.tickers,
+        panels: body.panels,
+    };
+    match settings::save(state.config.clone(), settings).await {
+        Ok(settings) => webutil::json_response(StatusCode::OK, &settings),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_share_shot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<share::ShareShotUpload>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    match share::save(state.config.clone(), body).await {
+        Ok(saved) => webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({ "ok": true, "shot": saved }),
+        ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
 }
 
 fn session_result(result: Result<String, String>) -> Response {

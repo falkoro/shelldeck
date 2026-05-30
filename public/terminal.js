@@ -6,6 +6,7 @@ let cascade = 0;
 const DEFAULT_W = 880;
 const DEFAULT_H = 540;
 const MOBILE_BREAKPOINT = 760;
+const TERMINAL_PASTE_CHUNK_BYTES = 4096;
 function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
 }
@@ -48,7 +49,7 @@ function renderDock() {
         any = true;
         const item = document.createElement('div');
         item.className = 'term-min-item';
-        item.innerHTML = `<span class="tm-name">${escapeHtml(tw.name)}</span><button type="button" class="tm-btn" data-act="restore" title="Restore window">▴</button><button type="button" class="tm-btn tm-close" data-act="close" title="Close">×</button>`;
+        item.innerHTML = `<span class="tm-name">${escapeHtml(tw.name)}</span><button type="button" class="tm-btn" data-act="restore" title="Restore window">▴</button><button type="button" class="tm-btn tm-close" data-act="close" title="Detach (the tmux session keeps running)">×</button>`;
         item.querySelectorAll('button').forEach((btn) => {
             const act = btn.dataset.act;
             btn.addEventListener('click', (e) => { e.stopPropagation(); if (act === 'restore')
@@ -136,10 +137,19 @@ function terminalClipboardImages(event) {
 function terminalDroppedImages(event) {
     return Array.from(event.dataTransfer?.files || []).filter((file) => String(file.type || '').startsWith('image/'));
 }
+function terminalPasteText(tw, text) {
+    const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\u0000/g, '');
+    if (tw.term?.modes?.bracketedPasteMode)
+        return `\x1b[200~${clean}\x1b[201~`;
+    return clean.replace(/\n/g, '\r');
+}
 function sendTerminalText(tw, text) {
     if (!text || !tw.ws || tw.ws.readyState !== WebSocket.OPEN)
         return;
-    tw.ws.send(new TextEncoder().encode(text));
+    const bytes = new TextEncoder().encode(text);
+    for (let offset = 0; offset < bytes.length; offset += TERMINAL_PASTE_CHUNK_BYTES) {
+        tw.ws.send(bytes.slice(offset, offset + TERMINAL_PASTE_CHUNK_BYTES));
+    }
 }
 async function insertTerminalImages(tw, files) {
     const paths = [];
@@ -159,10 +169,17 @@ async function insertTerminalImages(tw, files) {
 }
 function handleTerminalPaste(tw, event) {
     const files = terminalClipboardImages(event);
-    if (!files.length)
+    const text = event.clipboardData?.getData('text/plain') || '';
+    if (!files.length && !text)
         return;
     event.preventDefault();
     event.stopPropagation();
+    if (text) {
+        const paste = terminalPasteText(tw, text);
+        sendTerminalText(tw, paste);
+        tw.statusEl.textContent = `pasted ${text.length.toLocaleString()} chars`;
+        return;
+    }
     insertTerminalImages(tw, files).catch((error) => {
         tw.statusEl.textContent = 'image paste failed';
         toast(error.message);
@@ -246,7 +263,7 @@ function createTermWindow(name) {
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
-        <button type="button" class="term-btn term-close" data-act="close" title="Close terminal" aria-label="Close terminal"><span class="term-close-label">Close</span><span aria-hidden="true">×</span></button>
+        <button type="button" class="term-btn term-close" data-act="close" title="Detach this view — the tmux session keeps running" aria-label="Detach terminal view (session keeps running)"><span class="term-close-label">Detach</span><span aria-hidden="true">×</span></button>
       </div>
     </div>
     <div class="term-host" data-host></div>
@@ -452,19 +469,38 @@ function closeTerminal() {
 // to the same bottom-right dock used by the full interactive terminals.
 const minimizedPreviews = new Set();
 window.minimizedPreviews = minimizedPreviews;
+function shellPreviewCard(name) {
+    if (!name)
+        return null;
+    return document.querySelector(`[data-shell-card="${selectorEscape(name)}"]`);
+}
+function clearPreviewFullscreenState() {
+    document.body.classList.toggle('preview-fullscreen-open', Boolean(document.querySelector('.terminal-card.preview-fullscreen')));
+}
+function clearPreviewSizing(card) {
+    card.classList.remove('preview-enlarged', 'preview-fullscreen', 'resizing');
+    card.style.minHeight = '';
+    card.style.maxWidth = '';
+    delete card.dataset.sized;
+    const pre = card.querySelector('[data-role="output"]');
+    if (pre)
+        pre.style.maxHeight = '';
+}
 function minimizeShellPreview(name) {
     if (!name)
         return;
     minimizedPreviews.add(name);
-    // Hide the card in the grid if it's currently rendered there
-    const card = document.querySelector(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
-    if (card)
+    const card = shellPreviewCard(name);
+    if (card) {
+        card.classList.remove('preview-fullscreen');
         card.style.display = 'none';
+    }
+    clearPreviewFullscreenState();
     renderDock();
 }
 function restoreShellPreview(name) {
     minimizedPreviews.delete(name);
-    const card = document.querySelector(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
+    const card = shellPreviewCard(name);
     if (card) {
         card.style.display = '';
         card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -478,46 +514,53 @@ function restoreShellPreview(name) {
 function maximizeShellPreview(name) {
     if (!name)
         return;
-    // Minimize all other previews
-    const cards = document.querySelectorAll('[data-shell-card]');
-    cards.forEach((card) => {
-        const n = card.dataset.shellCard || '';
-        if (n && n !== name && !minimizedPreviews.has(n)) {
-            minimizeShellPreview(n);
-        }
-    });
-    // Make sure this one is visible and prominent
     restoreShellPreview(name);
-    const thisCard = document.querySelector(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
-    if (thisCard) {
-        thisCard.scrollIntoView({ block: 'start', behavior: 'smooth' });
-        // Optional: give it a temporary boost
-        thisCard.style.minHeight = '520px';
-        setTimeout(() => { if (thisCard)
-            thisCard.style.minHeight = ''; }, 8000);
-    }
-}
-function floatAndResizeShellPreview(name) {
-    if (!name)
-        return;
-    // For now, a practical "resize bigger" in the grid + hint that full floating drag is available via Shell in
-    const card = document.querySelector(`[data-shell-card="${name.replace(/"/g, '\\"')}"]`);
+    const card = shellPreviewCard(name);
     if (!card)
         return;
-    // Toggle a larger state
-    if (card.classList.contains('preview-enlarged')) {
-        card.classList.remove('preview-enlarged');
-        card.style.minHeight = '';
+    if (card.classList.contains('preview-fullscreen')) {
+        resetShellPreview(name);
+        return;
+    }
+    document.querySelectorAll('.terminal-card.preview-fullscreen').forEach((openCard) => {
+        if (openCard !== card)
+            openCard.classList.remove('preview-fullscreen');
+    });
+    card.classList.remove('preview-enlarged');
+    card.classList.add('preview-fullscreen');
+    card.style.display = '';
+    card.style.minHeight = '';
+    card.style.maxWidth = '';
+    const pre = card.querySelector('[data-role="output"]');
+    if (pre)
+        pre.style.maxHeight = '';
+    selectSession(name);
+    clearPreviewFullscreenState();
+}
+function resetShellPreview(name) {
+    if (!name)
+        return;
+    minimizedPreviews.delete(name);
+    const card = shellPreviewCard(name);
+    if (card) {
+        clearPreviewSizing(card);
+        resetShellCardSize(name);
+        card.style.display = '';
+        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     else {
-        card.classList.add('preview-enlarged');
-        card.style.minHeight = '620px';
-        card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        window.loadShells?.().catch(() => { });
     }
+    clearPreviewFullscreenState();
+    renderDock();
 }
 function restoreAllShellPreviews() {
     minimizedPreviews.clear();
-    document.querySelectorAll('[data-shell-card]').forEach(c => c.style.display = '');
+    document.querySelectorAll('[data-shell-card]').forEach((card) => {
+        card.style.display = '';
+        card.classList.remove('preview-fullscreen');
+    });
+    clearPreviewFullscreenState();
     renderDock();
 }
 window.restoreAllShellPreviews = restoreAllShellPreviews;
@@ -525,7 +568,16 @@ window.restoreAllShellPreviews = restoreAllShellPreviews;
 window.minimizeShellPreview = minimizeShellPreview;
 window.restoreShellPreview = restoreShellPreview;
 window.maximizeShellPreview = maximizeShellPreview;
-window.floatAndResizeShellPreview = floatAndResizeShellPreview;
+window.resetShellPreview = resetShellPreview;
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape')
+        return;
+    const card = document.querySelector('.terminal-card.preview-fullscreen');
+    if (!card)
+        return;
+    event.preventDefault();
+    resetShellPreview(card.dataset.shellCard || '');
+});
 window.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('scroll', refreshTerminalViewportMode);

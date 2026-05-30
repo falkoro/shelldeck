@@ -1,8 +1,14 @@
 mod auth;
 mod config;
+mod containers;
+mod links;
 mod metrics;
 mod pages;
+mod remote;
+mod remote_hosts;
 mod routes;
+mod settings;
+mod share;
 mod stream;
 mod summary;
 mod term;
@@ -28,6 +34,12 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     let config = Arc::new(Config::from_env());
+    if config.unlock_password == "change-me" {
+        eprintln!(
+            "WARNING: DASHBOARD_UNLOCK_PASSWORD is unset; using the default 'change-me'. \
+             Anyone who can reach the dashboard can unlock live shell control — set it."
+        );
+    }
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .connect_timeout(std::time::Duration::from_secs(4))

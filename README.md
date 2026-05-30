@@ -13,12 +13,14 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Per-shell work titles** — an AI summary names *what each session is working on* (the running/waiting state is the badge's job).
 - **Real in-browser terminal** — "Shell in" opens an [xterm.js](https://xtermjs.org/) terminal bridged over a WebSocket to a PTY running `tmux attach`. Type, run, Ctrl-C — like actually being in the shell.
 - **Resume button** — when a pane prints a recovery command (e.g. `codex resume <id>`), a one-click button runs it.
-- **Copy / Send / Paste / keys** — copy attach commands or pane output, send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, image paste, and command history. Image paste/drop works in both the composer cards and **Shell in** terminals.
+- **Copy / Send / Paste / keys** — copy attach commands or pane output, send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, browser-native microphone dictation, image paste, and command history. Image paste/drop works in both the composer cards and **Shell in** terminals.
 - **Browser memory** — remembers the selected shell, command history, view/density/line preferences, shell order/sizes, onboarding dismissal, and floating terminal window positions in local browser storage.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
 - **Agent presets** — optional Start/Restart entries for iFlow/Flow, Gemini CLI, Qwen Code, goose, Aider, OpenCode, Codex, Grok, Claude Code, and custom commands.
-- **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`).
-- **Machine metrics** — a sidebar widget shows live CPU, RAM, load average, and hardware temperatures (read from `/proc` and `/sys/class/hwmon`) for the host ShellDeck runs on.
+- **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`, then editable in `links.json`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`, then editable in `dashboard-config.json`).
+- **Configurable widgets** — Machine, remote hosts, local containers, Links, and the ticker bar can be shown/hidden from **Configure**, with JSON persistence for agent-driven setup. Remote-host widgets and quick links are fully self-service: add/edit/remove them from the sidebar (Homarr-style) without touching env or restarting.
+- **Machine metrics and containers** — sidebar widgets show live CPU, CPU MHz, RAM, load average, hardware temperatures, local Docker/Podman containers, plus optional SSH-based remote host ping/container checks.
+- **Safe shot** — creates a sanitized share image with shell names, commands, paths, hostnames, and output removed; copies it to the clipboard and saves it under `share/`.
 - **Locked down** — primary login + a second "unlock" password to gate shell control, optional IP allowlists, and first-class support for sitting behind **Cloudflare Access** (trusts the verified email).
 
 ## Requirements
@@ -40,9 +42,50 @@ cargo build --release
 
 Copy `.env.example` and set at least `DASHBOARD_PASSWORD`. See that file for every option (login, IP allowlists, Cloudflare Access, the optional AI summary, quick links, and tickers).
 
+For a real private env file, use the helper so the folder is created and the file is locked to `0600` without printing values:
+
+```sh
+scripts/shelldeck-secret --dir ~/.config/shelldeck DASHBOARD_SECRET --generate
+scripts/shelldeck-secret --dir ~/.config/shelldeck DASHBOARD_PASSWORD --prompt
+```
+
+`--dir ~/.config/shelldeck` writes `~/.config/shelldeck/.env`; use `--env-file ~/.config/shelldeck/shelldeck.env` when your systemd unit points at a named `EnvironmentFile`.
+
+`DASHBOARD_LINKS` seeds the sidebar links. Runtime edits are saved to `links.json` in `DASHBOARD_ROOT_DIR` by default, or to `DASHBOARD_LINKS_FILE` when set.
+
+`DASHBOARD_TICKERS` seeds the ticker bar. Runtime edits and widget visibility are saved to `dashboard-config.json` in `DASHBOARD_ROOT_DIR` by default, or to `DASHBOARD_UI_CONFIG_FILE` when set:
+
+```json
+{
+  "tickers": ["MSFT", "NVDA", "BTC-USD"],
+  "panels": {
+    "machine": true,
+    "machineSensors": true,
+    "remoteHosts": true,
+    "containers": true,
+    "links": true,
+    "tickers": true
+  }
+}
+```
+
+The **Safe shot** button saves a sanitized full-dashboard PNG to `share/shelldeck-safe-shot.png` by default, or `DASHBOARD_SHARE_SHOT_FILE` when set.
+
+`DASHBOARD_REMOTE_HOSTS` adds Homarr-style remote host widgets. ShellDeck checks these from the server using `ping` and read-only SSH container commands:
+
+```sh
+DASHBOARD_REMOTE_HOSTS=logan502vs|Logan GL502VS|logan-gl502vs
+```
+
+This env value only *seeds* `remote-hosts.json` on first run. After that, add, edit, and remove hosts from the sidebar's **Remote Hosts → Edit** button (self-service, no restart) — one `id|Label|user@host` per line. Targets are validated and a leading `-` is rejected so a value can never be parsed as an `ssh`/`ping` option. The widget shows each host's full container count (default cap 100, tune with `DASHBOARD_REMOTE_CONTAINER_CAP`) and notes "showing N" rather than silently hiding the tail.
+
+`DASHBOARD_SSH_ATTACH_TEMPLATE` adds a per-session **SSH** button that copies a command to attach to that tmux session from another machine (e.g. `ssh logan-laptop -t 'tmux attach -t {name}'`, `{name}` = session). It's copy-only — ShellDeck never runs it — and the button hides when the template is unset.
+
+Microphone dictation uses the browser's native speech recognition API. It needs a supporting browser such as Chrome or Edge and a secure context (`https://` or `localhost`); ShellDeck does not send audio to its backend or need a microphone secret.
+
 ### Agent Presets And Open-Source CLIs
 
-ShellDeck automatically shows live custom tmux sessions even when it did not start them. If you also want first-class **Start** / **Restart** buttons for AI coding agents, enable presets:
+ShellDeck shows the configured slots, presets, and custom sessions by default. Set `DASHBOARD_SHOW_UNKNOWN_SESSIONS=1` only if you also want unrelated live tmux sessions to appear in the bar. If you want first-class **Start** / **Restart** buttons for AI coding agents, enable presets:
 
 ```sh
 DASHBOARD_AGENT_WORKDIR=/home/you/repos
@@ -107,9 +150,12 @@ Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally
 1. Sign in, then enter `DASHBOARD_UNLOCK_PASSWORD` in **Shell Unlock**. Until unlocked, pane previews, input, summaries, and live terminals stay gated.
 2. Use **Send** to paste text and press Enter in a pane. Use **Paste** to insert text without pressing Enter. On mobile, plain Enter in the textarea sends; Shift+Enter inserts a newline.
 3. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
-4. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box.
-5. Use **Shell in** to open a real interactive terminal. Paste/drop an image there to upload it and insert the saved file path into the live terminal input. On mobile, the terminal opens full-screen with a visible **Close x** button in the title bar.
-6. Browser memory is on by default. ShellDeck stores UI preferences and command history in `localStorage`; clear site data in the browser if you want to reset that memory.
+4. Use **Mic** to dictate into a shell input when the browser supports native speech recognition.
+5. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box. Attachment chips clear after a successful send/paste into tmux.
+6. Use **Shell in** to open a real interactive terminal. Paste/drop an image there to upload it and insert the saved file path into the live terminal input. On mobile, the terminal opens full-screen with a visible **Close x** button in the title bar.
+7. Use **Configure** to edit widget visibility and stock/crypto tickers without changing env files. The **Edit tickers** button jumps straight to the same ticker config.
+8. Use **Safe shot** to copy a redacted PNG to the clipboard and save the same image in the repo `share/` folder.
+9. Browser memory is on by default. ShellDeck stores UI preferences, command history, cached shell previews, shell order/sizes, onboarding dismissal, and floating terminal window positions in `localStorage`; clear site data in the browser if you want to reset that memory.
 
 ## Development
 

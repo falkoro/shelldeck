@@ -1,4 +1,4 @@
-use crate::{auth, tmux, webutil, AppState};
+use crate::{auth, config::Config, tmux, webutil, AppState};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -31,35 +31,97 @@ pub async fn term_ws(
     ws: WebSocketUpgrade,
 ) -> Response {
     let remote = connect.0.ip().to_string();
-    if !auth::network_allowed(&state.config, &headers, Some(&remote)) || !auth::authenticated(&state.config, &headers, Some(&remote)) {
-        return webutil::json_response(StatusCode::FORBIDDEN, &serde_json::json!({ "error": "Forbidden" }));
+    if !auth::network_allowed(&state.config, &headers, Some(&remote))
+        || !auth::authenticated(&state.config, &headers, Some(&remote))
+    {
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": "Forbidden" }),
+        );
     }
     if !auth::unlocked(&state.config, &headers) {
-        return webutil::json_response(StatusCode::FORBIDDEN, &serde_json::json!({ "error": "Shell unlock required" }));
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": "Shell unlock required" }),
+        );
+    }
+    // Cross-site WebSocket hijacking guard: the WS handshake can't carry the X-Codex-Action
+    // CSRF header, so a malicious cross-origin page could otherwise drive this PTY using the
+    // victim's cookies. Reject when a browser Origin is present and doesn't match the host.
+    if let Some(reason) = blocked_origin(&state.config, &headers) {
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": reason }),
+        );
     }
     if !tmux::session_names().await.contains(&q.name) {
-        return webutil::json_response(StatusCode::BAD_REQUEST, &serde_json::json!({ "error": "Session is not running" }));
+        return webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": "Session is not running" }),
+        );
     }
     // A window in tmux has one size shared by all clients. "latest" sizes it to whichever client
     // is actively used, so the browser terminal only affects the session while it's focused and
     // hands the size back to your other client (RDP/SSH) when this terminal closes.
-    let _ = tokio::process::Command::new("/usr/bin/tmux").args(["set-option", "-g", "window-size", "latest"]).status().await;
+    let _ = tokio::process::Command::new("/usr/bin/tmux")
+        .args(["set-option", "-g", "window-size", "latest"])
+        .status()
+        .await;
     let name = q.name.clone();
     let cols = q.cols.unwrap_or(120).clamp(20, 400);
     let rows = q.rows.unwrap_or(34).clamp(6, 200);
     ws.on_upgrade(move |socket| handle_term(socket, name, cols, rows))
 }
 
+// Returns Some(reason) when the WebSocket upgrade should be refused. A missing Origin
+// (native/non-browser clients) is allowed; a present Origin must match the request Host
+// or an entry in DASHBOARD_ALLOWED_ORIGINS.
+fn blocked_origin(config: &Config, headers: &HeaderMap) -> Option<String> {
+    let origin = headers.get("origin").and_then(|v| v.to_str().ok())?;
+    let origin_host = origin
+        .split_once("://")
+        .map(|(_, rest)| rest.split('/').next().unwrap_or(rest))
+        .unwrap_or(origin);
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    if !host.is_empty() && origin_host.eq_ignore_ascii_case(host) {
+        return None;
+    }
+    if config
+        .allowed_origins
+        .iter()
+        .any(|allowed| allowed.eq_ignore_ascii_case(origin_host) || allowed.eq_ignore_ascii_case(origin))
+    {
+        return None;
+    }
+    Some("Cross-origin WebSocket blocked".to_string())
+}
+
 async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
-    let size = PtySize { rows, cols, pixel_width: 0, pixel_height: 0 };
-    let Ok(pair) = native_pty_system().openpty(size) else { return };
+    let size = PtySize {
+        rows,
+        cols,
+        pixel_width: 0,
+        pixel_height: 0,
+    };
+    let Ok(pair) = native_pty_system().openpty(size) else {
+        return;
+    };
     let mut cmd = CommandBuilder::new("/usr/bin/tmux");
     cmd.args(["attach-session", "-t", &name]);
     cmd.env("TERM", "xterm-256color");
-    let Ok(mut child) = pair.slave.spawn_command(cmd) else { return };
+    let Ok(mut child) = pair.slave.spawn_command(cmd) else {
+        return;
+    };
     drop(pair.slave);
-    let Ok(mut reader) = pair.master.try_clone_reader() else { return };
-    let Ok(mut writer) = pair.master.take_writer() else { return };
+    let Ok(mut reader) = pair.master.try_clone_reader() else {
+        return;
+    };
+    let Ok(mut writer) = pair.master.take_writer() else {
+        return;
+    };
     let master = pair.master;
 
     // PTY output -> channel -> websocket
@@ -110,7 +172,12 @@ async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
                 // a JSON {"cols":N,"rows":M} message is a resize; anything else is typed input
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&t) {
                     if let (Some(c), Some(r)) = (v["cols"].as_u64(), v["rows"].as_u64()) {
-                        let _ = master.resize(PtySize { rows: r as u16, cols: c as u16, pixel_width: 0, pixel_height: 0 });
+                        let _ = master.resize(PtySize {
+                            rows: r as u16,
+                            cols: c as u16,
+                            pixel_width: 0,
+                            pixel_height: 0,
+                        });
                         continue;
                     }
                 }

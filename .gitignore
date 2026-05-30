@@ -1,6 +1,7 @@
 /target
 /node_modules
 /uploads
+/share/*.png
 /.a5c
 .env
 *.env
