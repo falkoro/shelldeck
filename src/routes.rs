@@ -1,10 +1,10 @@
 use crate::{
-    auth, config, containers, links, metrics, pages, remote, remote_hosts, settings, share, stream,
-    stt, summary, term, tmux, uploads, webutil, AppState,
+    auth, config, containers, links, metrics, pages, ratelimit, remote, remote_hosts, settings,
+    share, stream, stt, summary, term, tmux, uploads, webutil, AppState,
 };
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::Response,
     routing::{get, post},
     Router,
@@ -141,6 +141,31 @@ fn guard(
         return Some(webutil::redirect("/login"));
     }
     None
+}
+
+// Rate-limit key for unlock attempts: the real client IP (Cloudflare's cf-connecting-ip wins,
+// then x-forwarded-for, then the socket peer). On the IP-bypass path everyone shares one IP, so a
+// brute-forcer there locks that bucket — fail-safe, even if it can also lock out the owner.
+fn unlock_key(headers: &HeaderMap, addr: &ConnectInfo<SocketAddr>) -> String {
+    webutil::client_ips(headers, Some(&remote(addr)))
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn too_many_unlock_attempts(retry_secs: u64) -> Response {
+    let minutes = retry_secs.div_ceil(60);
+    let mut response = webutil::json_response(
+        StatusCode::TOO_MANY_REQUESTS,
+        &serde_json::json!({
+            "error": format!("Too many attempts. Try again in {minutes} min."),
+            "retryAfter": retry_secs,
+        }),
+    );
+    if let Ok(value) = HeaderValue::from_str(&retry_secs.to_string()) {
+        response.headers_mut().insert(header::RETRY_AFTER, value);
+    }
+    response
 }
 
 fn require_action(headers: &HeaderMap) -> Result<(), Response> {
@@ -306,14 +331,28 @@ async fn api_unlock(
     if let Err(response) = require_action(&headers) {
         return response;
     }
+    let key = unlock_key(&headers, &connect);
+    let now = ratelimit::now_seconds();
+    if let Some(retry) = state.unlock_limiter.lock().unwrap().locked_for(&key, now) {
+        return too_many_unlock_attempts(retry);
+    }
     let given = body.password.to_lowercase();
     let want = state.config.unlock_password.to_lowercase();
     if !webutil::ct_eq(given.trim().as_bytes(), want.trim().as_bytes()) {
+        let locked = state
+            .unlock_limiter
+            .lock()
+            .unwrap()
+            .record_failure(&key, now);
+        if let Some(retry) = locked {
+            return too_many_unlock_attempts(retry);
+        }
         return webutil::json_response(
             StatusCode::UNAUTHORIZED,
             &serde_json::json!({ "error": "Second password did not match" }),
         );
     }
+    state.unlock_limiter.lock().unwrap().record_success(&key);
     let model = tmux::session_model(state.config.clone(), true).await;
     let shells = tmux::shell_previews(state.config.clone(), 80).await;
     let mut response = webutil::json_response(

@@ -4,6 +4,7 @@ mod containers;
 mod links;
 mod metrics;
 mod pages;
+mod ratelimit;
 mod remote;
 mod remote_hosts;
 mod routes;
@@ -33,6 +34,8 @@ pub struct AppState {
     pub summary_cache: Arc<Mutex<Option<summary::WorkSummary>>>,
     // caps concurrent speech-to-text jobs so whisper.cpp can't pile up and saturate CPU
     pub stt_limit: Arc<Semaphore>,
+    // throttles shell-unlock password guessing (the last gate before live shell control)
+    pub unlock_limiter: Arc<Mutex<ratelimit::UnlockLimiter>>,
 }
 
 #[tokio::main]
@@ -54,6 +57,7 @@ async fn main() {
         client,
         summary_cache: Arc::new(Mutex::new(None)),
         stt_limit: Arc::new(Semaphore::new(2)),
+        unlock_limiter: Arc::new(Mutex::new(ratelimit::UnlockLimiter::default())),
     };
     let app: Router = routes::router(state);
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
