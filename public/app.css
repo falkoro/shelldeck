@@ -93,9 +93,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .image-chip code{font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .image-chip span{color:var(--muted);font-size:11px}
 .terminal-panel{border-color:rgba(139,246,255,.32)}
-.shell-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px;overflow:visible;padding:0 0 10px;margin-top:-2px;align-items:stretch;scrollbar-width:none}
+.shell-tabs{display:flex;flex-wrap:wrap;gap:7px;overflow:visible;padding:0 0 10px;margin-top:-2px;align-items:stretch;scrollbar-width:none}
 .shell-tabs::-webkit-scrollbar{display:none}
-.shell-tabs button{width:100%;min-height:52px;padding:7px 10px;font-size:13px}
+.shell-tabs button{flex:1 1 280px;width:auto;min-height:46px;padding:6px 10px;font-size:13px}
 .shell-tabs button.session-tab{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:8px;min-width:0;max-width:none;text-align:left}
 .shell-tabs button.session-tab.no-summary{min-width:0;max-width:none}
 .shell-tabs button.selected{border-color:rgba(139,246,255,.7);background:#10202b}
@@ -201,17 +201,15 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.agent-waiting{border-color:rgba(255,200,87,.5)}
 @media (min-width:1700px){
   .workspace{grid-template-columns:360px minmax(0,1fr)}
-  .shell-tabs{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+  .shell-tabs button{flex-basis:300px}
 }
 @media (min-width:2400px){
   .workspace{grid-template-columns:380px minmax(0,1fr)}
-  .shell-tabs{grid-template-columns:repeat(auto-fit,minmax(560px,1fr))}
-  .shell-tabs button{min-height:58px}
+  .shell-tabs button{flex-basis:340px;min-height:50px}
 }
 @media (min-width:3200px){
   .workspace{grid-template-columns:400px minmax(0,1fr)}
-  .shell-tabs{grid-template-columns:repeat(auto-fit,minmax(720px,1fr))}
-  .shell-tabs button{min-height:62px}
+  .shell-tabs button{flex-basis:420px;min-height:54px}
 }
 /* Quick links panel (sidebar, under Sessions) */
 .links-panel .panel-header{margin-bottom:10px}
