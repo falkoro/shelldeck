@@ -258,15 +258,18 @@ function shellbarSummaryMoving(text) {
     return window.innerWidth <= 760 && text.length > 18;
 }
 function shellbarSummaryWords() {
+    // Tabs now fill the bar (flex-wrap), so each tab is narrower than the old wide grid; the
+    // brief is clamped to 2 lines per tab. Keep word counts modest so it reads cleanly — the
+    // full work title still shows on the shell card and in the tab's title= tooltip.
     if (window.innerWidth <= 760)
         return 4;
     if (window.innerWidth >= 3200)
-        return 24;
-    if (window.innerWidth >= 2400)
-        return 18;
-    if (window.innerWidth >= 1700)
         return 12;
-    return 7;
+    if (window.innerWidth >= 2400)
+        return 10;
+    if (window.innerWidth >= 1700)
+        return 8;
+    return 6;
 }
 function shellbarSummary(session) {
     return sessionWorkBrief(session, shellbarSummaryWords());
