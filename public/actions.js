@@ -599,6 +599,7 @@ function stopDictation() {
     activeDictation = null;
     if (!current)
         return;
+    current.stopMonitor?.();
     setDictationState(current.name, false);
     try {
         if (current.recorder.state !== 'inactive')
@@ -657,15 +658,89 @@ async function transcribeAndInsert(name, recorder, stream, chunks) {
         reportDictationError(name, error);
     }
 }
+// Stop the active recording and transcribe it — shared by the manual second click and auto-stop.
+async function finishActiveDictation() {
+    const current = activeDictation;
+    if (!current)
+        return;
+    activeDictation = null;
+    current.stopMonitor?.();
+    setDictationState(current.name, false);
+    await transcribeAndInsert(current.name, current.recorder, current.stream, current.chunks);
+}
+// Watch the mic level and auto-finish once the speaker goes quiet, so dictation is a single click:
+// click → speak → pause → text drops in. Returns a teardown fn. Degrades gracefully — the manual
+// Mic-to-stop click always works, and on browsers without Web Audio this is a no-op.
+function monitorSilence(stream, onDone) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC)
+        return () => { };
+    let ctx;
+    try {
+        ctx = new AC();
+    }
+    catch {
+        return () => { };
+    }
+    ctx.resume?.();
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    const SPEECH_RMS = 0.02; // RMS above this counts as speech
+    const SILENCE_MS = 1200; // auto-stop after this much quiet, once speech was heard
+    const NO_SPEECH_MS = 8000; // give up if nothing is ever said
+    const MAX_MS = 30000; // hard safety cap on a single take
+    const startedAt = Date.now();
+    let lastLoud = startedAt;
+    let heardSpeech = false;
+    let stopped = false;
+    let timer;
+    const cleanup = () => {
+        if (stopped)
+            return;
+        stopped = true;
+        clearInterval(timer);
+        try {
+            source.disconnect();
+        }
+        catch { }
+        try {
+            ctx.close();
+        }
+        catch { }
+    };
+    timer = setInterval(() => {
+        if (stopped)
+            return;
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i += 1) {
+            const v = (buf[i] - 128) / 128;
+            sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        const now = Date.now();
+        if (rms > SPEECH_RMS) {
+            lastLoud = now;
+            if (now - startedAt > 200)
+                heardSpeech = true;
+        }
+        const elapsed = now - startedAt;
+        if ((heardSpeech && now - lastLoud > SILENCE_MS) || elapsed > MAX_MS || (!heardSpeech && elapsed > NO_SPEECH_MS)) {
+            cleanup();
+            onDone();
+        }
+    }, 120);
+    return cleanup;
+}
 async function toggleDictation(name) {
     if (!targetReady(name))
         throw new Error('Choose a running unlocked shell');
     // Second click on the recording shell: stop and transcribe what was captured.
     if (activeDictation?.name === name) {
-        const { recorder, stream, chunks } = activeDictation;
-        activeDictation = null;
-        setDictationState(name, false);
-        await transcribeAndInsert(name, recorder, stream, chunks);
+        await finishActiveDictation();
         return;
     }
     stopDictation();
@@ -705,7 +780,9 @@ async function toggleDictation(name) {
     activeDictation = { name, recorder, stream, chunks };
     recorder.start();
     setDictationState(name, true);
-    setShellStatus(name, 'Recording. Click Mic again to transcribe.');
+    setShellStatus(name, "Recording — pause when you're done, or click Mic to stop.");
+    // Auto-finish on a natural pause so it's one click; the manual stop click still works.
+    activeDictation.stopMonitor = monitorSilence(stream, () => { void finishActiveDictation(); });
 }
 async function submitShellInput(name) {
     await sendInput(name, sendMode(name) === 'send');
