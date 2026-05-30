@@ -257,7 +257,7 @@ body.preview-fullscreen-open{overflow:hidden}
 @media (max-width:760px){
   .terminal-grid,.terminal-grid.focus-mode{grid-template-columns:1fr}
   .terminal-grid .terminal-card:not(.selected){display:none}
-  .shell-tabs{display:flex;overflow-x:auto;align-items:stretch;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 -4px 6px;padding:8px 4px;border-bottom:1px solid rgba(139,246,255,.16);gap:6px}
+  .shell-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:center;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 -4px 6px;padding:8px 4px;border-bottom:1px solid rgba(139,246,255,.16);gap:6px}
   .shell-tabs button{flex:0 0 auto;width:auto;min-height:44px;font-size:12px;padding:7px 10px}
   .shell-tabs button.session-tab{min-width:158px;max-width:240px;grid-template-columns:auto auto minmax(0,1fr) auto;gap:6px;padding:6px 8px}
   .shell-tabs button.session-tab.no-summary{min-width:104px;max-width:158px}
