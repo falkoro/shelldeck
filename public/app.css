@@ -102,10 +102,14 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .session-tab-copy{min-width:0;display:block}
 .session-tab-copy b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:10.5px;line-height:1.2;font-weight:650}
 .session-tab-copy small{color:var(--muted);font-size:11.5px;margin-top:2px;display:flex;align-items:flex-start;gap:5px;min-width:0;white-space:normal}
-.session-tab-summary,.session-tab-status{min-width:0;overflow:visible;white-space:normal}
+.session-tab-summary,.session-tab-status{min-width:0;overflow:hidden;white-space:normal}
 .session-tab-status{text-overflow:ellipsis}
 .session-tab-summary{color:#cfeaff;font-weight:650;display:block;line-height:1.25;overflow-wrap:anywhere;mask-image:none}
 .session-tab-summary .marquee-track{display:inline-flex;gap:18px;min-width:max-content}
+/* Static (desktop) tabs: clamp the brief to 2 lines INSIDE the tab so it can't spill into
+   neighbours when tabs are narrow. The marquee variant (mobile) keeps its max-content track. */
+.session-tab-summary:not(.moving){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.session-tab-summary:not(.moving) .marquee-track{display:contents}
 .session-tab-summary.moving .marquee-track{animation:tab-summary-marquee 12s linear infinite}
 @keyframes tab-summary-marquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 9px))}}
 @media (prefers-reduced-motion:reduce){.session-tab-summary.moving .marquee-track{animation:none}}
