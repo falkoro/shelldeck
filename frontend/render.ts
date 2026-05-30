@@ -285,16 +285,15 @@ function renderShellTabs(): void {
   shellTabsSignature = signature;
   q('#shellTabs').innerHTML = modelSessions.map((session) => {
     const state = sessionRuntime(session);
-    const attached = session.attached > 0 ? `<span class="session-tab-attached">${session.attached}</span>` : '';
-    const statusLine = `${state.label} · ${fmtTime(session.activity)}`;
+    // Compact one-line tab: badge · status-dot · label · work-title (truncated, marquee when
+    // selected) · relative time. Full title stays reachable via the tooltip + the card below.
+    const timeShort = fmtTime(session.activity).replace(/\s*ago$/, '').replace('just now', 'now').replace('never', '');
     const workTitle = sessionWorkTitle(session.name);
     const workBrief = shellbarSummary(session.name);
+    const briefText = workBrief || sessionTabFallback(session, state);
     const moving = shellbarSummaryMoving(workBrief) ? ' moving' : '';
-    const meta = workBrief
-      ? `<span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(workBrief)}</span>${moving ? `<span aria-hidden="true">${escapeHtml(workBrief)}</span>` : ''}</span></span>`
-      : `<span class="session-tab-status">${escapeHtml(sessionTabFallback(session, state))}</span>`;
-    const statusLabel = workBrief ? `<b>${escapeHtml(statusLine)}${attached}</b>` : '';
-    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || session.label || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><span class="session-tab-copy">${statusLabel}<small><i class="dot ${state.dotClass}"></i>${meta}${workBrief ? '' : attached}</small></span></button>`;
+    const labelText = session.label || session.name;
+    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || session.label || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line"><span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span><span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
   }).join('');
   markSelectedShell();
   renderSelectedSessionActions();

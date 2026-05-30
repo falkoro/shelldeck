@@ -95,28 +95,29 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .terminal-panel{border-color:rgba(139,246,255,.32)}
 .shell-tabs{display:flex;flex-wrap:wrap;gap:7px;overflow:visible;padding:0 0 10px;margin-top:-2px;align-items:stretch;scrollbar-width:none}
 .shell-tabs::-webkit-scrollbar{display:none}
-.shell-tabs button{flex:1 1 280px;width:auto;min-height:46px;padding:6px 10px;font-size:13px}
-.shell-tabs button.session-tab{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:8px;min-width:0;max-width:none;text-align:left}
+.shell-tabs button{flex:1 1 260px;width:auto;min-height:34px;padding:5px 10px;font-size:13px}
+/* One-line session tab: [badge] [dot] [label · work-title (truncated)] [time]. */
+.shell-tabs button.session-tab{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;max-width:none;text-align:left}
 .shell-tabs button.session-tab.no-summary{min-width:0;max-width:none}
 .shell-tabs button.selected{border-color:rgba(139,246,255,.7);background:#10202b}
-.session-tab-copy{min-width:0;display:block}
-.session-tab-copy b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:10.5px;line-height:1.2;font-weight:650}
-.session-tab-copy small{color:var(--muted);font-size:11.5px;margin-top:2px;display:flex;align-items:flex-start;gap:5px;min-width:0;white-space:normal}
-.session-tab-summary,.session-tab-status{min-width:0;overflow:hidden;white-space:normal}
-.session-tab-status{text-overflow:ellipsis}
-.session-tab-summary{color:#cfeaff;font-weight:650;display:block;line-height:1.25;overflow-wrap:anywhere;mask-image:none}
-.session-tab-summary .marquee-track{display:inline-flex;gap:18px;min-width:max-content}
-/* Static (desktop) tabs: clamp the brief to 2 lines INSIDE the tab so it can't spill into
-   neighbours when tabs are narrow. The marquee variant (mobile) keeps its max-content track. */
-.session-tab-summary:not(.moving){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.session-tab-summary:not(.moving) .marquee-track{display:contents}
-.session-tab-summary.moving .marquee-track{animation:tab-summary-marquee 12s linear infinite}
-@keyframes tab-summary-marquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 9px))}}
-@media (prefers-reduced-motion:reduce){.session-tab-summary.moving .marquee-track{animation:none}}
-.session-tab .dot{width:6px;height:6px;box-shadow:none;flex:0 0 auto}
+.session-tab .dot{width:7px;height:7px;border-radius:50%;box-shadow:none;flex:0 0 auto}
+.session-tab-line{min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden;white-space:nowrap}
+.session-tab-label{flex:0 0 auto;max-width:46%;overflow:hidden;text-overflow:ellipsis;color:#eaf6ff;font-weight:700;font-size:12.5px;line-height:1.2}
+.session-tab-sep{flex:0 0 auto;color:var(--muted)}
+.session-tab-summary{min-width:0;overflow:hidden;color:#bcd9ee;font-weight:500;font-size:12px;line-height:1.2}
+/* Default: truncate to one line with an ellipsis (full text is in the tooltip + the card). */
+.session-tab-summary .marquee-track{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-tab-summary .marquee-track span:nth-child(2){display:none}
+/* Selected + overflowing: scroll the full title instead of clipping it. */
+.session-tab.selected .session-tab-summary.moving .marquee-track{display:inline-flex;gap:24px;max-width:none;min-width:max-content;overflow:visible;text-overflow:clip;animation:tab-summary-marquee 12s linear infinite}
+.session-tab.selected .session-tab-summary.moving .marquee-track span:nth-child(2){display:inline}
+@keyframes tab-summary-marquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 12px))}}
+@media (prefers-reduced-motion:reduce){.session-tab.selected .session-tab-summary.moving .marquee-track{animation:none}}
+.session-tab-time{flex:0 0 auto;color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums}
+.session-tab-status{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .session-tab.waiting{border-color:rgba(255,200,87,.35);background:rgba(255,200,87,.06)}
 .session-tab.offline{opacity:.72}
-.session-tab-attached{display:inline-flex;margin-left:5px;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:0 5px;color:#c9fff3;font-size:10px}
+.session-tab-attached{display:inline-flex;align-self:center;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:0 5px;color:#c9fff3;font-size:10px}
 .session-actions{border:1px solid rgba(139,246,255,.16);background:#071017;border-radius:8px;margin:0 0 10px;padding:8px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .session-actions[hidden]{display:none}
 .session-action-meta{display:flex;align-items:center;gap:8px;min-width:0}
@@ -214,11 +215,11 @@ body.preview-fullscreen-open{overflow:hidden}
 }
 @media (min-width:2400px){
   .workspace{grid-template-columns:380px minmax(0,1fr)}
-  .shell-tabs button{flex-basis:340px;min-height:50px}
+  .shell-tabs button{flex-basis:320px;min-height:36px}
 }
 @media (min-width:3200px){
   .workspace{grid-template-columns:400px minmax(0,1fr)}
-  .shell-tabs button{flex-basis:420px;min-height:54px}
+  .shell-tabs button{flex-basis:380px;min-height:38px}
 }
 /* Quick links panel (sidebar, under Sessions) */
 .links-panel .panel-header{margin-bottom:10px}
@@ -258,15 +259,12 @@ body.preview-fullscreen-open{overflow:hidden}
   .terminal-grid .terminal-card:not(.selected){display:none}
   .shell-tabs{display:flex;overflow-x:auto;align-items:stretch;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 -4px 6px;padding:8px 4px;border-bottom:1px solid rgba(139,246,255,.16);gap:6px}
   .shell-tabs button{flex:0 0 auto;width:auto;min-height:44px;font-size:12px;padding:7px 10px}
-  .shell-tabs button.session-tab{min-width:126px;max-width:186px;grid-template-columns:28px minmax(0,1fr);gap:6px;padding:6px 8px}
-  .shell-tabs button.session-tab.no-summary{min-width:84px;max-width:126px}
-  .session-tab-copy small{align-items:center;white-space:nowrap}
-  .session-tab-summary,.session-tab-status{overflow:hidden;white-space:nowrap}
-  .session-tab-summary{overflow-wrap:normal;mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 18px),transparent)}
-  .session-tab-copy small{font-size:10.5px}
-  .session-tab-copy b{font-size:9.5px}
-  .session-tab-summary .marquee-track{gap:14px}
-  .session-tab-summary.moving .marquee-track{animation-duration:9s}
+  .shell-tabs button.session-tab{min-width:158px;max-width:240px;grid-template-columns:auto auto minmax(0,1fr) auto;gap:6px;padding:6px 8px}
+  .shell-tabs button.session-tab.no-summary{min-width:104px;max-width:158px}
+  .session-tab-label{font-size:11.5px;max-width:50%}
+  .session-tab-summary{font-size:11px}
+  .session-tab-time{font-size:10px}
+  .session-tab.selected .session-tab-summary.moving .marquee-track{animation-duration:9s}
   .shell-composer textarea,.unlock-form input,input,select{font-size:16px}
   .terminal-card pre,.shell-tabs,.shell-composer textarea{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   .terminal-card pre{max-height:46vh}
