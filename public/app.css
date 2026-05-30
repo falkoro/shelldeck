@@ -170,8 +170,13 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.selected .shell-composer{position:sticky;top:0;z-index:3}
 .shell-composer{border-bottom:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px}
 .shell-composer textarea{width:100%;min-height:78px;max-height:180px;resize:vertical;background:#03070b;border:1px solid #263846;color:#eef9ff;border-radius:6px;padding:10px 11px;line-height:1.4;font:13px/1.4 "Cascadia Mono","JetBrains Mono",Consolas,monospace}
-.shell-actions{display:flex;gap:7px;flex-wrap:wrap}
-.shell-actions button{min-height:27px;padding:4px 7px;font-size:12px}
+.shell-actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.shell-actions button{min-height:28px;padding:4px 8px;font-size:12px}
+.shell-actions .iconly{padding:5px 8px}
+.shell-actions .mic-btn{border-color:rgba(139,246,255,.55);color:#cdefff}
+.shell-actions .mic-btn:hover{border-color:var(--cyan);background:#102d33}
+.shell-actions .mic-btn.active{background:#e0566a;border-color:#ff97a4;color:#fff;animation:mic-pulse 1.15s ease-in-out infinite}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,86,106,.55)}50%{box-shadow:0 0 0 6px rgba(224,86,106,0)}}
 .segmented{display:inline-flex;border:1px solid rgba(139,246,255,.24);border-radius:6px;overflow:hidden;background:#071017}
 .segmented button{border:0;border-radius:0;min-width:44px}
 .segmented button+button{border-left:1px solid rgba(139,246,255,.18)}
@@ -300,8 +305,7 @@ body.preview-fullscreen-open{overflow:hidden}
 .term-controls{display:flex;gap:1px;margin-left:auto;flex:0 0 auto}
 .term-btn{background:rgba(255,255,255,.03);border:1px solid rgba(139,246,255,.25);color:#a8d8ff;font-size:13px;line-height:1;padding:1px 7px;border-radius:4px;cursor:pointer}
 .term-btn:hover{background:rgba(139,246,255,.12);color:#e6f8ff}
-.term-btn.term-close:hover{background:rgba(255,90,90,.15);border-color:rgba(255,120,120,.4);color:#ff9a9a}
-.term-close-label{display:none}
+.term-detach-label{display:inline}
 .term-host{flex:1 1 auto;min-height:0;padding:4px 6px 2px}
 .term-host .xterm{height:100%}
 .term-resize-handle{position:absolute;right:0;bottom:0;width:15px;height:15px;cursor:se-resize;background:linear-gradient(135deg,transparent 35%,rgba(139,246,255,.35) 36%);z-index:12;border-bottom-right-radius:6px}
@@ -326,8 +330,8 @@ body.preview-fullscreen-open{overflow:hidden}
   .term-titlebar .term-status{display:none}
   .term-controls{gap:4px}
   .term-btn{min-width:36px;min-height:34px;padding:4px 9px;font-size:15px}
-  .term-btn.term-close{min-width:70px;color:#ffd6d6;border-color:rgba(255,120,120,.45)}
-  .term-close-label{display:inline}
+  .term-btn.term-detach{min-width:70px}
+  .term-detach-label{display:inline}
   .term-host{padding:4px}
   .term-resize-handle{display:none}
 }

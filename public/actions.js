@@ -525,48 +525,34 @@ async function sendInput(name, submit) {
     updateUnlockState();
 }
 let activeDictation = null;
-function speechRecognitionCtor() {
-    return window.SpeechRecognition || window.webkitSpeechRecognition;
-}
 function browserMicHelp() {
     if (/Edg\//.test(navigator.userAgent)) {
         return 'In Edge, open the lock icon, set Microphone to Allow for this site, then reload ShellDeck.';
     }
     return 'Allow Microphone for this site in the browser address bar, then try Mic again.';
 }
-function dictationErrorMessage(error) {
-    const code = String(error?.error || error?.name || error?.message || '').toLowerCase();
-    if (code.includes('service-not-allowed')) {
-        return `Speech recognition is blocked by this browser or network. ${browserMicHelp()}`;
-    }
-    if (code.includes('not-allowed') || code.includes('notallowed') || code.includes('permission')) {
+// Map a getUserMedia/MediaRecorder DOMException (or our own thrown Error) to a plain-language hint.
+function micErrorMessage(error) {
+    const name = String(error?.name || '');
+    const message = String(error?.message || error || '');
+    if (name === 'NotAllowedError' || /not.?allowed|permission|denied/i.test(message)) {
         return `Microphone is blocked. ${browserMicHelp()}`;
     }
-    if (code.includes('audio-capture') || code.includes('notfound')) {
+    if (name === 'NotFoundError' || name === 'OverconstrainedError' || /no .*(microphone|device|audio)/i.test(message)) {
         return 'No microphone was found. Check your input device, then try Mic again.';
     }
-    if (code.includes('no-speech')) {
-        return 'No speech was heard. Check the microphone input and try again.';
+    if (name === 'NotReadableError') {
+        return 'The microphone is in use by another app. Close it, then try Mic again.';
     }
-    if (code.includes('network')) {
-        return 'Speech recognition could not reach the browser speech service. Check the connection or type/paste instead.';
-    }
-    if (code.includes('security') || code.includes('secure')) {
+    if (name === 'SecurityError' || /secure|https/i.test(message)) {
         return 'Microphone dictation needs HTTPS or localhost. Open ShellDeck over HTTPS or 127.0.0.1.';
     }
-    return 'Dictation stopped. Check microphone permissions for this site and try again.';
+    return message || 'Dictation failed. Check microphone permissions for this site and try again.';
 }
 function reportDictationError(name, error) {
-    const message = dictationErrorMessage(error);
+    const message = micErrorMessage(error);
     setShellStatus(name, message);
     toast(message);
-}
-function requestMicrophoneForDictation() {
-    if (!navigator.mediaDevices?.getUserMedia)
-        return Promise.resolve(null);
-    return navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .catch((error) => { throw new Error(dictationErrorMessage(error)); });
 }
 function appendDictationText(base, transcript) {
     const clean = transcript.trim().replace(/\s+/g, ' ');
@@ -579,130 +565,147 @@ function setDictationState(name, listening) {
         const active = listening && button.dataset.dictateShell === name;
         button.classList.toggle('active', active);
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        const label = button.querySelector('.mic-label');
+        if (label)
+            label.textContent = active ? 'Stop' : 'Mic';
     });
 }
-async function warmMicrophonePermission(name, recognition, streamRequest) {
-    try {
-        const stream = await streamRequest;
-        const current = activeDictation;
-        if (!current || current.recognition !== recognition) {
-            stream?.getTracks().forEach((track) => track.stop());
-            return;
-        }
-        current.stream = stream;
-    }
-    catch (error) {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        reportDictationError(name, error);
-        stopDictation();
-    }
+function mediaDictationSupported() {
+    const media = navigator.mediaDevices;
+    return !!(media && typeof media.getUserMedia === 'function' && typeof window.MediaRecorder !== 'undefined');
 }
+function pickRecorderMime() {
+    const MR = window.MediaRecorder;
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    if (MR?.isTypeSupported) {
+        for (const type of candidates) {
+            if (MR.isTypeSupported(type))
+                return type;
+        }
+    }
+    return undefined;
+}
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('Could not read the recording'));
+        reader.readAsDataURL(blob);
+    });
+}
+// Discard any in-progress recording WITHOUT transcribing (used when switching shells or sending).
 function stopDictation() {
     const current = activeDictation;
     activeDictation = null;
     if (!current)
         return;
     setDictationState(current.name, false);
-    current.stream?.getTracks().forEach((track) => track.stop());
     try {
-        current.recognition.stop();
+        if (current.recorder.state !== 'inactive')
+            current.recorder.stop();
     }
     catch { }
+    current.stream.getTracks().forEach((track) => track.stop());
+}
+// Stop the recorder and resolve with the combined audio Blob once the final chunk has landed.
+function finalizeRecording(recorder, chunks) {
+    return new Promise((resolve) => {
+        const done = () => {
+            if (!chunks.length) {
+                resolve(null);
+                return;
+            }
+            resolve(new Blob(chunks, { type: chunks[0].type || recorder.mimeType || 'audio/webm' }));
+        };
+        recorder.addEventListener('stop', done, { once: true });
+        if (recorder.state !== 'inactive')
+            recorder.stop();
+        else
+            done();
+    });
+}
+async function transcribeAndInsert(name, recorder, stream, chunks) {
+    setShellStatus(name, 'Transcribing…');
+    let blob = null;
+    try {
+        blob = await finalizeRecording(recorder, chunks);
+    }
+    finally {
+        stream.getTracks().forEach((track) => track.stop());
+    }
+    if (!blob || !blob.size) {
+        setShellStatus(name, 'No audio captured. Try Mic again.');
+        return;
+    }
+    try {
+        const dataUrl = await blobToDataUrl(blob);
+        const payload = await postJson('/api/transcribe', { dataUrl });
+        const text = String(payload.text || '').trim();
+        if (!text) {
+            setShellStatus(name, 'No speech detected. Speak closer to the mic and try again.');
+            return;
+        }
+        const input = inputFor(name);
+        if (input) {
+            input.value = appendDictationText(input.value, text);
+            input.focus();
+            updateUnlockState();
+        }
+        setShellStatus(name, 'Dictation added to the input.');
+    }
+    catch (error) {
+        reportDictationError(name, error);
+    }
 }
 async function toggleDictation(name) {
     if (!targetReady(name))
         throw new Error('Choose a running unlocked shell');
+    // Second click on the recording shell: stop and transcribe what was captured.
     if (activeDictation?.name === name) {
-        stopDictation();
-        setShellStatus(name, 'Dictation stopped.');
+        const { recorder, stream, chunks } = activeDictation;
+        activeDictation = null;
+        setDictationState(name, false);
+        await transcribeAndInsert(name, recorder, stream, chunks);
         return;
     }
     stopDictation();
-    const Recognition = speechRecognitionCtor();
-    if (!Recognition) {
-        throw new Error('Browser dictation is unavailable here. Use Chrome or Edge and allow Microphone for this site.');
+    if (!mediaDictationSupported()) {
+        throw new Error('This browser cannot record audio for dictation. Update your browser and try again.');
     }
     if (!window.isSecureContext) {
         throw new Error('Microphone dictation needs HTTPS or localhost. Open ShellDeck over HTTPS or 127.0.0.1.');
     }
-    const input = inputFor(name);
-    if (!input)
-        throw new Error('Could not find this shell input');
-    const recognition = new Recognition();
-    const micWarmup = requestMicrophoneForDictation();
-    const base = input.value;
-    const finals = [];
-    let hadError = false;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = navigator.language || 'en-US';
-    recognition.onresult = (event) => {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        let interim = '';
-        for (let i = 0; i < event.results.length; i += 1) {
-            const transcript = String(event.results[i][0]?.transcript || '').trim();
-            if (event.results[i].isFinal)
-                finals[i] = transcript;
-            else if (i >= event.resultIndex)
-                interim += ` ${transcript}`;
-        }
-        const spoken = [...finals.filter(Boolean), interim.trim()].filter(Boolean).join(' ');
-        input.value = appendDictationText(base, spoken);
-        updateUnlockState();
-    };
-    recognition.onstart = () => {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        setDictationState(name, true);
-        setShellStatus(name, 'Listening. Speak into your microphone.');
-    };
-    recognition.onaudiostart = () => {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        setShellStatus(name, 'Microphone active. Listening...');
-    };
-    recognition.onspeechstart = () => {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        setShellStatus(name, 'Speech detected. Dictating...');
-    };
-    recognition.onspeechend = () => {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        setShellStatus(name, 'Speech paused. Keep talking or press Mic to stop.');
-    };
-    recognition.onnomatch = () => {
-        if (activeDictation?.recognition !== recognition)
-            return;
-        setShellStatus(name, 'Could not understand that audio. Try again or speak closer to the mic.');
-    };
-    recognition.onerror = (event) => {
-        hadError = true;
-        reportDictationError(name, event);
-    };
-    recognition.onend = () => {
-        activeDictation?.stream?.getTracks().forEach((track) => track.stop());
-        if (activeDictation?.recognition === recognition)
-            activeDictation = null;
-        setDictationState(name, false);
-        if (!hadError)
-            setShellStatus(name, 'Dictation stopped.');
-    };
+    let stream;
     try {
-        setShellStatus(name, 'Starting dictation. Allow Microphone when the browser asks.');
-        activeDictation = { name, recognition, stream: null };
-        recognition.start();
-        setDictationState(name, true);
-        warmMicrophonePermission(name, recognition, micWarmup);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     }
     catch (error) {
-        activeDictation = null;
-        setDictationState(name, false);
-        micWarmup.then((stream) => stream?.getTracks().forEach((track) => track.stop())).catch(() => { });
-        throw new Error(dictationErrorMessage(error));
+        throw new Error(micErrorMessage(error));
     }
+    const mime = pickRecorderMime();
+    let recorder;
+    try {
+        recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    }
+    catch (error) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error(micErrorMessage(error));
+    }
+    const chunks = [];
+    recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size)
+            chunks.push(event.data);
+    };
+    recorder.onerror = (event) => {
+        if (activeDictation?.recorder !== recorder)
+            return;
+        reportDictationError(name, event?.error || new Error('Recording failed'));
+        stopDictation();
+    };
+    activeDictation = { name, recorder, stream, chunks };
+    recorder.start();
+    setDictationState(name, true);
+    setShellStatus(name, 'Recording. Click Mic again to transcribe.');
 }
 async function submitShellInput(name) {
     await sendInput(name, sendMode(name) === 'send');

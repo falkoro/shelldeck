@@ -10,6 +10,7 @@ mod routes;
 mod settings;
 mod share;
 mod stream;
+mod stt;
 mod summary;
 mod term;
 mod tmux;
@@ -22,6 +23,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use tokio::sync::Semaphore;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -29,6 +31,8 @@ pub struct AppState {
     pub client: reqwest::Client,
     // last successful (non-local) work summary, served if the AI backend briefly fails
     pub summary_cache: Arc<Mutex<Option<summary::WorkSummary>>>,
+    // caps concurrent speech-to-text jobs so whisper.cpp can't pile up and saturate CPU
+    pub stt_limit: Arc<Semaphore>,
 }
 
 #[tokio::main]
@@ -49,6 +53,7 @@ async fn main() {
         config: config.clone(),
         client,
         summary_cache: Arc::new(Mutex::new(None)),
+        stt_limit: Arc::new(Semaphore::new(2)),
     };
     let app: Router = routes::router(state);
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
