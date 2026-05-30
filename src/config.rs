@@ -12,6 +12,13 @@ pub struct KnownSession {
 }
 
 #[derive(Clone)]
+pub struct RemoteHostConfig {
+    pub id: String,
+    pub label: String,
+    pub target: String,
+}
+
+#[derive(Clone)]
 pub struct Config {
     pub host: String,
     pub port: u16,
@@ -39,7 +46,12 @@ pub struct Config {
     pub xai_client_id: String,
     pub attach_template: String,
     pub quick_links: Vec<(String, String)>,
+    pub links_file: PathBuf,
+    pub ui_config_file: PathBuf,
+    pub share_shot_file: PathBuf,
     pub tickers: Vec<String>,
+    pub remote_hosts: Vec<RemoteHostConfig>,
+    pub show_unknown_sessions: bool,
     pub known_sessions: Vec<KnownSession>,
     pub image_types: HashMap<String, &'static str>,
 }
@@ -133,7 +145,23 @@ impl Config {
             attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE")
                 .unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
             quick_links: parse_links(&env::var("DASHBOARD_LINKS").unwrap_or_default()),
+            links_file: configured_path(
+                env::var("DASHBOARD_LINKS_FILE").ok(),
+                root_dir.join("links.json"),
+            ),
+            ui_config_file: configured_path(
+                env::var("DASHBOARD_UI_CONFIG_FILE").ok(),
+                root_dir.join("dashboard-config.json"),
+            ),
+            share_shot_file: configured_path(
+                env::var("DASHBOARD_SHARE_SHOT_FILE").ok(),
+                root_dir.join("share").join("shelldeck-safe-shot.png"),
+            ),
             tickers: split_env("DASHBOARD_TICKERS"),
+            remote_hosts: parse_remote_hosts(
+                &env::var("DASHBOARD_REMOTE_HOSTS").unwrap_or_default(),
+            ),
+            show_unknown_sessions: env_flag("DASHBOARD_SHOW_UNKNOWN_SESSIONS"),
             known_sessions: known_sessions(),
             image_types: image_types(),
         }
@@ -159,6 +187,63 @@ fn parse_links(raw: &str) -> Vec<(String, String)> {
             (!label.is_empty() && !url.is_empty()).then(|| (label.to_string(), url.to_string()))
         })
         .collect()
+}
+
+// Parse DASHBOARD_REMOTE_HOSTS into monitored SSH hosts.
+// Format: "id|Label|ssh-target;id2|Label 2|user@host".
+fn parse_remote_hosts(raw: &str) -> Vec<RemoteHostConfig> {
+    let mut seen = std::collections::HashSet::new();
+    raw.split(';')
+        .filter_map(|item| {
+            let mut parts = item.split('|').map(str::trim);
+            let id = clean_remote_id(parts.next()?);
+            let label = parts.next()?.trim();
+            let target = clean_remote_target(parts.next()?);
+            if id.is_empty() || label.is_empty() || target.is_empty() || !seen.insert(id.clone()) {
+                return None;
+            }
+            Some(RemoteHostConfig {
+                id,
+                label: label.chars().take(48).collect(),
+                target,
+            })
+        })
+        .take(8)
+        .collect()
+}
+
+fn clean_remote_id(raw: &str) -> String {
+    raw.trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        .take(32)
+        .collect()
+}
+
+fn clean_remote_target(raw: &str) -> String {
+    raw.trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '@' | ':'))
+        .take(96)
+        .collect()
+}
+
+fn configured_path(raw: Option<String>, default: PathBuf) -> PathBuf {
+    raw.map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or(default)
+}
+
+fn env_flag(key: &str) -> bool {
+    parse_flag(&env::var(key).unwrap_or_default())
+}
+
+fn parse_flag(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
 }
 
 fn known_sessions() -> Vec<KnownSession> {
@@ -366,5 +451,41 @@ mod tests {
     #[test]
     fn shell_word_escapes_single_quotes() {
         assert_eq!(shell_word("/tmp/falk's repo"), "'/tmp/falk'\"'\"'s repo'");
+    }
+
+    #[test]
+    fn configured_path_ignores_empty_values() {
+        let default = PathBuf::from("/tmp/shelldeck/links.json");
+        assert_eq!(configured_path(None, default.clone()), default);
+        assert_eq!(
+            configured_path(Some("   ".to_string()), default.clone()),
+            default
+        );
+        assert_eq!(
+            configured_path(Some("/tmp/custom-links.json".to_string()), default),
+            PathBuf::from("/tmp/custom-links.json")
+        );
+    }
+
+    #[test]
+    fn remote_hosts_parse_valid_unique_ssh_targets() {
+        let hosts = parse_remote_hosts(
+            "logan502vs|Logan GL502VS|logan-gl502vs;bad|Missing;ops|Ops Host|deploy@10.0.0.8:22;logan502vs|Duplicate|other",
+        );
+        assert_eq!(hosts.len(), 2);
+        assert_eq!(hosts[0].id, "logan502vs");
+        assert_eq!(hosts[0].label, "Logan GL502VS");
+        assert_eq!(hosts[0].target, "logan-gl502vs");
+        assert_eq!(hosts[1].target, "deploy@10.0.0.8:22");
+    }
+
+    #[test]
+    fn env_flag_accepts_common_truthy_values() {
+        for value in ["1", "true", "TRUE", "yes", "on"] {
+            assert!(parse_flag(value));
+        }
+        for value in ["", "0", "false", "no", "off"] {
+            assert!(!parse_flag(value));
+        }
     }
 }

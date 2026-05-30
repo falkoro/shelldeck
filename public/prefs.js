@@ -6,6 +6,7 @@ let followOutput = localStorage.getItem('sdFollowOutput') !== '0';
 let shellImages = {};
 let clearedOutputs = {};
 let historyCursor = {};
+let historyDrafts = {};
 function storageJson(key, fallback) {
     try {
         return JSON.parse(localStorage.getItem(key) || '');
@@ -34,18 +35,32 @@ function pushHistory(name, text) {
     const next = [text, ...(all[name] || []).filter((item) => item !== text)].slice(0, 20);
     all[name] = next;
     historyCursor[name] = -1;
+    delete historyDrafts[name];
     localStorage.setItem('sdCommandHistory', JSON.stringify(all));
+}
+function resetHistoryNavigation(name) {
+    historyCursor[name] = -1;
+    delete historyDrafts[name];
 }
 function cycleHistory(name, direction) {
     const history = commandHistory(name);
-    if (!history.length)
-        return;
+    const input = inputFor(name);
+    if (!input)
+        return false;
+    if (!history.length && direction > 0)
+        return false;
     const current = historyCursor[name] ?? -1;
+    if (direction < 0 && current < 0)
+        return false;
+    if (direction > 0 && current < 0)
+        historyDrafts[name] = input.value;
     const next = Math.max(-1, Math.min(history.length - 1, current + direction));
     historyCursor[name] = next;
-    const input = inputFor(name);
-    if (input)
-        input.value = next >= 0 ? history[next] : '';
+    input.value = next >= 0 ? history[next] : (historyDrafts[name] || '');
+    if (next < 0)
+        delete historyDrafts[name];
+    updateUnlockState();
+    return true;
 }
 function applyPrefs() {
     document.body.classList.toggle('density-compact', density === 'compact');
@@ -87,6 +102,10 @@ function removeShellImage(name, path) {
     shellImages[name] = (shellImages[name] || []).filter((image) => image.path !== path);
     renderShellImages(name);
 }
+function clearShellImages(name) {
+    delete shellImages[name];
+    renderShellImages(name);
+}
 // --- Shell card order persistence ---
 // Persist the preferred sort order of shell cards so drag-to-reorder survives refresh.
 function shellOrder() {
@@ -125,6 +144,11 @@ function loadShellCardSize(name) {
     if (s && typeof s.w === 'number' && typeof s.h === 'number')
         return s;
     return null;
+}
+function resetShellCardSize(name) {
+    const sizes = shellCardSizes();
+    delete sizes[name];
+    localStorage.setItem('sdShellSizes', JSON.stringify(sizes));
 }
 // --- Shell card drag-to-reorder threshold ---
 const DRAG_REORDER_THRESHOLD = 8;

@@ -1,4 +1,7 @@
-use crate::{auth, metrics, pages, stream, summary, term, tmux, uploads, webutil, AppState};
+use crate::{
+    auth, containers, links, metrics, pages, remote, settings, share, stream, summary, term, tmux,
+    uploads, webutil, AppState,
+};
 use axum::{
     extract::{ConnectInfo, Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -37,6 +40,17 @@ struct LinesQuery {
     lines: Option<u32>,
 }
 
+#[derive(Deserialize)]
+struct LinksBody {
+    links: Vec<links::QuickLink>,
+}
+
+#[derive(Deserialize)]
+struct SettingsBody {
+    tickers: Vec<String>,
+    panels: settings::PanelSettings,
+}
+
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(root))
@@ -52,7 +66,15 @@ pub fn router(state: AppState) -> Router {
         .route("/api/summary", get(api_summary))
         .route("/api/shells", get(api_shells))
         .route("/api/metrics", get(api_metrics))
+        .route("/api/containers", get(api_containers))
+        .route("/api/remote-hosts", get(api_remote_hosts))
+        .route("/api/links", get(api_links).post(api_links_save))
+        .route(
+            "/api/ui-config",
+            get(api_ui_config).post(api_ui_config_save),
+        )
         .route("/api/tickers", get(api_tickers))
+        .route("/api/share-shot", post(api_share_shot))
         .route("/api/shells/stream", get(stream::api_shell_stream))
         .route("/api/term", get(term::term_ws))
         .route("/api/input", post(api_input))
@@ -187,11 +209,14 @@ async fn asset(State(state): State<AppState>, Path(file): Path<String>) -> Respo
     let content_type = match file.rsplit_once('.').map(|(_, ext)| ext) {
         Some("css") => "text/css; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
+        Some("png") => "image/png",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml; charset=utf-8",
         _ => {
             return webutil::json_response(
                 StatusCode::NOT_FOUND,
                 &serde_json::json!({ "error": "Not found" }),
-            )
+            );
         }
     };
     let path = state
@@ -329,7 +354,11 @@ async fn api_tickers(
             &serde_json::json!({ "error": "Forbidden" }),
         );
     }
-    let fetches = state.config.tickers.iter().take(16).cloned().map(|sym| {
+    let settings = settings::load(state.config.clone()).await;
+    if !settings.panels.tickers {
+        return webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": [] }));
+    }
+    let fetches = settings.tickers.iter().take(16).cloned().map(|sym| {
         let client = state.client.clone();
         async move {
             let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d", urlencoding::encode(&sym));
@@ -470,6 +499,127 @@ async fn api_metrics(
         return response;
     }
     webutil::json_response(StatusCode::OK, &metrics::gather().await)
+}
+
+// Running Docker/Podman containers on the ShellDeck host. Login-gated, not shell-unlock gated.
+async fn api_containers(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(StatusCode::OK, &containers::running().await)
+}
+
+// Remote host checks run from the ShellDeck server, so DNS/VPN/SSH reachability matches
+// what the dashboard backend can actually see.
+async fn api_remote_hosts(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(
+        StatusCode::OK,
+        &remote::check_all(state.config.remote_hosts.clone()).await,
+    )
+}
+
+async fn api_links(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    let links = links::load(state.config.clone()).await;
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "links": links }))
+}
+
+async fn api_links_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<LinksBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    match links::save(state.config.clone(), body.links).await {
+        Ok(links) => webutil::json_response(StatusCode::OK, &serde_json::json!({ "links": links })),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_ui_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(StatusCode::OK, &settings::load(state.config.clone()).await)
+}
+
+async fn api_ui_config_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<SettingsBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    let settings = settings::DashboardSettings {
+        tickers: body.tickers,
+        panels: body.panels,
+    };
+    match settings::save(state.config.clone(), settings).await {
+        Ok(settings) => webutil::json_response(StatusCode::OK, &settings),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_share_shot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<share::ShareShotUpload>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    match share::save(state.config.clone(), body).await {
+        Ok(saved) => webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({ "ok": true, "shot": saved }),
+        ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
 }
 
 fn session_result(result: Result<String, String>) -> Response {

@@ -30,6 +30,26 @@ interface ShellPreview {
   updatedAt?: string;
 }
 
+interface PanelSettings {
+  machine: boolean;
+  machineSensors: boolean;
+  containers: boolean;
+  remoteHosts: boolean;
+  links: boolean;
+  tickers: boolean;
+}
+
+interface DashboardSettings {
+  tickers: string[];
+  panels: PanelSettings;
+}
+
+interface ShellAutoTitleEntry {
+  title: string;
+  cachedAt: number;
+  created: number | null;
+}
+
 interface ApiPayload {
   ok?: boolean;
   error?: string;
@@ -40,6 +60,7 @@ interface ApiPayload {
   provider?: string;
   generatedAt?: string;
   image?: UploadedImage;
+  shot?: { path: string; bytes: number };
 }
 
 interface UploadedImage {
@@ -65,19 +86,44 @@ let currentModel: DashboardModel = initialModel;
 let latestShells: ShellPreview[] = [];
 let latestSummaryText = '';
 let summaryLoading = false;
+let shellsLoading = false;
+let dashboardSettings: DashboardSettings = {
+  tickers: [],
+  panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, links: true, tickers: true },
+};
+const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
+const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';
+const SHELL_PREVIEW_CACHE_KEY = 'sdShellPreviewCache';
+const SHELL_PREVIEW_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const SHELL_AUTO_TITLE_TTL_MS = 2 * 60 * 60 * 1000;
+const SHELLBOX_TITLE_WORDS = 3;
+const AUTO_FOLLOW_UP_MAX_CHARS = 280;
+const autoFollowUpDrafts: Record<string, string> = {};
+const autoFollowUpSentDrafts: Record<string, string> = {};
 
 // Pull the one-liner for a given session out of the Current Work summary (lines like
 // "- main: ...", "main (claude): ...", "**slot1** — ..."), to use as a per-slot title.
 function sessionWorkTitle(session: string): string {
+  const cached = shellAutoTitles();
   for (const raw of latestSummaryText.split('\n')) {
     const head = raw.trim().replace(/^[\-*•\s]+/, '').replace(/\*\*/g, '');
     if (!new RegExp(`^${session}\\b`, 'i').test(head)) continue;
     const after = head.slice(session.length);
     const sep = after.match(/[:–—]|\s-\s/);
     const text = sep && sep.index !== undefined ? after.slice(sep.index + sep[0].length) : after;
-    return text.replace(/^[\s:\-–—)]+/, '').trim();
+    const title = text.replace(/^[\s:\-–—)]+/, '').trim();
+    if (title) {
+      cacheShellAutoTitle(session, title, cached);
+      return title;
+    }
   }
-  return '';
+  return cached[session] || '';
+}
+
+function sessionWorkBrief(session: string, words = 10): string {
+  const title = sessionWorkTitle(session);
+  if (!title) return '';
+  return title.split(/\s+/).filter(Boolean).slice(0, words).join(' ');
 }
 let shellUnlocked = Boolean(initialModel.unlocked);
 let selectedSession = localStorage.getItem('sdSelectedSession') || '';
@@ -126,6 +172,11 @@ const ICONS: Record<string, string> = {
   terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   unlock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>',
+  camera: '<path d="M14.5 4 13 2H7L5.5 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-6.5Z"/><circle cx="12" cy="12" r="3.5"/><path d="M20 8h.01"/>',
+  settings: '<path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.36.45.7.6 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-.5 1Z"/>',
 };
 
 function icon(name: string): string {
@@ -169,6 +220,186 @@ function sessions(): SessionItem[] {
   return currentModel.sessions || [];
 }
 
+function shellLabelAliases(): Record<string, string> {
+  return storageJson<Record<string, string>>(SHELL_LABEL_ALIASES_KEY, {});
+}
+
+function shellCreatedAt(name: string): number | null {
+  return sessionByName(name)?.created ?? null;
+}
+
+function shellAutoTitleStore(): Record<string, string | ShellAutoTitleEntry> {
+  return storageJson<Record<string, string | ShellAutoTitleEntry>>(SHELL_AUTO_TITLES_KEY, {});
+}
+
+function shellAutoTitles(): Record<string, string> {
+  const store = shellAutoTitleStore();
+  const titles: Record<string, string> = {};
+  const nextStore: Record<string, ShellAutoTitleEntry> = {};
+  const now = Date.now();
+  let changed = false;
+
+  Object.entries(store).forEach(([session, value]) => {
+    const entry: ShellAutoTitleEntry = typeof value === 'string'
+      ? { title: value, cachedAt: now, created: shellCreatedAt(session) }
+      : value;
+    const title = entry.title?.replace(/\s+/g, ' ').trim();
+    const currentCreated = shellCreatedAt(session);
+    const cachedCreated = entry.created ?? currentCreated;
+    const expired = !entry.cachedAt || now - entry.cachedAt > SHELL_AUTO_TITLE_TTL_MS;
+    const restarted = entry.created !== null && entry.created !== undefined && currentCreated !== null && entry.created !== currentCreated;
+    if (!title || expired || restarted) {
+      changed = true;
+      return;
+    }
+    const normalized = { title, cachedAt: entry.cachedAt, created: cachedCreated };
+    titles[session] = title;
+    nextStore[session] = normalized;
+    if (typeof value === 'string' || value.title !== normalized.title || value.created !== normalized.created) changed = true;
+  });
+
+  if (changed) {
+    try {
+      localStorage.setItem(SHELL_AUTO_TITLES_KEY, JSON.stringify(nextStore));
+    } catch {}
+  }
+  return titles;
+}
+
+function clearShellAutoTitleCache(): void {
+  try {
+    localStorage.removeItem(SHELL_AUTO_TITLES_KEY);
+  } catch {}
+}
+
+function cacheShellAutoTitle(session: string, title: string, existing?: Record<string, string>): void {
+  const clean = title.replace(/\s+/g, ' ').trim();
+  if (!session || !clean) return;
+  const titles = existing || shellAutoTitles();
+  if (titles[session] === clean) return;
+  const store = shellAutoTitleStore();
+  store[session] = { title: clean, cachedAt: Date.now(), created: shellCreatedAt(session) };
+  try {
+    localStorage.setItem(SHELL_AUTO_TITLES_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+function shellHasCustomLabel(name: string): boolean {
+  return Boolean(shellLabelAliases()[name]?.trim());
+}
+
+function shellDisplayLabel(name: string, fallback: string): string {
+  const alias = shellLabelAliases()[name]?.trim();
+  return alias || shellAutoDisplayLabel(name, fallback);
+}
+
+function compactShellLabel(name: string, fallback: string): string {
+  const slot = /^slot(\d+)$/.exec(name);
+  if (slot) return slot[1];
+  return fallback;
+}
+
+function shellboxTitle(name: string): string {
+  const title = sessionWorkBrief(name, SHELLBOX_TITLE_WORDS).replace(/\s+/g, ' ').trim();
+  if (!title) return '';
+  return title.replace(/[.,;:!?]+$/, '');
+}
+
+function shellboxSummary(name: string): string {
+  return sessionWorkTitle(name);
+}
+
+function generatedShellLabel(name: string): string {
+  return shellboxTitle(name);
+}
+
+function shellAutoDisplayLabel(name: string, fallback: string): string {
+  const base = compactShellLabel(name, fallback);
+  const generated = generatedShellLabel(name);
+  if (!generated || generated.toLowerCase() === base.toLowerCase()) return base;
+  return `${base} · ${generated}`;
+}
+
+function shellRawNameBadge(name: string, displayLabel: string): string {
+  if (name === 'main' || /^slot\d+$/.test(name)) return '';
+  return name !== displayLabel ? name : '';
+}
+
+function renameShellLabel(name: string): boolean {
+  const shell = shellPreviewByName(name);
+  const session = sessionByName(name);
+  const fallback = shell?.label || session?.label || name;
+  const current = shellDisplayLabel(name, fallback);
+  const next = window.prompt('Shell card name', current);
+  if (next === null) return false;
+  const clean = next.trim().replace(/\s+/g, ' ').slice(0, 64);
+  const defaultLabel = compactShellLabel(name, fallback);
+  const autoLabel = shellAutoDisplayLabel(name, fallback);
+  const aliases = shellLabelAliases();
+  if (!clean || clean === fallback || clean === defaultLabel || clean === autoLabel || clean === name) {
+    delete aliases[name];
+  } else {
+    aliases[name] = clean;
+  }
+  localStorage.setItem(SHELL_LABEL_ALIASES_KEY, JSON.stringify(aliases));
+  return true;
+}
+
+function resetShellLabel(name: string): boolean {
+  const aliases = shellLabelAliases();
+  if (!(name in aliases)) return false;
+  delete aliases[name];
+  localStorage.setItem(SHELL_LABEL_ALIASES_KEY, JSON.stringify(aliases));
+  return true;
+}
+
+function stripTerminalDecor(value: string): string {
+  return value
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+    .replace(/[╭╮╰╯│┃║┆┊]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanAutoFollowUp(value: string): string {
+  return stripTerminalDecor(value)
+    .replace(/^(?:claude|codex|grok|gemini|assistant)\s*[:>]\s*/i, '')
+    .replace(/^(?:[>›»•*+-]|\d+[.)])\s*/, '')
+    .replace(/^["'“”]+|["'“”]+$/g, '')
+    .slice(0, AUTO_FOLLOW_UP_MAX_CHARS)
+    .trim();
+}
+
+function looksLikeAutoFollowUp(line: string): boolean {
+  const text = cleanAutoFollowUp(line);
+  if (text.length < 12) return false;
+  if (/how is claude doing this session|esc to interrupt|shift\+tab|tokens|context left/i.test(text)) return false;
+  if (/^(?:would you like me to|do you want me to|should i|shall i|want me to|would you like|do you want|should we|shall we)\b/i.test(text)) return true;
+  if (/^(?:i can|next,? i can|i could|we can)\s+(?:also\s+)?(?:add|fix|run|update|review|commit|push|open|continue|test|deploy|implement|create|write|check|wire|rename)\b/i.test(text)) return true;
+  return /\?$/.test(text) && /\b(add|fix|run|update|review|commit|push|open|continue|test|deploy|implement|create|write|check|wire|rename)\b/i.test(text);
+}
+
+function extractAutoFollowUpDraft(output: string): string {
+  const lines = output.split('\n').map(stripTerminalDecor).filter(Boolean).slice(-90);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    const heading = line.match(/^(?:auto[- ]?)?(?:follow[- ]?up|suggested follow[- ]?up|suggested next prompt|next prompt|try asking|ask me)[:：-]\s*(.*)$/i);
+    if (heading) {
+      const inline = cleanAutoFollowUp(heading[1] || '');
+      if (inline) return inline;
+      const next = cleanAutoFollowUp(lines[i + 1] || '');
+      if (next) return next;
+    }
+    if (looksLikeAutoFollowUp(line)) return cleanAutoFollowUp(line);
+  }
+  return '';
+}
+
+function markAutoFollowUpSent(name: string, text: string): void {
+  const clean = text.trim();
+  if (clean && autoFollowUpDrafts[name] === clean) autoFollowUpSentDrafts[name] = clean;
+}
+
 function sessionByName(name: string): SessionItem | null {
   return sessions().find((session) => session.name === name) || null;
 }
@@ -193,7 +424,8 @@ function chooseSession(preferRunning = false): SessionItem | null {
 function selectSession(name: string | undefined): void {
   selectedSession = String(name || '');
   if (selectedSession) localStorage.setItem('sdSelectedSession', selectedSession);
-  renderSessionList();
+  renderShellTabs();
+  renderSelectedSessionActions();
   markSelectedShell();
   updateUnlockState();
 }
@@ -209,6 +441,28 @@ function focusComposer(name: string): void {
 
 function shellPreviewByName(name: string): ShellPreview | null {
   return latestShells.find((shell) => shell.name === name) || null;
+}
+
+function saveShellPreviewCache(shells: ShellPreview[]): void {
+  if (!shells.length) return;
+  try {
+    localStorage.setItem(SHELL_PREVIEW_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), shells }));
+  } catch {}
+}
+
+function cachedShellPreviews(): ShellPreview[] {
+  const cached = storageJson<{ savedAt?: number; shells?: ShellPreview[] }>(SHELL_PREVIEW_CACHE_KEY, {});
+  if (!Array.isArray(cached.shells) || !cached.shells.length) return [];
+  if (!cached.savedAt || Date.now() - cached.savedAt > SHELL_PREVIEW_CACHE_MAX_AGE_MS) return [];
+  return cached.shells.filter((shell) => shell && typeof shell.name === 'string');
+}
+
+function setShellsLoading(loading: boolean): void {
+  shellsLoading = loading;
+  document.body.classList.toggle('shells-refreshing', loading);
+  document.querySelectorAll<HTMLElement>('[data-shell-card]').forEach((card) => {
+    card.classList.toggle('shell-refreshing', loading);
+  });
 }
 
 // "Running" = the pane is actively changing. Claude Code / Codex animate a spinner with a
@@ -245,10 +499,19 @@ function setStreamState(text: string, live = false): void {
   el.textContent = text;
 }
 
+function updateSummaryRefreshState(): void {
+  const button = document.getElementById('refreshSummaryBtn') as HTMLButtonElement | null;
+  if (!button) return;
+  button.disabled = !shellUnlocked || summaryLoading;
+  button.classList.toggle('active', summaryLoading);
+  button.innerHTML = `${icon('refresh')}<span>${summaryLoading ? 'Summarising' : 'Summary'}</span>`;
+}
+
 function updateUnlockState(): void {
   document.body.classList.toggle('shells-locked', !shellUnlocked);
   q<HTMLElement>('#unlockPanel').style.display = shellUnlocked ? 'none' : '';
   q<HTMLButtonElement>('#refreshShellsTopBtn').disabled = !shellUnlocked;
+  updateSummaryRefreshState();
   document.querySelectorAll<HTMLButtonElement>('[data-send-shell]').forEach((button) => {
     button.disabled = !targetReady(button.dataset.sendShell || '');
   });
@@ -257,6 +520,9 @@ function updateUnlockState(): void {
   });
   document.querySelectorAll<HTMLButtonElement>('[data-add-image]').forEach((button) => {
     button.disabled = !targetReady(button.dataset.addImage || '');
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-dictate-shell]').forEach((button) => {
+    button.disabled = !targetReady(button.dataset.dictateShell || '');
   });
   document.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((button) => {
     button.disabled = !targetReady(button.dataset.shell || '');
@@ -277,6 +543,8 @@ function updateLastActivityTimes(): void {
       if (el.textContent !== rel) el.textContent = rel;
     }
   });
+  renderShellTabs();
+  renderSelectedSessionActions();
 }
 
 function syncTargetUi(): void {
@@ -284,14 +552,14 @@ function syncTargetUi(): void {
   updateUnlockState();
 }
 
-async function postJson<T extends ApiPayload = ApiPayload>(endpoint: string, body: unknown): Promise<T> {
+async function postJson<T = ApiPayload>(endpoint: string, body: unknown): Promise<T> {
   const response = await fetch(endpoint, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', 'X-Codex-Action': '1' },
     body: JSON.stringify(body),
   });
-  const payload = await response.json() as T;
+  const payload = await response.json() as T & ApiPayload;
   if (!response.ok) throw new Error(payload.error || 'Request failed');
   return payload;
 }

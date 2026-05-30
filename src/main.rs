@@ -1,8 +1,13 @@
 mod auth;
 mod config;
+mod containers;
+mod links;
 mod metrics;
 mod pages;
+mod remote;
 mod routes;
+mod settings;
+mod share;
 mod stream;
 mod summary;
 mod term;

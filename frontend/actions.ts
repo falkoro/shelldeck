@@ -4,12 +4,464 @@ const AGENT_IMAGE_MAX_EDGES = [1400, 1200, 1024, 900, 768, 640];
 const AGENT_IMAGE_QUALITIES = [0.86, 0.78, 0.70, 0.62, 0.54];
 const SUPPORTED_UPLOAD_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
+interface QuickLink {
+  label: string;
+  url: string;
+}
+
+let quickLinks: QuickLink[] = [];
+
+function applyDashboardSettings(settings: DashboardSettings): void {
+  const panels = { ...dashboardSettings.panels, ...(settings.panels || {}) };
+  dashboardSettings = { ...settings, panels };
+  const metricsPanel = document.getElementById('metricsPanel');
+  const metricTemps = document.getElementById('metricTemps');
+  const containersPanel = document.getElementById('containersPanel');
+  const remotePanel = document.getElementById('remotePanel');
+  const linksPanel = document.getElementById('linksPanel');
+  const tickerStrip = document.getElementById('tickerStrip');
+  const tickerBar = document.getElementById('tickerBar');
+  if (metricsPanel) metricsPanel.hidden = !panels.machine;
+  if (metricTemps) metricTemps.hidden = !panels.machine || !panels.machineSensors;
+  if (containersPanel) containersPanel.hidden = !panels.containers;
+  if (remotePanel) remotePanel.hidden = !panels.remoteHosts;
+  if (linksPanel) linksPanel.hidden = !panels.links;
+  if (tickerStrip) tickerStrip.hidden = !panels.tickers;
+  if (tickerBar) {
+    tickerBar.hidden = false;
+    if (!panels.tickers) tickerBar.innerHTML = '<span class="ticker-empty">Tickers hidden</span>';
+  }
+}
+
+async function loadDashboardSettings(): Promise<void> {
+  const response = await fetch('/api/ui-config', { cache: 'no-store', credentials: 'same-origin' });
+  if (!response.ok) return;
+  applyDashboardSettings(await response.json() as DashboardSettings);
+}
+
+function parseTickerText(text: string): string[] {
+  return text
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function focusSettingsEditor(focus?: 'tickers'): void {
+  const editor = document.getElementById('settingsEditor');
+  if (!editor) return;
+  const tickers = editor.querySelector<HTMLTextAreaElement>('#settingsTickers');
+  if (focus === 'tickers' && tickers) {
+    tickers.focus();
+    tickers.select();
+    return;
+  }
+  editor.querySelector<HTMLInputElement>('input[name="machine"]')?.focus();
+}
+
+function openSettingsEditor(focus?: 'tickers'): void {
+  if (document.getElementById('settingsEditor')) {
+    focusSettingsEditor(focus);
+    return;
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'links-editor-modal settings-editor-modal';
+  overlay.id = 'settingsEditor';
+  const panels = dashboardSettings.panels;
+  overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock/crypto tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label></div><label for="settingsTickers">Tickers</label><textarea id="settingsTickers" spellcheck="false" placeholder="MSFT, NVDA, BTC-USD"></textarea><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
+  document.body.appendChild(overlay);
+  const form = overlay.querySelector<HTMLFormElement>('form')!;
+  const textarea = overlay.querySelector<HTMLTextAreaElement>('#settingsTickers')!;
+  textarea.value = (dashboardSettings.tickers || []).join('\n');
+  const close = (): void => overlay.remove();
+  overlay.querySelector('[data-close-settings]')?.addEventListener('click', close);
+  overlay.addEventListener('mousedown', (event: MouseEvent) => { if (event.target === overlay) close(); });
+  form.addEventListener('submit', (event: Event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    saveDashboardSettings({
+      tickers: parseTickerText(textarea.value),
+      panels: {
+        machine: data.has('machine'),
+        machineSensors: data.has('machineSensors'),
+        remoteHosts: data.has('remoteHosts'),
+        containers: data.has('containers'),
+        links: data.has('links'),
+        tickers: data.has('tickers'),
+      },
+    }).then(close).catch((error: Error) => toast(error.message));
+  });
+  requestAnimationFrame(() => focusSettingsEditor(focus));
+}
+
+async function saveDashboardSettings(settings: DashboardSettings): Promise<void> {
+  const saved = await postJson<DashboardSettings>('/api/ui-config', settings);
+  applyDashboardSettings(saved);
+  await Promise.allSettled([loadTickers(), loadMetrics(), loadContainers(), loadRemoteHosts(), loadLinks()]);
+  toast('Config saved');
+}
+
+function roundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawSafeShot(): HTMLCanvasElement {
+  const shells = latestShells.length ? latestShells : sessions().map((session) => ({
+    name: session.name,
+    label: session.label,
+    running: session.running,
+    cwd: '',
+    command: '',
+    output: '',
+  }));
+  const modelSessions = sessions();
+  const width = Math.min(2200, Math.max(1600, Math.round(window.innerWidth || 1600)));
+  const pad = 40;
+  const gap = 18;
+  const topH = 98;
+  const tickerH = 54;
+  const contentTop = pad + topH + tickerH + gap * 2;
+  const sidebarW = width >= 1900 ? 370 : 330;
+  const mainX = pad + sidebarW + gap;
+  const mainW = width - mainX - pad;
+  const tabCols = Math.max(2, Math.min(width >= 1900 ? 4 : 3, Math.floor(mainW / 330)));
+  const tabRows = Math.max(1, Math.ceil(Math.max(1, modelSessions.length) / tabCols));
+  const tabW = Math.floor((mainW - 28 - (tabCols - 1) * 10) / tabCols);
+  const cardCols = mainW >= 1080 ? 2 : 1;
+  const cardW = Math.floor((mainW - 28 - (cardCols - 1) * 14) / cardCols);
+  const cardH = 206;
+  const cardRows = Math.max(1, Math.ceil(shells.length / cardCols));
+  const shellPanelH = 72 + tabRows * 44 + 56 + cardRows * (cardH + 14) + 28;
+  const sidebarH = 860;
+  const height = Math.max(980, contentTop + Math.max(shellPanelH, sidebarH) + pad);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not create safe screenshot');
+
+  const text = (value: string, x: number, y: number, maxWidth?: number): void => {
+    ctx.fillText(value, x, y, maxWidth);
+  };
+  const panel = (x: number, y: number, w: number, h: number, title: string, subtitle = ''): void => {
+    ctx.fillStyle = '#0b121a';
+    roundedRect(ctx, x, y, w, h, 12);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(139,246,255,.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '700 18px Segoe UI, sans-serif';
+    text(title, x + 16, y + 28, w - 32);
+    if (subtitle) {
+      ctx.fillStyle = '#91a7b7';
+      ctx.font = '13px Segoe UI, sans-serif';
+      text(subtitle, x + 16, y + 48, w - 32);
+    }
+  };
+  const pill = (x: number, y: number, label: string, color = '#cfeaff', w = 118): void => {
+    ctx.fillStyle = '#071017';
+    roundedRect(ctx, x, y, w, 32, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(139,246,255,.25)';
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.font = '700 13px Segoe UI, sans-serif';
+    text(label, x + 14, y + 21, w - 24);
+  };
+  const line = (x: number, y: number, w: number, color = 'rgba(145,167,183,.24)'): void => {
+    ctx.fillStyle = color;
+    roundedRect(ctx, x, y, w, 7, 4);
+    ctx.fill();
+  };
+  const button = (x: number, y: number, label: string, w = 92): void => {
+    ctx.fillStyle = '#0c1720';
+    roundedRect(ctx, x, y, w, 30, 7);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(139,246,255,.25)';
+    ctx.stroke();
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '700 12px Segoe UI, sans-serif';
+    text(label, x + 12, y + 20, w - 18);
+  };
+
+  ctx.fillStyle = '#070b10';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = '#0b121a';
+  roundedRect(ctx, pad, pad, width - pad * 2, topH, 14);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(139,246,255,.16)';
+  ctx.stroke();
+  ctx.fillStyle = '#8bf6ff';
+  roundedRect(ctx, pad + 22, pad + 22, 54, 54, 10);
+  ctx.fill();
+  ctx.fillStyle = '#061014';
+  ctx.font = '900 17px Segoe UI, sans-serif';
+  text('SD', pad + 38, pad + 57);
+  ctx.fillStyle = '#edf7ff';
+  ctx.font = '800 28px Segoe UI, sans-serif';
+  text('ShellDeck', pad + 92, pad + 42);
+  ctx.fillStyle = '#91a7b7';
+  ctx.font = '14px Segoe UI, sans-serif';
+  text('Safe dashboard snapshot. Hostnames, paths, commands, shell names, and output are hidden.', pad + 92, pad + 66, 760);
+
+  const running = shells.filter((shell) => shell.running).length;
+  const waiting = shells.filter((shell) => shell.running && !shellWorking(shell.name)).length;
+  const active = shells.filter((shell) => shell.running && shellWorking(shell.name)).length;
+  const stats = [`${shells.length} shells`, `${active} active`, `${waiting} waiting`, `${Math.max(0, shells.length - running)} offline`];
+  stats.forEach((value, idx) => {
+    pill(width - pad - 520 + idx * 128, pad + 33, value, idx === 1 ? '#72f7c8' : idx === 2 ? '#ffc857' : '#cfeaff', 116);
+  });
+
+  ctx.fillStyle = '#0b121a';
+  roundedRect(ctx, pad, pad + topH + gap, width - pad * 2, tickerH, 10);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(139,246,255,.16)';
+  ctx.stroke();
+  ctx.fillStyle = '#91a7b7';
+  ctx.font = '700 13px Segoe UI, sans-serif';
+  text(dashboardSettings.tickers.length ? `${dashboardSettings.tickers.length} tickers configured` : 'Ticker bar empty', pad + 16, pad + topH + gap + 32, 260);
+  for (let i = 0; i < Math.min(6, Math.max(3, dashboardSettings.tickers.length || 3)); i += 1) {
+    const x = pad + 250 + i * 112;
+    pill(x, pad + topH + gap + 11, `TICK ${i + 1}`, i % 2 ? '#ff9fb4' : '#72f7c8', 92);
+  }
+  button(width - pad - 130, pad + topH + gap + 12, 'Configure', 112);
+
+  let sideY = contentTop;
+  panel(pad, sideY, sidebarW, 176, 'Machine', 'Host details hidden');
+  line(pad + 18, sideY + 76, sidebarW - 52, 'rgba(114,247,200,.45)');
+  line(pad + 18, sideY + 116, Math.round((sidebarW - 52) * 0.68), 'rgba(139,246,255,.28)');
+  ctx.fillStyle = '#91a7b7';
+  ctx.font = '12px Segoe UI, sans-serif';
+  text('CPU / RAM / load', pad + 18, sideY + 96);
+  text('Thermal sensors summarized', pad + 18, sideY + 136);
+  sideY += 190;
+  panel(pad, sideY, sidebarW, 136, 'Remote Hosts', 'Server ping and containers');
+  for (let i = 0; i < 2; i += 1) {
+    const y = sideY + 64 + i * 32;
+    ctx.fillStyle = '#050a0f';
+    roundedRect(ctx, pad + 16, y, sidebarW - 32, 24, 6);
+    ctx.fill();
+    line(pad + 28, y + 9, sidebarW - 132, i === 0 ? 'rgba(114,247,200,.32)' : 'rgba(139,246,255,.18)');
+  }
+  sideY += 150;
+  panel(pad, sideY, sidebarW, 166, 'Local Containers', 'Docker and Podman');
+  for (let i = 0; i < 3; i += 1) {
+    const y = sideY + 64 + i * 30;
+    ctx.fillStyle = '#050a0f';
+    roundedRect(ctx, pad + 16, y, sidebarW - 32, 22, 6);
+    ctx.fill();
+    line(pad + 28, y + 8, sidebarW - 112, 'rgba(139,246,255,.18)');
+  }
+  sideY += 180;
+  panel(pad, sideY, sidebarW, 132, 'Links', 'Quick jumps');
+  for (let i = 0; i < 4; i += 1) button(pad + 16 + (i % 2) * ((sidebarW - 42) / 2), sideY + 64 + Math.floor(i / 2) * 38, 'Link', (sidebarW - 50) / 2);
+  sideY += 146;
+  panel(pad, sideY, sidebarW, 126, 'Shell Unlock', 'Input controls hidden');
+  ctx.fillStyle = '#03070b';
+  roundedRect(ctx, pad + 16, sideY + 68, sidebarW - 112, 34, 7);
+  ctx.fill();
+  button(pad + sidebarW - 84, sideY + 70, 'Unlock', 68);
+
+  panel(mainX, contentTop, mainW, shellPanelH, 'Shells', 'All panes side-by-side. Text and output redacted.');
+  const toolsX = mainX + mainW - 514;
+  ['Grid', '80', 'Follow', 'Compact', 'Refresh'].forEach((label, idx) => button(toolsX + idx * 100, contentTop + 18, label, 88));
+
+  modelSessions.forEach((session, idx) => {
+    const state = sessionRuntime(session);
+    const col = idx % tabCols;
+    const row = Math.floor(idx / tabCols);
+    const x = mainX + 14 + col * (tabW + 10);
+    const y = contentTop + 76 + row * 44;
+    ctx.fillStyle = session.name === selectedSession ? '#10202b' : '#0d151f';
+    roundedRect(ctx, x, y, tabW, 34, 7);
+    ctx.fill();
+    ctx.strokeStyle = session.name === selectedSession ? 'rgba(139,246,255,.7)' : 'rgba(255,255,255,.09)';
+    ctx.stroke();
+    ctx.fillStyle = '#071017';
+    roundedRect(ctx, x + 10, y + 6, 34, 22, 5);
+    ctx.fill();
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '900 12px Cascadia Mono, monospace';
+    text(String(session.badge || idx + 1).slice(0, 2).toUpperCase(), x + 20, y + 21, 22);
+    ctx.fillStyle = state.dotClass === 'on' ? '#72f7c8' : state.dotClass === 'wait' ? '#ffc857' : '#ff6a7a';
+    ctx.beginPath();
+    ctx.arc(x + 58, y + 17, 4, 0, Math.PI * 2);
+    ctx.fill();
+    line(x + 70, y + 13, tabW - 96, 'rgba(207,234,255,.28)');
+  });
+
+  const actionY = contentTop + 86 + tabRows * 44;
+  ctx.fillStyle = '#071017';
+  roundedRect(ctx, mainX + 14, actionY, mainW - 28, 42, 8);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(139,246,255,.16)';
+  ctx.stroke();
+  line(mainX + 30, actionY + 17, 230, 'rgba(207,234,255,.24)');
+  button(mainX + mainW - 274, actionY + 6, 'Start', 78);
+  button(mainX + mainW - 188, actionY + 6, 'Restart', 86);
+  button(mainX + mainW - 94, actionY + 6, 'Attach', 76);
+
+  const cardsTop = actionY + 56;
+  shells.forEach((shell, idx) => {
+    const col = idx % cardCols;
+    const row = Math.floor(idx / cardCols);
+    const x = mainX + 14 + col * (cardW + 14);
+    const y = cardsTop + row * (cardH + 14);
+    const activeShell = shell.running && shellWorking(shell.name);
+    const waitingShell = shell.running && !activeShell;
+    ctx.fillStyle = '#050a0f';
+    roundedRect(ctx, x, y, cardW, cardH, 10);
+    ctx.fill();
+    ctx.strokeStyle = activeShell ? 'rgba(114,247,200,.5)' : waitingShell ? 'rgba(255,200,87,.45)' : 'rgba(139,246,255,.22)';
+    ctx.stroke();
+    ctx.fillStyle = '#071017';
+    roundedRect(ctx, x + 1, y + 1, cardW - 2, 44, 10);
+    ctx.fill();
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '800 17px Segoe UI, sans-serif';
+    text(`Shell ${idx + 1}`, x + 18, y + 28);
+    ctx.fillStyle = activeShell ? '#72f7c8' : waitingShell ? '#ffc857' : '#ff6a7a';
+    ctx.beginPath();
+    ctx.arc(x + cardW - 28, y + 23, 6, 0, Math.PI * 2);
+    ctx.fill();
+    line(x + 18, y + 62, cardW - 60, 'rgba(139,246,255,.2)');
+    ctx.fillStyle = '#03070b';
+    roundedRect(ctx, x + 18, y + 78, cardW - 36, 42, 7);
+    ctx.fill();
+    line(x + 32, y + 96, cardW - 92, 'rgba(145,167,183,.22)');
+    for (let i = 0; i < 5; i += 1) {
+      button(x + 18 + i * 76, y + 130, ['Send', 'Paste', 'Image', 'Mic', 'Enter'][i], 68);
+    }
+    ctx.fillStyle = '#03070b';
+    roundedRect(ctx, x + 18, y + 166, cardW - 36, 24, 7);
+    ctx.fill();
+    for (let i = 0; i < 3; i += 1) {
+      line(x + 32 + i * 118, y + 175, Math.min(88, cardW - 72 - i * 118), 'rgba(145,167,183,.18)');
+    }
+  });
+
+  ctx.fillStyle = '#91a7b7';
+  ctx.font = '13px Segoe UI, sans-serif';
+  text(`Generated ${new Date().toLocaleString()} by ShellDeck safe shot`, pad, height - 24, width - pad * 2);
+  return canvas;
+}
+
+function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Could not export safe screenshot'));
+    }, 'image/png');
+  });
+}
+
+async function writeImageToClipboard(blob: Blob): Promise<boolean> {
+  const ClipboardItemCtor = (window as any).ClipboardItem;
+  if (!navigator.clipboard || !ClipboardItemCtor) return false;
+  await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })]);
+  return true;
+}
+
+async function createSafeShot(): Promise<void> {
+  const button = document.getElementById('safeShotBtn') as HTMLButtonElement | null;
+  if (button) button.disabled = true;
+  try {
+    const canvas = drawSafeShot();
+    const blob = await canvasToPngBlob(canvas);
+    const copied = await writeImageToClipboard(blob).catch(() => false);
+    await postJson('/api/share-shot', { dataUrl: canvas.toDataURL('image/png') });
+    toast(copied ? 'Safe shot copied and saved in share/' : 'Safe shot saved in share/');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function loadTickers(): Promise<void> {
-  if (!document.getElementById('tickerBar')) return;
+  if (!document.getElementById('tickerBar') || !dashboardSettings.panels.tickers) return;
   const response = await fetch('/api/tickers', { cache: 'no-store', credentials: 'same-origin' });
   if (!response.ok) return;
   const payload = await response.json() as { tickers?: Ticker[] };
   renderTickers(payload.tickers || []);
+}
+
+function renderLinks(links: QuickLink[]): void {
+  quickLinks = links;
+  const grid = document.getElementById('linksGrid');
+  if (!grid) return;
+  if (!links.length) {
+    grid.innerHTML = '<div class="muted links-empty">No links configured</div>';
+    return;
+  }
+  grid.innerHTML = links
+    .map((link) => `<a class="link-item" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${icon('external')}<span>${escapeHtml(link.label)}</span></a>`)
+    .join('');
+}
+
+async function loadLinks(): Promise<void> {
+  if (!document.getElementById('linksPanel') || !dashboardSettings.panels.links) return;
+  const response = await fetch('/api/links', { cache: 'no-store', credentials: 'same-origin' });
+  if (!response.ok) return;
+  const payload = await response.json() as { links?: QuickLink[] };
+  renderLinks(payload.links || []);
+}
+
+function linkEditorText(): string {
+  return quickLinks.map((link) => `${link.label}|${link.url}`).join('\n');
+}
+
+function parseLinkEditorText(text: string): QuickLink[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [label, ...urlParts] = line.split('|');
+      return { label: (label || '').trim(), url: urlParts.join('|').trim() };
+    })
+    .filter((link) => link.label && link.url);
+}
+
+function openLinksEditor(): void {
+  if (document.getElementById('linksEditor')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'links-editor-modal';
+  overlay.id = 'linksEditor';
+  overlay.innerHTML = `<form class="links-editor-box"><div class="links-editor-head"><div><h2>Links</h2><p class="muted">One per line: Label|https://example.com</p></div><button type="button" class="ghost" data-close-links>Cancel</button></div><textarea id="linksEditorText" spellcheck="false"></textarea><div class="links-editor-actions"><button type="submit" class="primary">Save links</button></div></form>`;
+  document.body.appendChild(overlay);
+  const textarea = overlay.querySelector<HTMLTextAreaElement>('#linksEditorText')!;
+  textarea.value = linkEditorText();
+  textarea.focus();
+  const close = (): void => overlay.remove();
+  overlay.querySelector('[data-close-links]')?.addEventListener('click', close);
+  overlay.addEventListener('mousedown', (event: MouseEvent) => { if (event.target === overlay) close(); });
+  overlay.querySelector('form')?.addEventListener('submit', (event: Event) => {
+    event.preventDefault();
+    saveLinks(parseLinkEditorText(textarea.value)).then(close).catch((error: Error) => toast(error.message));
+  });
+}
+
+async function saveLinks(links: QuickLink[]): Promise<void> {
+  const payload = await postJson('/api/links', { links }) as { links?: QuickLink[] };
+  renderLinks(payload.links || []);
+  toast('Links saved');
 }
 
 async function sessionAction(endpoint: string, name: string): Promise<void> {
@@ -25,11 +477,187 @@ async function sendInput(name: string, submit: boolean): Promise<void> {
   const input = inputFor(name);
   const text = input?.value || '';
   if (!text.trim()) throw new Error('Input is empty');
+  if (activeDictation?.name === name) stopDictation();
   const payload = await postJson('/api/input', { name, text, submit });
   pushHistory(name, text);
+  markAutoFollowUpSent(name, text);
   toast(payload.message || 'Sent');
   if (input) input.value = '';
+  clearShellImages(name);
+  setShellStatus(name, 'Sent. Attachments cleared.');
   updateUnlockState();
+}
+
+let activeDictation: { name: string; recognition: any; stream?: MediaStream | null } | null = null;
+
+function speechRecognitionCtor(): any {
+  return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+}
+
+function browserMicHelp(): string {
+  if (/Edg\//.test(navigator.userAgent)) {
+    return 'In Edge, open the lock icon, set Microphone to Allow for this site, then reload ShellDeck.';
+  }
+  return 'Allow Microphone for this site in the browser address bar, then try Mic again.';
+}
+
+function dictationErrorMessage(error: any): string {
+  const code = String(error?.error || error?.name || error?.message || '').toLowerCase();
+  if (code.includes('service-not-allowed')) {
+    return `Speech recognition is blocked by this browser or network. ${browserMicHelp()}`;
+  }
+  if (code.includes('not-allowed') || code.includes('notallowed') || code.includes('permission')) {
+    return `Microphone is blocked. ${browserMicHelp()}`;
+  }
+  if (code.includes('audio-capture') || code.includes('notfound')) {
+    return 'No microphone was found. Check your input device, then try Mic again.';
+  }
+  if (code.includes('no-speech')) {
+    return 'No speech was heard. Check the microphone input and try again.';
+  }
+  if (code.includes('network')) {
+    return 'Speech recognition could not reach the browser speech service. Check the connection or type/paste instead.';
+  }
+  if (code.includes('security') || code.includes('secure')) {
+    return 'Microphone dictation needs HTTPS or localhost. Open ShellDeck over HTTPS or 127.0.0.1.';
+  }
+  return 'Dictation stopped. Check microphone permissions for this site and try again.';
+}
+
+function reportDictationError(name: string, error: any): void {
+  const message = dictationErrorMessage(error);
+  setShellStatus(name, message);
+  toast(message);
+}
+
+function requestMicrophoneForDictation(): Promise<MediaStream | null> {
+  if (!navigator.mediaDevices?.getUserMedia) return Promise.resolve(null);
+  return navigator.mediaDevices
+    .getUserMedia({ audio: true })
+    .catch((error) => { throw new Error(dictationErrorMessage(error)); });
+}
+
+function appendDictationText(base: string, transcript: string): string {
+  const clean = transcript.trim().replace(/\s+/g, ' ');
+  if (!clean) return base;
+  return `${base}${base && !/\s$/.test(base) ? ' ' : ''}${clean}`;
+}
+
+function setDictationState(name: string, listening: boolean): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-dictate-shell]').forEach((button) => {
+    const active = listening && button.dataset.dictateShell === name;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+async function warmMicrophonePermission(name: string, recognition: any, streamRequest: Promise<MediaStream | null>): Promise<void> {
+  try {
+    const stream = await streamRequest;
+    const current = activeDictation;
+    if (!current || current.recognition !== recognition) {
+      stream?.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    current.stream = stream;
+  } catch (error) {
+    if (activeDictation?.recognition !== recognition) return;
+    reportDictationError(name, error);
+    stopDictation();
+  }
+}
+
+function stopDictation(): void {
+  const current = activeDictation;
+  activeDictation = null;
+  if (!current) return;
+  setDictationState(current.name, false);
+  current.stream?.getTracks().forEach((track) => track.stop());
+  try {
+    current.recognition.stop();
+  } catch {}
+}
+
+async function toggleDictation(name: string): Promise<void> {
+  if (!targetReady(name)) throw new Error('Choose a running unlocked shell');
+  if (activeDictation?.name === name) {
+    stopDictation();
+    setShellStatus(name, 'Dictation stopped.');
+    return;
+  }
+  stopDictation();
+  const Recognition = speechRecognitionCtor();
+  if (!Recognition) {
+    throw new Error('Browser dictation is unavailable here. Use Chrome or Edge and allow Microphone for this site.');
+  }
+  if (!window.isSecureContext) {
+    throw new Error('Microphone dictation needs HTTPS or localhost. Open ShellDeck over HTTPS or 127.0.0.1.');
+  }
+  const input = inputFor(name);
+  if (!input) throw new Error('Could not find this shell input');
+  const recognition = new Recognition();
+  const micWarmup = requestMicrophoneForDictation();
+  const base = input.value;
+  const finals: string[] = [];
+  let hadError = false;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = navigator.language || 'en-US';
+  recognition.onresult = (event: any): void => {
+    if (activeDictation?.recognition !== recognition) return;
+    let interim = '';
+    for (let i = 0; i < event.results.length; i += 1) {
+      const transcript = String(event.results[i][0]?.transcript || '').trim();
+      if (event.results[i].isFinal) finals[i] = transcript;
+      else if (i >= event.resultIndex) interim += ` ${transcript}`;
+    }
+    const spoken = [...finals.filter(Boolean), interim.trim()].filter(Boolean).join(' ');
+    input.value = appendDictationText(base, spoken);
+    updateUnlockState();
+  };
+  recognition.onstart = (): void => {
+    if (activeDictation?.recognition !== recognition) return;
+    setDictationState(name, true);
+    setShellStatus(name, 'Listening. Speak into your microphone.');
+  };
+  recognition.onaudiostart = (): void => {
+    if (activeDictation?.recognition !== recognition) return;
+    setShellStatus(name, 'Microphone active. Listening...');
+  };
+  recognition.onspeechstart = (): void => {
+    if (activeDictation?.recognition !== recognition) return;
+    setShellStatus(name, 'Speech detected. Dictating...');
+  };
+  recognition.onspeechend = (): void => {
+    if (activeDictation?.recognition !== recognition) return;
+    setShellStatus(name, 'Speech paused. Keep talking or press Mic to stop.');
+  };
+  recognition.onnomatch = (): void => {
+    if (activeDictation?.recognition !== recognition) return;
+    setShellStatus(name, 'Could not understand that audio. Try again or speak closer to the mic.');
+  };
+  recognition.onerror = (event: any): void => {
+    hadError = true;
+    reportDictationError(name, event);
+  };
+  recognition.onend = (): void => {
+    activeDictation?.stream?.getTracks().forEach((track) => track.stop());
+    if (activeDictation?.recognition === recognition) activeDictation = null;
+    setDictationState(name, false);
+    if (!hadError) setShellStatus(name, 'Dictation stopped.');
+  };
+  try {
+    setShellStatus(name, 'Starting dictation. Allow Microphone when the browser asks.');
+    activeDictation = { name, recognition, stream: null };
+    recognition.start();
+    setDictationState(name, true);
+    warmMicrophonePermission(name, recognition, micWarmup);
+  } catch (error) {
+    activeDictation = null;
+    setDictationState(name, false);
+    micWarmup.then((stream) => stream?.getTracks().forEach((track) => track.stop())).catch(() => {});
+    throw new Error(dictationErrorMessage(error));
+  }
 }
 
 async function submitShellInput(name: string): Promise<void> {
@@ -209,26 +837,41 @@ function setShellStatus(name: string, text: string): void {
 
 // The Hermes/Grok summary is no longer shown as one block — it feeds the per-slot titles
 // (sessionWorkTitle) so each shell shows its own line. We only keep the raw text + repaint titles.
-async function loadSummary(): Promise<void> {
+async function loadSummary(force = false): Promise<void> {
   if (!shellUnlocked) {
     latestSummaryText = '';
     summaryLoading = false;
+    updateSummaryRefreshState();
     applyWorkTitles();
     return;
   }
+  if (force) {
+    latestSummaryText = '';
+    clearShellAutoTitleCache();
+  }
   summaryLoading = true;
+  updateSummaryRefreshState();
   applyWorkTitles();
   try {
     const response = await fetch('/api/summary', { cache: 'no-store', credentials: 'same-origin' });
     const payload = await response.json() as ApiPayload;
     if (!response.ok) throw new Error(payload.error || 'Summary failed');
-    // Ignore the transient `local` fallback (bridge blip) so good titles aren't overwritten with
-    // the bare "command · cwd" local format; keep the last real summary instead.
-    if (!String(payload.provider || '').startsWith('local')) latestSummaryText = payload.summary || '';
+    const provider = String(payload.provider || '');
+    const summary = payload.summary || '';
+    // Keep the last model-backed summary during transient fallback blips, but still accept local
+    // summaries when no better text exists yet so default installs can populate shell titles.
+    if (summary && (force || !provider.startsWith('local') || !latestSummaryText.trim())) latestSummaryText = summary;
   } finally {
     summaryLoading = false;
+    updateSummaryRefreshState();
     applyWorkTitles();
   }
+}
+
+async function refreshSummaries(): Promise<void> {
+  if (!shellUnlocked) throw new Error('Unlock shells before refreshing summaries');
+  await loadSummary(true);
+  toast('Summaries refreshed');
 }
 
 async function unlockShells(password: string): Promise<void> {
@@ -266,17 +909,29 @@ async function loadShells(showLoading = true): Promise<void> {
     return;
   }
   if (showLoading && !grid.querySelector('[data-shell-card]')) {
-    grid.innerHTML = '<div class="locked-note">Loading shell previews...</div>';
+    const cached = cachedShellPreviews();
+    if (cached.length) {
+      setShellsLoading(true);
+      renderShells({ shells: cached, fromCache: true });
+      setStreamState('refreshing shells');
+    } else {
+      grid.innerHTML = '<div class="locked-note">Loading shell previews...</div>';
+    }
   }
-  const response = await fetch(shellEndpoint('/api/shells'), { cache: 'no-store', credentials: 'same-origin' });
-  const payload = await response.json() as ApiPayload;
-  if (!response.ok) {
-    if (response.status === 403) shellUnlocked = false;
-    updateUnlockState();
-    grid.innerHTML = `<div class="locked-note">${escapeHtml(payload.error || 'Shell preview failed')}. Enter the second password and try again.</div>`;
-    throw new Error(payload.error || 'Shell preview failed');
+  setShellsLoading(true);
+  try {
+    const response = await fetch(shellEndpoint('/api/shells'), { cache: 'no-store', credentials: 'same-origin' });
+    const payload = await response.json() as ApiPayload;
+    if (!response.ok) {
+      if (response.status === 403) shellUnlocked = false;
+      updateUnlockState();
+      grid.innerHTML = `<div class="locked-note">${escapeHtml(payload.error || 'Shell preview failed')}. Enter the second password and try again.</div>`;
+      throw new Error(payload.error || 'Shell preview failed');
+    }
+    renderShells({ shells: payload.shells });
+  } finally {
+    setShellsLoading(false);
   }
-  renderShells({ shells: payload.shells });
 }
 
 function startShellStream(): void {
@@ -288,6 +943,7 @@ function startShellStream(): void {
   shellStream = new EventSource(shellEndpoint('/api/shells/stream'));
   shellStream.addEventListener('shells', (event) => {
     const payload = JSON.parse((event as MessageEvent).data) as ApiPayload;
+    setShellsLoading(false);
     renderShells({ shells: payload.shells });
     setStreamState(`live ${new Date().toLocaleTimeString()}`, true);
   });

@@ -10,7 +10,9 @@ use axum::{
 use serde::Deserialize;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
 
-fn remote(addr: &ConnectInfo<SocketAddr>) -> String { addr.0.ip().to_string() }
+fn remote(addr: &ConnectInfo<SocketAddr>) -> String {
+    addr.0.ip().to_string()
+}
 
 fn allowed(state: &AppState, headers: &HeaderMap, addr: &ConnectInfo<SocketAddr>) -> bool {
     auth::network_allowed(&state.config, headers, Some(&remote(addr)))
@@ -21,7 +23,9 @@ fn signed_in(state: &AppState, headers: &HeaderMap, addr: &ConnectInfo<SocketAdd
 }
 
 #[derive(Deserialize)]
-pub struct LinesQuery { lines: Option<u32> }
+pub struct LinesQuery {
+    lines: Option<u32>,
+}
 
 pub async fn api_shell_stream(
     State(state): State<AppState>,
@@ -30,10 +34,16 @@ pub async fn api_shell_stream(
     Query(query): Query<LinesQuery>,
 ) -> Response {
     if !allowed(&state, &headers, &connect) || !signed_in(&state, &headers, &connect) {
-        return webutil::json_response(StatusCode::FORBIDDEN, &serde_json::json!({ "error": "Forbidden" }));
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": "Forbidden" }),
+        );
     }
     if !auth::unlocked(&state.config, &headers) {
-        return webutil::json_response(StatusCode::FORBIDDEN, &serde_json::json!({ "error": "Shell unlock required" }));
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": "Shell unlock required" }),
+        );
     }
     let config = state.config.clone();
     let lines = tmux::clean_lines(query.lines.unwrap_or(80));
@@ -45,5 +55,7 @@ pub async fn api_shell_stream(
             tokio::time::sleep(Duration::from_millis(1_200)).await;
         }
     };
-    Sse::new(stream).keep_alive(KeepAlive::default()).into_response()
+    Sse::new(stream)
+        .keep_alive(KeepAlive::default())
+        .into_response()
 }
