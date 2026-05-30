@@ -21,6 +21,9 @@ pub async fn save(config: Arc<Config>, payload: ShareShotUpload) -> Result<Saved
         .data_url
         .strip_prefix("data:image/png;base64,")
         .ok_or("Safe shot must be a PNG data URL")?;
+    if encoded.len() / 4 * 3 > 4 * 1024 * 1024 {
+        return Err("Safe shot image is too large".to_string());
+    }
     let bytes = STANDARD
         .decode(encoded.trim().replace(char::is_whitespace, ""))
         .map_err(|_| "Invalid safe shot image data")?;

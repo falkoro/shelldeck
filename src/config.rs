@@ -1,4 +1,5 @@
 use rand::{rngs::OsRng, RngCore};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, path::PathBuf};
 
 #[derive(Clone)]
@@ -11,7 +12,7 @@ pub struct KnownSession {
     pub start: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RemoteHostConfig {
     pub id: String,
     pub label: String,
@@ -45,12 +46,16 @@ pub struct Config {
     pub xai_auth_file: PathBuf,
     pub xai_client_id: String,
     pub attach_template: String,
+    pub ssh_attach_template: String,
     pub quick_links: Vec<(String, String)>,
     pub links_file: PathBuf,
     pub ui_config_file: PathBuf,
     pub share_shot_file: PathBuf,
     pub tickers: Vec<String>,
     pub remote_hosts: Vec<RemoteHostConfig>,
+    pub remote_hosts_file: PathBuf,
+    pub remote_container_cap: usize,
+    pub allowed_origins: Vec<String>,
     pub show_unknown_sessions: bool,
     pub known_sessions: Vec<KnownSession>,
     pub image_types: HashMap<String, &'static str>,
@@ -144,6 +149,11 @@ impl Config {
                 .unwrap_or_else(|_| "b1a00492-073a-47ea-816f-4c329264a828".to_string()),
             attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE")
                 .unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
+            // SSH-into-tmux command (copy-only, never executed server-side). {name} = session.
+            ssh_attach_template: env::var("DASHBOARD_SSH_ATTACH_TEMPLATE")
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
             quick_links: parse_links(&env::var("DASHBOARD_LINKS").unwrap_or_default()),
             links_file: configured_path(
                 env::var("DASHBOARD_LINKS_FILE").ok(),
@@ -161,6 +171,19 @@ impl Config {
             remote_hosts: parse_remote_hosts(
                 &env::var("DASHBOARD_REMOTE_HOSTS").unwrap_or_default(),
             ),
+            // Runtime-editable remote hosts (self-service UI). Seeds from DASHBOARD_REMOTE_HOSTS
+            // when this file is absent, then lives in remote-hosts.json.
+            remote_hosts_file: configured_path(
+                env::var("DASHBOARD_REMOTE_HOSTS_FILE").ok(),
+                root_dir.join("remote-hosts.json"),
+            ),
+            remote_container_cap: env::var("DASHBOARD_REMOTE_CONTAINER_CAP")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .filter(|cap| *cap > 0)
+                .unwrap_or(100),
+            // Extra browser Origins allowed to open the /api/term WebSocket (beyond same-host).
+            allowed_origins: split_env("DASHBOARD_ALLOWED_ORIGINS"),
             show_unknown_sessions: env_flag("DASHBOARD_SHOW_UNKNOWN_SESSIONS"),
             known_sessions: known_sessions(),
             image_types: image_types(),
@@ -179,12 +202,15 @@ fn split_env(key: &str) -> Vec<String> {
 }
 
 // Parse DASHBOARD_LINKS into (label, url) quick links. Format: "Label|https://url;Label|https://url".
+// Mirrors the runtime save path's scheme allowlist (links::valid_url) so an env-seeded
+// javascript:/data: URL can't slip into an href that the API path would have rejected.
 fn parse_links(raw: &str) -> Vec<(String, String)> {
     raw.split(';')
         .filter_map(|item| {
             let (label, url) = item.trim().split_once('|')?;
             let (label, url) = (label.trim(), url.trim());
-            (!label.is_empty() && !url.is_empty()).then(|| (label.to_string(), url.to_string()))
+            (!label.is_empty() && !url.is_empty() && crate::links::valid_url(url))
+                .then(|| (label.to_string(), url.to_string()))
         })
         .collect()
 }
@@ -212,7 +238,7 @@ fn parse_remote_hosts(raw: &str) -> Vec<RemoteHostConfig> {
         .collect()
 }
 
-fn clean_remote_id(raw: &str) -> String {
+pub fn clean_remote_id(raw: &str) -> String {
     raw.trim()
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
@@ -220,12 +246,30 @@ fn clean_remote_id(raw: &str) -> String {
         .collect()
 }
 
-fn clean_remote_target(raw: &str) -> String {
-    raw.trim()
+// Sanitize an SSH target. Returns "" (rejected) for anything that isn't a plain
+// [user@]host[:port] value. Crucially rejects a leading '-' on any segment so the
+// value can never be parsed by ssh/ping as an OPTION (argument/option injection) —
+// this matters now that the self-service UI lets users supply targets.
+pub fn clean_remote_target(raw: &str) -> String {
+    let cleaned: String = raw
+        .trim()
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '@' | ':'))
         .take(96)
-        .collect()
+        .collect();
+    if valid_ssh_target(&cleaned) {
+        cleaned
+    } else {
+        String::new()
+    }
+}
+
+fn valid_ssh_target(target: &str) -> bool {
+    if target.is_empty() || !target.chars().any(|c| c.is_ascii_alphanumeric()) {
+        return false;
+    }
+    // No '@'-separated segment (the optional user, then the host) may start with '-'.
+    !target.split('@').any(|segment| segment.starts_with('-'))
 }
 
 fn configured_path(raw: Option<String>, default: PathBuf) -> PathBuf {

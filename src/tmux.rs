@@ -11,6 +11,10 @@ pub struct SessionView {
     pub alias: String,
     pub badge: String,
     pub command: String,
+    // Optional "ssh into this tmux session" command (DASHBOARD_SSH_ATTACH_TEMPLATE);
+    // empty string when no template is configured. Copy-only — never executed server-side.
+    #[serde(rename = "sshCommand")]
+    pub ssh_command: String,
     pub running: bool,
     pub windows: u32,
     pub attached: u32,
@@ -89,6 +93,15 @@ async fn list_tmux_sessions() -> Vec<LiveSession> {
         .collect()
 }
 
+// Render DASHBOARD_SSH_ATTACH_TEMPLATE for a session, or "" when unset.
+fn ssh_attach_command(config: &Config, name: &str) -> String {
+    if config.ssh_attach_template.is_empty() {
+        String::new()
+    } else {
+        config.ssh_attach_template.replace("{name}", name)
+    }
+}
+
 pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel {
     let live = list_tmux_sessions().await;
     let live_by_name: HashMap<String, LiveSession> =
@@ -103,6 +116,7 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
             alias: spec.alias.clone(),
             badge: spec.badge.clone(),
             command: config.attach_template.replace("{name}", &spec.name),
+            ssh_command: ssh_attach_command(&config, &spec.name),
             running: found.is_some(),
             windows: found.map(|s| s.windows).unwrap_or(0),
             attached: found.map(|s| s.attached).unwrap_or(0),
@@ -122,6 +136,7 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
             let label = custom_label(&item.name);
             sessions.push(SessionView {
                 command: config.attach_template.replace("{name}", &item.name),
+                ssh_command: ssh_attach_command(&config, &item.name),
                 label,
                 name: item.name.clone(),
                 family: "custom".to_string(),

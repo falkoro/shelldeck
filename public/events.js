@@ -192,6 +192,7 @@ document.getElementById('settingsBtn')?.addEventListener('click', () => openSett
 document.getElementById('editTickersBtn')?.addEventListener('click', () => openSettingsEditor('tickers'));
 document.getElementById('safeShotBtn')?.addEventListener('click', () => createSafeShot().catch((error) => toast(error.message)));
 document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
+document.getElementById('editRemoteHostsBtn')?.addEventListener('click', () => openRemoteHostsEditor().catch((error) => toast(error.message)));
 document.getElementById('refreshSummaryBtn')?.addEventListener('click', () => refreshSummaries().catch((error) => toast(error.message)));
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));

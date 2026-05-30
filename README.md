@@ -17,7 +17,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
 - **Agent presets** — optional Start/Restart entries for iFlow/Flow, Gemini CLI, Qwen Code, goose, Aider, OpenCode, Codex, Grok, Claude Code, and custom commands.
 - **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`, then editable in `links.json`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`, then editable in `dashboard-config.json`).
-- **Configurable widgets** — Machine, remote hosts, local containers, Links, and the ticker bar can be shown/hidden from **Configure**, with JSON persistence for agent-driven setup.
+- **Configurable widgets** — Machine, remote hosts, local containers, Links, and the ticker bar can be shown/hidden from **Configure**, with JSON persistence for agent-driven setup. Remote-host widgets and quick links are fully self-service: add/edit/remove them from the sidebar (Homarr-style) without touching env or restarting.
 - **Machine metrics and containers** — sidebar widgets show live CPU, CPU MHz, RAM, load average, hardware temperatures, local Docker/Podman containers, plus optional SSH-based remote host ping/container checks.
 - **Safe shot** — creates a sanitized share image with shell names, commands, paths, hostnames, and output removed; copies it to the clipboard and saves it under `share/`.
 - **Locked down** — primary login + a second "unlock" password to gate shell control, optional IP allowlists, and first-class support for sitting behind **Cloudflare Access** (trusts the verified email).
@@ -75,6 +75,10 @@ The **Safe shot** button saves a sanitized full-dashboard PNG to `share/shelldec
 ```sh
 DASHBOARD_REMOTE_HOSTS=logan502vs|Logan GL502VS|logan-gl502vs
 ```
+
+This env value only *seeds* `remote-hosts.json` on first run. After that, add, edit, and remove hosts from the sidebar's **Remote Hosts → Edit** button (self-service, no restart) — one `id|Label|user@host` per line. Targets are validated and a leading `-` is rejected so a value can never be parsed as an `ssh`/`ping` option. The widget shows each host's full container count (default cap 100, tune with `DASHBOARD_REMOTE_CONTAINER_CAP`) and notes "showing N" rather than silently hiding the tail.
+
+`DASHBOARD_SSH_ATTACH_TEMPLATE` adds a per-session **SSH** button that copies a command to attach to that tmux session from another machine (e.g. `ssh logan-laptop -t 'tmux attach -t {name}'`, `{name}` = session). It's copy-only — ShellDeck never runs it — and the button hides when the template is unset.
 
 Microphone dictation uses the browser's native speech recognition API. It needs a supporting browser such as Chrome or Edge and a secure context (`https://` or `localhost`); ShellDeck does not send audio to its backend or need a microphone secret.
 

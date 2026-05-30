@@ -39,6 +39,7 @@ interface RemoteHostStatus {
   ssh_ms: number | null;
   checked_at: string;
   containers: ContainerInfo[];
+  container_total?: number;
   error?: string | null;
 }
 
@@ -189,8 +190,11 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
   }
   list.innerHTML = hosts.map((host) => {
     const containers = host.containers || [];
+    const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
+    const countLabel = total === 1 ? '1 container' : `${total} containers`;
+    const shownNote = total > containers.length ? ` · showing ${containers.length}` : '';
     const containerHtml = containers.length
-      ? `<div class="remote-containers">${containers.slice(0, 8).map((container) => `<div class="container-item remote-container"><div><b>${escapeHtml(container.name)}</b><span>${escapeHtml(container.image)}</span></div><small>${escapeHtml(container.engine)}</small><em>${escapeHtml(container.status)}</em></div>`).join('')}</div>`
+      ? `<div class="remote-count">${escapeHtml(countLabel)}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((container) => `<div class="container-item remote-container"><div><b>${escapeHtml(container.name)}</b><span>${escapeHtml(container.image)}</span></div><small>${escapeHtml(container.engine)}</small><em>${escapeHtml(container.status)}</em></div>`).join('')}</div>`
       : `<div class="muted remote-empty">${host.online ? 'No running containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
     const error = host.error && host.online ? `<div class="remote-error">${escapeHtml(host.error)}</div>` : '';
     return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${containerHtml}${error}</div>`;

@@ -24,7 +24,11 @@ function sessionWorkTitle(session) {
     const cached = shellAutoTitles();
     for (const raw of latestSummaryText.split('\n')) {
         const head = raw.trim().replace(/^[\-*•\s]+/, '').replace(/\*\*/g, '');
-        if (!new RegExp(`^${session}\\b`, 'i').test(head))
+        // Escape regex metacharacters: tmux/session names can contain them (e.g. with
+        // DASHBOARD_SHOW_UNKNOWN_SESSIONS), and an unescaped name throws a SyntaxError that
+        // would abort renderShellTabs/applyWorkTitles on every refresh tick.
+        const safe = session.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (!new RegExp(`^${safe}\\b`, 'i').test(head))
             continue;
         const after = head.slice(session.length);
         const sep = after.match(/[:–—]|\s-\s/);

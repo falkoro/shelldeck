@@ -1,9 +1,9 @@
 use crate::{
-    auth, containers, links, metrics, pages, remote, settings, share, stream, summary, term, tmux,
-    uploads, webutil, AppState,
+    auth, config, containers, links, metrics, pages, remote, remote_hosts, settings, share, stream,
+    summary, term, tmux, uploads, webutil, AppState,
 };
 use axum::{
-    extract::{ConnectInfo, Path, Query, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::Response,
     routing::{get, post},
@@ -51,7 +51,17 @@ struct SettingsBody {
     panels: settings::PanelSettings,
 }
 
+#[derive(Deserialize)]
+struct RemoteHostsBody {
+    hosts: Vec<config::RemoteHostConfig>,
+}
+
 pub fn router(state: AppState) -> Router {
+    // Honor the configured image cap: base64 inflates ~4/3, so size the body limit to the
+    // configured raw cap plus the base64 overhead (axum's 2 MiB default would otherwise
+    // silently reject anything over ~1.5 MB raw, making DASHBOARD_MAX_IMAGE_BYTES a no-op).
+    let upload_limit = state.config.max_image_bytes / 3 * 4 + 4096;
+    let share_limit = 4 * 1024 * 1024 / 3 * 4 + 4096;
     Router::new()
         .route("/", get(root))
         .route("/healthz", get(health))
@@ -68,18 +78,28 @@ pub fn router(state: AppState) -> Router {
         .route("/api/metrics", get(api_metrics))
         .route("/api/containers", get(api_containers))
         .route("/api/remote-hosts", get(api_remote_hosts))
+        .route(
+            "/api/remote-hosts/config",
+            get(api_remote_hosts_config).post(api_remote_hosts_save),
+        )
         .route("/api/links", get(api_links).post(api_links_save))
         .route(
             "/api/ui-config",
             get(api_ui_config).post(api_ui_config_save),
         )
         .route("/api/tickers", get(api_tickers))
-        .route("/api/share-shot", post(api_share_shot))
+        .route(
+            "/api/share-shot",
+            post(api_share_shot).layer(DefaultBodyLimit::max(share_limit)),
+        )
         .route("/api/shells/stream", get(stream::api_shell_stream))
         .route("/api/term", get(term::term_ws))
         .route("/api/input", post(api_input))
         .route("/api/key", post(api_key))
-        .route("/api/upload-image", post(api_upload))
+        .route(
+            "/api/upload-image",
+            post(api_upload).layer(DefaultBodyLimit::max(upload_limit)),
+        )
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
         .with_state(state)
@@ -162,7 +182,9 @@ async fn login_post(
     }
     let username = webutil::form_value(&body, "username");
     let password = webutil::form_value(&body, "password");
-    if username == state.config.user && password == state.config.password {
+    if username == state.config.user
+        && webutil::ct_eq(password.as_bytes(), state.config.password.as_bytes())
+    {
         let mut response = webutil::redirect("/");
         auth::set_login_cookie(&mut response, &state.config, &headers, &username);
         return response;
@@ -246,11 +268,7 @@ async fn upload(
         return response;
     }
     match uploads::load_image(state.config.clone(), &file).await {
-        Ok((content_type, bytes)) => webutil::text_response(
-            StatusCode::OK,
-            Box::leak(content_type.into_boxed_str()),
-            bytes,
-        ),
+        Ok((content_type, bytes)) => webutil::text_response(StatusCode::OK, content_type, bytes),
         Err(response) => response,
     }
 }
@@ -283,7 +301,9 @@ async fn api_unlock(
     if let Err(response) = require_action(&headers) {
         return response;
     }
-    if body.password.to_lowercase().trim() != state.config.unlock_password.to_lowercase().trim() {
+    let given = body.password.to_lowercase();
+    let want = state.config.unlock_password.to_lowercase();
+    if !webutil::ct_eq(given.trim().as_bytes(), want.trim().as_bytes()) {
         return webutil::json_response(
             StatusCode::UNAUTHORIZED,
             &serde_json::json!({ "error": "Second password did not match" }),
@@ -523,10 +543,49 @@ async fn api_remote_hosts(
     if let Some(response) = guard(&state, &headers, &connect) {
         return response;
     }
+    let hosts = remote_hosts::load(state.config.clone()).await;
     webutil::json_response(
         StatusCode::OK,
-        &remote::check_all(state.config.remote_hosts.clone()).await,
+        &remote::check_all(hosts, state.config.remote_container_cap).await,
     )
+}
+
+async fn api_remote_hosts_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    let hosts = remote_hosts::load(state.config.clone()).await;
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "hosts": hosts }))
+}
+
+async fn api_remote_hosts_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<RemoteHostsBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    // Adding a host means the server will SSH to that target, so gate it behind unlock
+    // (same bar as sending shell input), not just login.
+    if let Err(response) = require_unlock(&state, &headers) {
+        return response;
+    }
+    match remote_hosts::save(state.config.clone(), body.hosts).await {
+        Ok(hosts) => webutil::json_response(StatusCode::OK, &serde_json::json!({ "hosts": hosts })),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
 }
 
 async fn api_links(

@@ -49,7 +49,7 @@ function renderDock() {
         any = true;
         const item = document.createElement('div');
         item.className = 'term-min-item';
-        item.innerHTML = `<span class="tm-name">${escapeHtml(tw.name)}</span><button type="button" class="tm-btn" data-act="restore" title="Restore window">▴</button><button type="button" class="tm-btn tm-close" data-act="close" title="Close">×</button>`;
+        item.innerHTML = `<span class="tm-name">${escapeHtml(tw.name)}</span><button type="button" class="tm-btn" data-act="restore" title="Restore window">▴</button><button type="button" class="tm-btn tm-close" data-act="close" title="Detach (the tmux session keeps running)">×</button>`;
         item.querySelectorAll('button').forEach((btn) => {
             const act = btn.dataset.act;
             btn.addEventListener('click', (e) => { e.stopPropagation(); if (act === 'restore')
@@ -263,7 +263,7 @@ function createTermWindow(name) {
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
-        <button type="button" class="term-btn term-close" data-act="close" title="Close terminal" aria-label="Close terminal"><span class="term-close-label">Close</span><span aria-hidden="true">×</span></button>
+        <button type="button" class="term-btn term-close" data-act="close" title="Detach this view — the tmux session keeps running" aria-label="Detach terminal view (session keeps running)"><span class="term-close-label">Detach</span><span aria-hidden="true">×</span></button>
       </div>
     </div>
     <div class="term-host" data-host></div>

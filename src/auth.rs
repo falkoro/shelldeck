@@ -51,7 +51,7 @@ fn verify_token(config: &Config, token: Option<String>, kind: &str) -> bool {
     let Some((payload, signature)) = token.split_once('.') else {
         return false;
     };
-    if sign(config, payload) != signature {
+    if !webutil::ct_eq(sign(config, payload).as_bytes(), signature.as_bytes()) {
         return false;
     }
     let Ok(bytes) = URL_SAFE_NO_PAD.decode(payload.as_bytes()) else {

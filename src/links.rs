@@ -69,6 +69,6 @@ fn normalize_links(links: Vec<QuickLink>) -> Vec<QuickLink> {
         .collect()
 }
 
-fn valid_url(url: &str) -> bool {
+pub fn valid_url(url: &str) -> bool {
     url.starts_with("https://") || url.starts_with("http://") || url.starts_with('/')
 }

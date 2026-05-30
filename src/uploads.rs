@@ -45,6 +45,14 @@ pub async fn save_image(config: Arc<Config>, payload: ImageUpload) -> Result<Sav
         .image_types
         .get(&declared)
         .ok_or("Supported image types are PNG, JPEG, WebP, and GIF")?;
+    // Reject oversized uploads on the ENCODED length before decoding, so we never
+    // allocate a huge buffer just to discover it's over the cap. base64 is ~4/3 of raw.
+    if encoded.len() / 4 * 3 > config.max_image_bytes {
+        return Err(format!(
+            "Image is too large. Limit is {} MB",
+            config.max_image_bytes / 1024 / 1024
+        ));
+    }
     let bytes = STANDARD
         .decode(encoded.trim().replace(char::is_whitespace, ""))
         .map_err(|_| "Invalid image data")?;
@@ -80,7 +88,7 @@ pub async fn save_image(config: Arc<Config>, payload: ImageUpload) -> Result<Sav
 pub async fn load_image(
     config: Arc<Config>,
     file_name: &str,
-) -> Result<(String, Vec<u8>), axum::response::Response> {
+) -> Result<(&'static str, Vec<u8>), axum::response::Response> {
     let safe_name = Path::new(file_name)
         .file_name()
         .and_then(|v| v.to_str())
@@ -124,7 +132,7 @@ pub async fn load_image(
             &serde_json::json!({ "error": "Not found" }),
         )
     })?;
-    Ok((content_type.to_string(), bytes))
+    Ok((content_type, bytes))
 }
 
 fn stem(name: Option<String>) -> String {

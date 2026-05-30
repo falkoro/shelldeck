@@ -20,6 +20,9 @@ pub struct RemoteHostStatus {
     pub ssh_ms: Option<u128>,
     pub checked_at: String,
     pub containers: Vec<ContainerInfo>,
+    // Total containers the host reported, before the display cap — so the UI can show
+    // "showing N of M" instead of silently hiding the tail on busy hosts.
+    pub container_total: usize,
     pub error: Option<String>,
 }
 
@@ -28,15 +31,15 @@ pub struct RemoteHostList {
     pub hosts: Vec<RemoteHostStatus>,
 }
 
-pub async fn check_all(hosts: Vec<RemoteHostConfig>) -> RemoteHostList {
+pub async fn check_all(hosts: Vec<RemoteHostConfig>, cap: usize) -> RemoteHostList {
     RemoteHostList {
-        hosts: join_all(hosts.into_iter().map(check_host)).await,
+        hosts: join_all(hosts.into_iter().map(|host| check_host(host, cap))).await,
     }
 }
 
-async fn check_host(host: RemoteHostConfig) -> RemoteHostStatus {
+async fn check_host(host: RemoteHostConfig, cap: usize) -> RemoteHostStatus {
     let ping_ms = ping_latency_ms(&host.target).await;
-    let (containers, ssh_ms, ssh_error) = ssh_containers(&host.target).await;
+    let (containers, container_total, ssh_ms, ssh_error) = ssh_containers(&host.target, cap).await;
     let online = ping_ms.is_some() || ssh_ms.is_some();
     RemoteHostStatus {
         id: host.id,
@@ -47,6 +50,7 @@ async fn check_host(host: RemoteHostConfig) -> RemoteHostStatus {
         ssh_ms,
         checked_at: Utc::now().to_rfc3339(),
         containers,
+        container_total,
         error: if online {
             ssh_error
         } else {
@@ -58,8 +62,9 @@ async fn check_host(host: RemoteHostConfig) -> RemoteHostStatus {
 async fn ping_latency_ms(target: &str) -> Option<u128> {
     let started = Instant::now();
     let mut command = Command::new("ping");
+    // `--` ends option parsing so a target can never be read as a ping flag.
     command
-        .args(["-c", "1", "-W", "1", target])
+        .args(["-c", "1", "-W", "1", "--", target])
         .kill_on_drop(true);
     let Ok(Ok(output)) = timeout(Duration::from_millis(1600), command.output()).await else {
         return None;
@@ -71,9 +76,14 @@ async fn ping_latency_ms(target: &str) -> Option<u128> {
         .or_else(|| Some(started.elapsed().as_millis()))
 }
 
-async fn ssh_containers(target: &str) -> (Vec<ContainerInfo>, Option<u128>, Option<String>) {
+async fn ssh_containers(
+    target: &str,
+    cap: usize,
+) -> (Vec<ContainerInfo>, usize, Option<u128>, Option<String>) {
     let started = Instant::now();
     let mut command = Command::new("ssh");
+    // `-o` flags first, then the validated target. clean_remote_target() already rejects
+    // a leading-dash target, so it can't be parsed as an ssh option.
     command
         .args([
             "-o",
@@ -92,6 +102,7 @@ async fn ssh_containers(target: &str) -> (Vec<ContainerInfo>, Option<u128>, Opti
     let Ok(result) = timeout(Duration::from_millis(5200), command.output()).await else {
         return (
             Vec::new(),
+            0,
             None,
             Some("SSH timed out while checking containers".to_string()),
         );
@@ -99,17 +110,19 @@ async fn ssh_containers(target: &str) -> (Vec<ContainerInfo>, Option<u128>, Opti
     let Ok(output) = result else {
         return (
             Vec::new(),
+            0,
             None,
             Some("Could not start SSH for remote container check".to_string()),
         );
     };
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
-        return (Vec::new(), None, Some(clean_error(&err)));
+        return (Vec::new(), 0, None, Some(clean_error(&err)));
     }
     let mut containers = parse_remote_containers(&String::from_utf8_lossy(&output.stdout));
-    containers.truncate(32);
-    (containers, Some(started.elapsed().as_millis()), None)
+    let total = containers.len();
+    containers.truncate(cap.max(1));
+    (containers, total, Some(started.elapsed().as_millis()), None)
 }
 
 fn parse_remote_containers(raw: &str) -> Vec<ContainerInfo> {

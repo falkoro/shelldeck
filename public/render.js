@@ -247,8 +247,11 @@ function renderSelectedSessionActions() {
     const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
     const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
     const displayLabel = shellDisplayLabel(selected.name, selected.label);
+    const sshButton = selected.sshCommand
+        ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
+        : '';
     el.hidden = false;
-    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${startDisabled} data-start="${escapeHtml(selected.name)}">${icon('play')}<span>Start</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button></div>`;
+    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${startDisabled} data-start="${escapeHtml(selected.name)}">${icon('play')}<span>Start</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 let shellTabsSignature = '';
 function shellbarSummaryMoving(text) {

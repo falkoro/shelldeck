@@ -1,4 +1,4 @@
-use crate::{auth, tmux, webutil, AppState};
+use crate::{auth, config::Config, tmux, webutil, AppState};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -45,6 +45,15 @@ pub async fn term_ws(
             &serde_json::json!({ "error": "Shell unlock required" }),
         );
     }
+    // Cross-site WebSocket hijacking guard: the WS handshake can't carry the X-Codex-Action
+    // CSRF header, so a malicious cross-origin page could otherwise drive this PTY using the
+    // victim's cookies. Reject when a browser Origin is present and doesn't match the host.
+    if let Some(reason) = blocked_origin(&state.config, &headers) {
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": reason }),
+        );
+    }
     if !tmux::session_names().await.contains(&q.name) {
         return webutil::json_response(
             StatusCode::BAD_REQUEST,
@@ -62,6 +71,32 @@ pub async fn term_ws(
     let cols = q.cols.unwrap_or(120).clamp(20, 400);
     let rows = q.rows.unwrap_or(34).clamp(6, 200);
     ws.on_upgrade(move |socket| handle_term(socket, name, cols, rows))
+}
+
+// Returns Some(reason) when the WebSocket upgrade should be refused. A missing Origin
+// (native/non-browser clients) is allowed; a present Origin must match the request Host
+// or an entry in DASHBOARD_ALLOWED_ORIGINS.
+fn blocked_origin(config: &Config, headers: &HeaderMap) -> Option<String> {
+    let origin = headers.get("origin").and_then(|v| v.to_str().ok())?;
+    let origin_host = origin
+        .split_once("://")
+        .map(|(_, rest)| rest.split('/').next().unwrap_or(rest))
+        .unwrap_or(origin);
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    if !host.is_empty() && origin_host.eq_ignore_ascii_case(host) {
+        return None;
+    }
+    if config
+        .allowed_origins
+        .iter()
+        .any(|allowed| allowed.eq_ignore_ascii_case(origin_host) || allowed.eq_ignore_ascii_case(origin))
+    {
+        return None;
+    }
+    Some("Cross-origin WebSocket blocked".to_string())
 }
 
 async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
