@@ -6,3 +6,6 @@
 .env
 *.env
 .DS_Store
+/links.json
+/dashboard-config.json
+/remote-hosts.json
