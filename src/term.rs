@@ -73,33 +73,30 @@ pub async fn term_ws(
     ws.on_upgrade(move |socket| handle_term(socket, name, cols, rows))
 }
 
-// Returns Some(reason) when the WebSocket upgrade should be refused. A missing Origin
-// (native/non-browser clients) is allowed; a present Origin must match the request Host,
-// the X-Forwarded-Host, or an entry in DASHBOARD_ALLOWED_ORIGINS.
+// Cross-site WebSocket hijacking guard on a shell-granting socket — DEFAULT CLOSED.
+// A missing Origin (native/non-browser clients, which can't be driven cross-site by a
+// browser) is allowed; a present Origin must match the request Host or an entry in
+// DASHBOARD_ALLOWED_ORIGINS, else it is refused.
 //
-// NB: a reverse proxy that rewrites the Host header (e.g. cloudflared with
-// `httpHostHeader: 127.0.0.1`) will make the origin's host never match the Host the origin
-// sees. Such deployments must either pass X-Forwarded-Host or set DASHBOARD_ALLOWED_ORIGINS
-// to the public hostname — otherwise the browser terminal can't connect.
+// NB: a reverse proxy that REWRITES the Host header (e.g. cloudflared
+// `httpHostHeader: 127.0.0.1`) makes the browser Origin never match the Host the app sees, so
+// such deployments MUST set DASHBOARD_ALLOWED_ORIGINS to the public hostname — otherwise the
+// browser terminal cannot connect. We deliberately do NOT trust X-Forwarded-Host (a client
+// can spoof it where the proxy doesn't strip it) and do NOT fail open on missing config:
+// inferring trust from absent configuration on an RCE-class sink is unsafe.
 fn blocked_origin(config: &Config, headers: &HeaderMap) -> Option<String> {
     let origin = headers.get("origin").and_then(|v| v.to_str().ok())?;
     let origin_host = origin
         .split_once("://")
         .map(|(_, rest)| rest.split('/').next().unwrap_or(rest))
         .unwrap_or(origin);
-    let header_host = |name: &str| -> String {
-        headers
-            .get(name)
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v.split(',').next().unwrap_or(v).trim().to_string())
-            .unwrap_or_default()
-    };
-    let host = header_host("host");
-    let forwarded_host = header_host("x-forwarded-host");
-    for candidate in [&host, &forwarded_host] {
-        if !candidate.is_empty() && origin_host.eq_ignore_ascii_case(candidate) {
-            return None;
-        }
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.split(',').next().unwrap_or(v).trim())
+        .unwrap_or_default();
+    if !host.is_empty() && origin_host.eq_ignore_ascii_case(host) {
+        return None;
     }
     if config
         .allowed_origins
@@ -108,27 +105,7 @@ fn blocked_origin(config: &Config, headers: &HeaderMap) -> Option<String> {
     {
         return None;
     }
-    // The Origin matched nothing. Only REJECT when we actually have a basis to know our own
-    // public origin — an explicit allowlist, an X-Forwarded-Host, or a non-loopback Host.
-    // Behind a proxy that rewrites Host to a loopback address (e.g. cloudflared
-    // `httpHostHeader: 127.0.0.1`) with no allowlist set, the public origin is undeterminable,
-    // so fail OPEN rather than break the browser terminal. Set DASHBOARD_ALLOWED_ORIGINS to
-    // the public hostname to enforce strictly in that case.
-    let host_is_public = !host.is_empty() && !is_loopback_host(&host);
-    let has_basis = host_is_public || !forwarded_host.is_empty() || !config.allowed_origins.is_empty();
-    if has_basis {
-        Some("Cross-origin WebSocket blocked".to_string())
-    } else {
-        None
-    }
-}
-
-fn is_loopback_host(host: &str) -> bool {
-    let bare = host
-        .strip_prefix('[')
-        .and_then(|h| h.split(']').next())
-        .unwrap_or_else(|| host.split(':').next().unwrap_or(host));
-    bare.eq_ignore_ascii_case("localhost") || bare == "::1" || bare.starts_with("127.")
+    Some("Cross-origin WebSocket blocked (set DASHBOARD_ALLOWED_ORIGINS to the public host)".to_string())
 }
 
 async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
