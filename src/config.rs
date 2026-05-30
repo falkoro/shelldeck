@@ -59,6 +59,14 @@ pub struct Config {
     pub show_unknown_sessions: bool,
     pub known_sessions: Vec<KnownSession>,
     pub image_types: HashMap<String, &'static str>,
+    // Server-side speech-to-text for Mic dictation. The browser-native Web Speech API has no
+    // working backend on Linux (Edge/Chromium), so we record audio in the browser and transcribe
+    // it here with whisper.cpp. Audio stays on the box; nothing is sent to a third party.
+    pub stt_cmd: String,
+    pub ffmpeg_cmd: String,
+    pub stt_model: Option<PathBuf>,
+    pub stt_language: String,
+    pub max_audio_bytes: usize,
 }
 
 impl Config {
@@ -187,6 +195,22 @@ impl Config {
             show_unknown_sessions: env_flag("DASHBOARD_SHOW_UNKNOWN_SESSIONS"),
             known_sessions: known_sessions(),
             image_types: image_types(),
+            stt_cmd: env::var("DASHBOARD_STT_CMD").unwrap_or_else(|_| "whisper-cli".to_string()),
+            ffmpeg_cmd: env::var("DASHBOARD_FFMPEG_CMD").unwrap_or_else(|_| "ffmpeg".to_string()),
+            // Explicit DASHBOARD_STT_MODEL always wins (a missing path surfaces as a runtime error
+            // rather than silently disabling). Otherwise auto-enable when the bundled model exists.
+            stt_model: env::var("DASHBOARD_STT_MODEL")
+                .ok()
+                .map(PathBuf::from)
+                .or_else(|| {
+                    let d = root_dir.join("share").join("models").join("ggml-base.en.bin");
+                    d.exists().then_some(d)
+                }),
+            stt_language: env::var("DASHBOARD_STT_LANG").unwrap_or_else(|_| "en".to_string()),
+            max_audio_bytes: env::var("DASHBOARD_MAX_AUDIO_BYTES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(25 * 1024 * 1024),
         }
     }
 }

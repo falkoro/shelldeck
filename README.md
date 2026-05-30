@@ -81,7 +81,9 @@ This env value only *seeds* `remote-hosts.json` on first run. After that, add, e
 
 `DASHBOARD_SSH_ATTACH_TEMPLATE` adds a per-session **SSH** button that copies a command to attach to that tmux session from another machine (e.g. `ssh logan-laptop -t 'tmux attach -t {name}'`, `{name}` = session). It's copy-only — ShellDeck never runs it — and the button hides when the template is unset.
 
-Microphone dictation uses the browser's native speech recognition API. It needs a supporting browser such as Chrome or Edge and a secure context (`https://` or `localhost`); ShellDeck does not send audio to its backend or need a microphone secret.
+Microphone dictation records your voice in the browser (`getUserMedia` + `MediaRecorder`) and transcribes it **on the ShellDeck host** with [whisper.cpp](https://github.com/ggml-org/whisper.cpp) — the audio stays on your machine and is never sent to a third party. It needs a secure context (`https://` or `localhost`), `whisper-cli` + `ffmpeg` installed, and a whisper model. ShellDeck deliberately does **not** use the browser-native Web Speech API: that has no working recognition backend on Linux (Edge's is broken since v134; distro Chromium ships no Google speech key). Click **Mic** to start recording, click it again to stop and transcribe into the shell input. If no model is configured, the Mic button reports it clearly instead of failing silently.
+
+Setup: install `ffmpeg` and `whisper-cli` (build whisper.cpp, or your distro/AUR package), then drop a model at `share/models/ggml-base.en.bin` (auto-detected) or point `DASHBOARD_STT_MODEL` at one. See `DASHBOARD_STT_*` in `.env.example`.
 
 ### Agent Presets And Open-Source CLIs
 
@@ -150,7 +152,7 @@ Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally
 1. Sign in, then enter `DASHBOARD_UNLOCK_PASSWORD` in **Shell Unlock**. Until unlocked, pane previews, input, summaries, and live terminals stay gated.
 2. Use **Send** to paste text and press Enter in a pane. Use **Paste** to insert text without pressing Enter. On mobile, plain Enter in the textarea sends; Shift+Enter inserts a newline.
 3. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
-4. Use **Mic** to dictate into a shell input when the browser supports native speech recognition.
+4. Use **Mic** to dictate into a shell input: click to start recording, click again to stop and transcribe (server-side whisper.cpp; needs a model configured).
 5. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box. Attachment chips clear after a successful send/paste into tmux.
 6. Use **Shell in** to open a real interactive terminal. Paste/drop an image there to upload it and insert the saved file path into the live terminal input. On mobile, the terminal opens full-screen with a visible **Close x** button in the title bar.
 7. Use **Configure** to edit widget visibility and stock/crypto tickers without changing env files. The **Edit tickers** button jumps straight to the same ticker config.

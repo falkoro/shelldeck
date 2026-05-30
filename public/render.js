@@ -20,17 +20,17 @@ function createShellCard(shell) {
     <textarea spellcheck="false" data-command placeholder="Type for this shell. Enter sends on mobile; Ctrl+Enter on desktop."></textarea>
     <div class="shell-actions">
       <button class="primary" type="button" data-send-shell title="Type the text and press Enter in the shell">${icon('send')}<span>Send</span></button>
-      <button type="button" data-paste-shell title="Insert the text without pressing Enter">${icon('paste')}<span>Paste</span></button>
-      <button type="button" data-add-image title="Attach an image; inserts its saved path">${icon('image')}<span>Image</span></button>
-      <button type="button" data-dictate-shell title="Dictate into this shell input with the browser microphone">${icon('mic')}<span>Mic</span></button>
-      <button type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)">${icon('clock')}<span>History</span></button>
-      <button type="button" data-key="enter" title="Press Enter in the shell">${icon('enter')}<span>Enter</span></button>
+      <button class="mic-btn" type="button" data-dictate-shell title="Record your voice; click again to stop and transcribe into this input">${icon('mic')}<span class="mic-label">Mic</span></button>
+      <button class="iconly" type="button" data-paste-shell title="Paste — insert the text without pressing Enter" aria-label="Paste (no Enter)">${icon('paste')}</button>
+      <button class="iconly" type="button" data-add-image title="Attach an image; inserts its saved path" aria-label="Attach image">${icon('image')}</button>
+      <button class="iconly" type="button" data-key="enter" title="Press Enter in the shell" aria-label="Press Enter">${icon('enter')}</button>
       <button class="warn" type="button" data-key="interrupt" title="Interrupt the running command (Ctrl-C)">${icon('stop')}<span>Ctrl-C</span></button>
-      <button type="button" data-key="clear" title="Clear the shell screen">${icon('eraser')}<span>Clear</span></button>
-      <button type="button" data-copy-output title="Copy the pane output">${icon('copy')}<span>Copy</span></button>
-      <button type="button" data-clear-preview title="Clear this preview locally (not the shell)">${icon('eyeoff')}<span>Clear view</span></button>
-      <button type="button" data-shellin title="Open a live interactive terminal in this session">${icon('terminal')}<span>Shell in</span></button>
-      <button class="warn resume-btn" type="button" data-resume title="Re-run the agent's resume command shown in the pane">${icon('restart')}<span>Resume</span></button>
+      <button class="iconly" type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)" aria-label="Input history">${icon('clock')}</button>
+      <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
+      <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
+      <button class="iconly" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
+      <button class="iconly" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
+      <button class="warn resume-btn iconly" type="button" data-resume title="Re-run the agent's resume command shown in the pane" aria-label="Resume agent">${icon('restart')}</button>
     </div>
     <div class="attach-list" data-role="attachments"></div>
     <div class="shell-status" data-role="status">Paste or drop an image into this input to insert its saved path.</div>
@@ -291,16 +291,15 @@ function renderShellTabs() {
     shellTabsSignature = signature;
     q('#shellTabs').innerHTML = modelSessions.map((session) => {
         const state = sessionRuntime(session);
-        const attached = session.attached > 0 ? `<span class="session-tab-attached">${session.attached}</span>` : '';
-        const statusLine = `${state.label} · ${fmtTime(session.activity)}`;
+        // Compact one-line tab: badge · status-dot · label · work-title (truncated, marquee when
+        // selected) · relative time. Full title stays reachable via the tooltip + the card below.
+        const timeShort = fmtTime(session.activity).replace(/\s*ago$/, '').replace('just now', 'now').replace('never', '');
         const workTitle = sessionWorkTitle(session.name);
         const workBrief = shellbarSummary(session.name);
+        const briefText = workBrief || sessionTabFallback(session, state);
         const moving = shellbarSummaryMoving(workBrief) ? ' moving' : '';
-        const meta = workBrief
-            ? `<span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(workBrief)}</span>${moving ? `<span aria-hidden="true">${escapeHtml(workBrief)}</span>` : ''}</span></span>`
-            : `<span class="session-tab-status">${escapeHtml(sessionTabFallback(session, state))}</span>`;
-        const statusLabel = workBrief ? `<b>${escapeHtml(statusLine)}${attached}</b>` : '';
-        return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || session.label || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><span class="session-tab-copy">${statusLabel}<small><i class="dot ${state.dotClass}"></i>${meta}${workBrief ? '' : attached}</small></span></button>`;
+        const labelText = session.label || session.name;
+        return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || session.label || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line"><span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span><span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
     }).join('');
     markSelectedShell();
     renderSelectedSessionActions();

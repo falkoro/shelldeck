@@ -1,6 +1,6 @@
 use crate::{
     auth, config, containers, links, metrics, pages, remote, remote_hosts, settings, share, stream,
-    summary, term, tmux, uploads, webutil, AppState,
+    stt, summary, term, tmux, uploads, webutil, AppState,
 };
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
@@ -62,6 +62,7 @@ pub fn router(state: AppState) -> Router {
     // silently reject anything over ~1.5 MB raw, making DASHBOARD_MAX_IMAGE_BYTES a no-op).
     let upload_limit = state.config.max_image_bytes / 3 * 4 + 4096;
     let share_limit = 4 * 1024 * 1024 / 3 * 4 + 4096;
+    let audio_limit = state.config.max_audio_bytes / 3 * 4 + 4096;
     Router::new()
         .route("/", get(root))
         .route("/healthz", get(health))
@@ -99,6 +100,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/upload-image",
             post(api_upload).layer(DefaultBodyLimit::max(upload_limit)),
+        )
+        .route(
+            "/api/transcribe",
+            post(api_transcribe).layer(DefaultBodyLimit::max(audio_limit)),
         )
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
@@ -470,6 +475,40 @@ async fn api_upload(
         Ok(image) => webutil::json_response(
             StatusCode::OK,
             &serde_json::json!({ "ok": true, "image": image }),
+        ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_transcribe(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<stt::TranscribeRequest>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    // Bound concurrent transcriptions so whisper.cpp can't pile up and saturate the host.
+    let _permit = match state.stt_limit.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            return webutil::json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &serde_json::json!({ "error": "Speech-to-text is busy. Try again in a moment." }),
+            )
+        }
+    };
+    match stt::transcribe(state.config.clone(), body).await {
+        Ok(transcript) => webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({ "ok": true, "text": transcript.text }),
         ),
         Err(error) => webutil::json_response(
             StatusCode::BAD_REQUEST,

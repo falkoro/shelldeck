@@ -291,7 +291,7 @@ function createTermWindow(name: string): TermWindow {
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
-        <button type="button" class="term-btn term-close" data-act="close" title="Detach this view — the tmux session keeps running" aria-label="Detach terminal view (session keeps running)"><span class="term-close-label">Detach</span><span aria-hidden="true">×</span></button>
+        <button type="button" class="term-btn term-detach" data-act="close" title="Detach this view and return to the dashboard — the tmux session keeps running" aria-label="Detach terminal view and return to the dashboard (session keeps running)"><span class="term-detach-label">Detach</span></button>
       </div>
     </div>
     <div class="term-host" data-host></div>
