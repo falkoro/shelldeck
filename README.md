@@ -1,4 +1,5 @@
 # ShellDeck
+<img width="2200" height="1392" alt="image" src="https://github.com/user-attachments/assets/e7da59c9-ecfa-42a9-9258-11f594b12ff5" />
 
 A small, self-hosted web dashboard to **monitor and drive your `tmux` sessions and AI coding agents** (Claude Code, Codex, opencode, Grok, …) from a browser — including a **real interactive terminal**. Single Rust binary, no database.
 
