@@ -63,36 +63,102 @@ interface RemoteHostStatus {
   error?: string | null;
 }
 
-// running = "Up ..."; flag unhealthy/restarting; everything else (Exited/Created) = stopped.
-function containerState(status: string): 'running' | 'unhealthy' | 'stopped' {
-  const s = (status || '').toLowerCase();
+type ContainerStateKind =
+  | 'running' | 'unhealthy' | 'restarting' | 'paused' | 'crashed' | 'created' | 'stopped';
+
+// Display order (most attention-worthy first) for the health rollup + legend, plus each
+// state's legend label and status-dot colour class.
+const CONTAINER_STATE_ORDER: ContainerStateKind[] =
+  ['running', 'unhealthy', 'restarting', 'crashed', 'paused', 'created', 'stopped'];
+const CONTAINER_STATE_LABEL: Record<ContainerStateKind, string> = {
+  running: 'running', unhealthy: 'unhealthy', restarting: 'restarting',
+  crashed: 'crashed', paused: 'paused', created: 'created', stopped: 'stopped',
+};
+
+// Fine-grained lifecycle/health from a docker/podman status string. Beyond running/stopped it
+// surfaces unhealthy (failed healthcheck), restarting (crash-looping), paused, created, and —
+// crucially — distinguishes a clean stop (Exited 0) from a crash (Exited non-zero / Dead).
+function containerState(status: string): ContainerStateKind {
+  const s = (status || '').toLowerCase().trim();
   if (s.includes('unhealthy')) return 'unhealthy';
-  if (s.startsWith('restarting')) return 'unhealthy';
+  if (s.startsWith('restarting')) return 'restarting';
+  if (s.includes('paused')) return 'paused';
+  if (s.startsWith('created')) return 'created';
+  if (s.startsWith('dead')) return 'crashed';
+  const exit = /^exited \((\d+)\)/.exec(s);
+  if (exit) return exit[1] === '0' ? 'stopped' : 'crashed';
   if (s.startsWith('up')) return 'running';
   return 'stopped';
 }
 
-// "23 running · 2 stopped · 1 unhealthy" — omits zero buckets.
+// "23 running · 1 unhealthy · 2 crashed · 1 stopped" — every non-empty bucket, severity order.
 function containerHealth(containers: ContainerInfo[]): string {
-  let running = 0; let stopped = 0; let unhealthy = 0;
+  const counts: Partial<Record<ContainerStateKind, number>> = {};
   for (const c of containers) {
     const st = containerState(c.status);
-    if (st === 'unhealthy') unhealthy += 1;
-    else if (st === 'stopped') stopped += 1;
-    else running += 1;
+    counts[st] = (counts[st] || 0) + 1;
   }
-  const parts: string[] = [];
-  if (running) parts.push(`${running} running`);
-  if (stopped) parts.push(`${stopped} stopped`);
-  if (unhealthy) parts.push(`${unhealthy} unhealthy`);
+  const parts = CONTAINER_STATE_ORDER
+    .filter((st) => counts[st])
+    .map((st) => `${counts[st]} ${CONTAINER_STATE_LABEL[st]}`);
   return parts.join(' · ') || 'no containers';
 }
 
-function containerStatsText(c: ContainerInfo): string {
-  const bits: string[] = [];
-  if (c.cpu) bits.push(`${c.cpu} CPU`);
-  if (c.mem) bits.push(c.mem);
-  return bits.join(' · ');
+// "12.50%" → 12.5; null when there's no parseable number.
+function parsePercent(s?: string | null): number | null {
+  if (!s) return null;
+  const n = parseFloat(s.replace('%', '').trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+// "128MiB" / "1.5GiB" / "512kB" → bytes. Handles docker's IEC (KiB/MiB/GiB) and SI (kB/MB/GB) units.
+function parseBytes(s?: string | null): number | null {
+  if (!s) return null;
+  const m = /([\d.]+)\s*([kmgtp]i?b|b)?/i.exec(s.trim());
+  if (!m) return null;
+  const val = parseFloat(m[1]);
+  if (!Number.isFinite(val)) return null;
+  const mult: Record<string, number> = {
+    b: 1, kb: 1e3, mb: 1e6, gb: 1e9, tb: 1e12, pb: 1e15,
+    kib: 1024, mib: 1024 ** 2, gib: 1024 ** 3, tib: 1024 ** 4, pib: 1024 ** 5,
+  };
+  return val * (mult[(m[2] || 'b').toLowerCase()] ?? 1);
+}
+
+function fmtBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(bytes >= 10 * 1024 ** 3 ? 0 : 1)} GiB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MiB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
+  return `${bytes.toFixed(0)} B`;
+}
+
+// One stat pill with an inline intensity bar (the `--fill` width) behind the text.
+function statChip(kind: 'cpu' | 'mem', fillPct: number, text: string, title: string): string {
+  const fill = Math.max(0, Math.min(100, fillPct)).toFixed(0);
+  return `<span class="ci-stat ci-stat-${kind} ${meterLevel(fillPct)}" style="--fill:${fill}%" title="${escapeHtml(title)}"><span>${escapeHtml(text)}</span></span>`;
+}
+
+// Compact CPU + mem pills shared by the local and remote container rows so both lists read alike.
+// CPU% can exceed 100 on multi-core hosts, so the bar clamps but the printed number is the real
+// value; mem shows used + %-of-limit, with the full "used / limit" string in the tooltip.
+function containerStatChipsHtml(c: ContainerInfo): string {
+  const chips: string[] = [];
+  const cpu = parsePercent(c.cpu);
+  if (cpu !== null) chips.push(statChip('cpu', cpu, `CPU ${cpu.toFixed(cpu < 10 ? 1 : 0)}%`, `CPU ${c.cpu}`));
+  if (c.mem) {
+    const [usedRaw, limitRaw] = c.mem.split('/').map((p) => p.trim());
+    const used = parseBytes(usedRaw);
+    const limit = parseBytes(limitRaw);
+    if (used !== null && limit && limit > 0) {
+      const pct = (used / limit) * 100;
+      chips.push(statChip('mem', pct, `${fmtBytes(used)} · ${pct.toFixed(pct < 10 ? 1 : 0)}%`, `RAM ${c.mem}`));
+    } else if (used !== null) {
+      chips.push(statChip('mem', 0, fmtBytes(used), `RAM ${c.mem}`));
+    } else {
+      chips.push(`<span class="ci-stat ci-stat-mem ok"><span>${escapeHtml(c.mem)}</span></span>`);
+    }
+  }
+  return chips.join('');
 }
 
 // Compact age from a docker status string, e.g. "Up 7 days (healthy)" → "7d", "Up About an hour"
@@ -184,8 +250,8 @@ function containerActionsHtml(c: ContainerInfo, host: string): string {
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
 // then actions. Stopped/unhealthy get a state class for greying/highlighting.
 function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string {
-  const stats = containerStatsText(c);
-  const statsHtml = stats ? `<div class="ci-stats">${escapeHtml(stats)}</div>` : '';
+  const chips = containerStatChipsHtml(c);
+  const statsHtml = chips ? `<div class="ci-stats">${chips}</div>` : '';
   const age = containerAge(c);
   const ageHtml = age ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(age)}</span>` : '';
   const desc = containerDescription(c);
@@ -205,9 +271,9 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
 function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   const state = containerState(c.status);
   const age = containerAge(c);
-  // Show full "used / limit" (the limit is the container's RAM cap = its max), like the local panel.
-  const right = c.cpu ? `${c.cpu}${c.mem ? ` · ${c.mem}` : ''}` : '';
-  const rightHtml = right ? `<span class="ci-cpu">${escapeHtml(right)}</span>` : '';
+  // Same CPU/mem pills as the local panel (intensity bar + %-of-limit), kept on one line.
+  const chips = containerStatChipsHtml(c);
+  const rightHtml = chips ? `<span class="ci-cpu">${chips}</span>` : '';
   const badge = age || c.status.split(/[\s(]/)[0];
   const badgeHtml = badge ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(badge)}</span>` : '';
   // Line 2 shows the description when there is one (image to the tooltip), else the image. Click
@@ -333,17 +399,17 @@ function renderMetrics(m: MachineMetrics): void {
     if (!dashboardSettings.panels.machineSensors) {
       temps.hidden = true;
       temps.innerHTML = '';
-      return;
-    }
-    temps.hidden = false;
-    const list = (m.temps || []).filter((t) => isCoreSensor(t.label)).sort((a, b) => b.celsius - a.celsius);
-    if (!list.length) {
-      temps.innerHTML = '<div class="muted sensor-empty">No CPU/GPU/NVMe sensors reported</div>';
     } else {
-      temps.innerHTML = `<div class="sensor-panel"><div class="sensor-panel-head"><b>Thermal sensors</b><small>${list.length} live readings</small></div><div class="sensor-list">${list.map((t) => {
-        const display = sensorDisplayLabel(t.label);
-        return `<div class="sensor-row ${tempLevel(t.celsius)}"><div><b>${escapeHtml(display)}</b><small title="${escapeHtml(t.label)}">${escapeHtml(t.label)}</small></div><span>${formatTemp(t.celsius)}</span><button type="button" class="sensor-rename" data-rename-sensor="${escapeHtml(t.label)}" title="Rename sensor">${icon('edit')}</button></div>`;
-      }).join('')}</div></div>`;
+      temps.hidden = false;
+      const list = (m.temps || []).filter((t) => isCoreSensor(t.label)).sort((a, b) => b.celsius - a.celsius);
+      if (!list.length) {
+        temps.innerHTML = '<div class="muted sensor-empty">No CPU/GPU/NVMe sensors</div>';
+      } else {
+        // Compact chips, identical to the remote-host cards — click a chip to rename the sensor.
+        temps.innerHTML = `<div class="rm-temps">${list.map((t) =>
+          `<button type="button" class="rm-temp ${tempLevel(t.celsius)}" data-rename-sensor="${escapeHtml(t.label)}" title="${escapeHtml(t.label)} — click to rename">${escapeHtml(sensorDisplayLabel(t.label))} ${formatTemp(t.celsius)}</button>`
+        ).join('')}</div>`;
+      }
     }
   }
 }
@@ -400,7 +466,10 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
     list.innerHTML = '<div class="muted remote-empty">No remote hosts configured</div>';
     return;
   }
-  const legend = '<div class="remote-legend"><span class="lg"><i class="lg-dot running"></i>running</span><span class="lg"><i class="lg-dot unhealthy"></i>unhealthy</span><span class="lg"><i class="lg-dot stopped"></i>stopped</span><span class="lg"><b class="lg-ic">↻</b>restart</span><span class="lg"><b class="lg-ic">⬇</b>pull</span></div>';
+  const legendStates: ContainerStateKind[] = ['running', 'unhealthy', 'restarting', 'crashed', 'paused', 'stopped'];
+  const legendDots = legendStates
+    .map((st) => `<span class="lg"><i class="lg-dot ${st}"></i>${CONTAINER_STATE_LABEL[st]}</span>`).join('');
+  const legend = `<div class="remote-legend">${legendDots}<span class="lg"><b class="lg-ic">↻</b>restart</span><span class="lg"><b class="lg-ic">⬇</b>pull</span></div>`;
   list.innerHTML = legend + hosts.map((host) => {
     const containers = host.containers || [];
     const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
