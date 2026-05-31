@@ -193,11 +193,11 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
     ? `<div class="ci-desc" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(desc)} — click to edit">${escapeHtml(desc)}</div>`
     : `<div class="ci-desc ci-desc-empty" data-edit-desc="${escapeHtml(c.name)}" title="Add a description">+ description</div>`;
   return `<div class="container-item ${extraClass} state-${containerState(c.status)}">`
-    + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small></div>`
+    + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small>${containerActionsHtml(c, host)}</div>`
     + `<div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>`
     + descHtml
     + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
-    + `${statsHtml}${containerActionsHtml(c, host)}</div>`;
+    + statsHtml + `</div>`;
 }
 
 // Denser 2-line row for the remote host cards: status dot + name + cpu/mem on top, image + age
@@ -217,9 +217,9 @@ function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   const subTitle = desc ? `${desc}\n${c.image} — click to edit` : `${c.image} — click to add a description`;
   const subClass = desc ? 'ci-image ci-editdesc has-desc' : 'ci-image ci-editdesc';
   return `<div class="container-item remote-container compact state-${state}">`
-    + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}</div>`
+    + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
     + `<div class="ci-bot"><span class="${subClass}" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
-    + `${containerActionsHtml(c, host)}</div>`;
+    + `</div>`;
 }
 
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
