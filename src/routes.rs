@@ -1,6 +1,6 @@
 use crate::{
-    auth, config, containers, links, metrics, pages, ratelimit, remote, remote_hosts, settings,
-    share, stream, stt, summary, term, tmux, uploads, webutil, AppState,
+    auth, config, container_actions, containers, links, metrics, pages, ratelimit, remote,
+    remote_hosts, settings, share, stream, stt, summary, term, tmux, uploads, webutil, AppState,
 };
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
@@ -33,6 +33,15 @@ struct KeyBody {
 #[derive(Deserialize)]
 struct NameBody {
     name: String,
+}
+
+#[derive(Deserialize)]
+struct ContainerActionBody {
+    // Remote host id (from remote-hosts config) for a remote container; omitted/empty = local.
+    host: Option<String>,
+    engine: String,
+    name: String,
+    action: String,
 }
 
 #[derive(Deserialize)]
@@ -107,6 +116,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
+        .route("/api/container-action", post(api_container_action))
         .with_state(state)
 }
 
@@ -584,6 +594,37 @@ async fn api_restart(
         return response;
     }
     session_result(tmux::restart_session(state.config.clone(), &body.name).await)
+}
+
+// Restart / pull-latest a Docker/Podman container, locally or on a configured remote host.
+// Mutating: login + shell-unlock + action-header gated, same as the tmux session controls.
+async fn api_container_action(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<ContainerActionBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    let host_id = body.host.as_deref().unwrap_or("").trim();
+    let result = if host_id.is_empty() {
+        container_actions::local(&body.engine, &body.name, &body.action).await
+    } else {
+        // Resolve the remote host's SSH target from the runtime config by id.
+        let hosts = remote_hosts::load(state.config.clone()).await;
+        match hosts.into_iter().find(|h| h.id == host_id) {
+            Some(host) => {
+                container_actions::remote(&host.target, &body.engine, &body.name, &body.action)
+                    .await
+            }
+            None => Err("Unknown remote host".to_string()),
+        }
+    };
+    session_result(result)
 }
 
 // Live machine stats (CPU / RAM / temps) for the host ShellDeck runs on. Login-gated

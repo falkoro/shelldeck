@@ -434,6 +434,13 @@ body.preview-fullscreen-open{overflow:hidden}
 .container-item.state-unhealthy{border-color:rgba(255,106,122,.45)}
 .container-item.state-unhealthy em{color:#ffb3bd}
 .container-health{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-bottom:2px}
+.container-item .container-age{align-self:start;justify-self:end;font-size:10px;color:#9fe9dd;font-variant-numeric:tabular-nums;border:1px solid rgba(139,246,255,.18);border-radius:999px;padding:1px 6px}
+.container-actions{grid-column:1 / -1;display:flex;gap:6px;justify-content:flex-end;margin-top:2px}
+.container-action{font-size:10.5px;padding:2px 9px;border-radius:6px;border:1px solid rgba(139,246,255,.22);background:rgba(139,246,255,.06);color:#c9fff3;cursor:pointer}
+.container-action:hover{background:rgba(139,246,255,.16)}
+.container-action[data-container-action="restart"]{border-color:rgba(255,191,73,.3);color:var(--amber)}
+/* Container actions are mutating — only available once shells are unlocked. */
+body.shells-locked .container-actions{display:none}
 /* Remote host monitor widget */
 .remote-list{display:flex;flex-direction:column;gap:8px}
 .remote-empty{font-size:12px}
