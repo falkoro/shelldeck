@@ -1,6 +1,6 @@
 use crate::{
     config::RemoteHostConfig,
-    containers::{attach_stats, ContainerInfo},
+    containers::{attach_inspect, attach_stats, parse_inspect, ContainerInfo},
     remote_metrics::{self, RemoteMetrics, REMOTE_METRICS_SCRIPT},
 };
 use chrono::Utc;
@@ -18,10 +18,14 @@ const PS_SCRIPT: &str = "echo '##SD_PS'\n\
 echo '##SD_IP'\n\
 (hostname -I 2>/dev/null || true)\n";
 
-// Per-container CPU/mem — the slow call, so only appended when metrics are enabled.
+// Per-container CPU/mem + one inspect for StartedAt/description — slower calls, so only appended
+// when metrics are enabled. INSPECT emits name<TAB>StartedAt<TAB>description (real tabs).
 const STATS_SCRIPT: &str = "echo '##SD_STATS'\n\
 (docker stats --no-stream --format 'docker\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n\
-(podman stats --no-stream --format 'podman\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n";
+(podman stats --no-stream --format 'podman\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n\
+echo '##SD_INSPECT'\n\
+(docker inspect --format '{{.Name}}\t{{.State.StartedAt}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}' $(docker ps -aq) 2>/dev/null || true)\n\
+(podman inspect --format '{{.Name}}\t{{.State.StartedAt}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}' $(podman ps -aq) 2>/dev/null || true)\n";
 
 #[derive(Serialize)]
 pub struct RemoteHostStatus {
@@ -190,6 +194,9 @@ async fn ssh_probe(target: &str, cap: usize, with_metrics: bool) -> ProbeResult 
     if let Some(stats) = secs.get("STATS") {
         attach_stats(&mut containers, &parse_remote_stats(stats));
     }
+    if let Some(inspect) = secs.get("INSPECT") {
+        attach_inspect(&mut containers, &parse_inspect(inspect));
+    }
     let total = containers.len();
     containers.truncate(cap.max(1));
     let ip = secs
@@ -231,6 +238,8 @@ fn parse_remote_containers(raw: &str) -> Vec<ContainerInfo> {
                 status: status.to_string(),
                 cpu: None,
                 mem: None,
+                started: None,
+                desc: None,
             })
         })
         .collect();

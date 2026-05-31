@@ -18,7 +18,45 @@ pub struct ContainerInfo {
     pub cpu: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mem: Option<String>,
+    // Container start time (RFC3339 from .State.StartedAt) for precise uptime.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started: Option<String>,
+    // Image's org.opencontainers.image.description label, when present.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
 }
+
+// `name\tStartedAt\tdescription` rows from `inspect` → name -> (started, desc). Container names
+// from inspect have a leading '/'. Empty fields stay None.
+pub(crate) fn parse_inspect(
+    raw: &str,
+) -> std::collections::HashMap<String, (Option<String>, Option<String>)> {
+    raw.lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(3, '\t');
+            let name = parts.next()?.trim().trim_start_matches('/').to_string();
+            if name.is_empty() {
+                return None;
+            }
+            let started = parts
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty() && *s != "0001-01-01T00:00:00Z")
+                .map(str::to_string);
+            let desc = parts
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
+            Some((name, (started, desc)))
+        })
+        .collect()
+}
+
+// inspect `--format` template shared by local and remote: name, StartedAt, description label,
+// tab-separated (real \t). Empty description renders as an empty field.
+pub(crate) const INSPECT_FORMAT: &str =
+    "{{.Name}}\t{{.State.StartedAt}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}";
 
 #[derive(Serialize)]
 pub struct ContainerList {
@@ -56,9 +94,28 @@ pub(crate) fn parse_ps(engine: &str, raw: &str) -> Vec<ContainerInfo> {
                 status: status.to_string(),
                 cpu: None,
                 mem: None,
+                started: None,
+                desc: None,
             })
         })
         .collect()
+}
+
+// Attach StartedAt + description from an inspect map onto matching containers (by name).
+pub(crate) fn attach_inspect(
+    list: &mut [ContainerInfo],
+    inspect: &HashMap<String, (Option<String>, Option<String>)>,
+) {
+    for container in list.iter_mut() {
+        if let Some((started, desc)) = inspect.get(&container.name) {
+            if container.started.is_none() {
+                container.started = started.clone();
+            }
+            if container.desc.is_none() {
+                container.desc = desc.clone();
+            }
+        }
+    }
 }
 
 // `{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}` rows from `stats --no-stream` → name -> (cpu, mem).
@@ -117,6 +174,22 @@ async fn engine_containers(engine: &str) -> Vec<ContainerInfo> {
     .await
     {
         attach_stats(&mut list, &parse_stats(&raw));
+    }
+    // One inspect over all containers for StartedAt + description label. Needs a shell for the
+    // `$(... ps -aq)` substitution; engine is validated to docker/podman so it's injection-safe.
+    if matches!(engine, "docker" | "podman") {
+        let script =
+            format!("{engine} inspect --format '{INSPECT_FORMAT}' $({engine} ps -aq) 2>/dev/null");
+        let mut command = Command::new("sh");
+        command.args(["-c", &script]).kill_on_drop(true);
+        if let Ok(Ok(output)) = timeout(Duration::from_millis(2500), command.output()).await {
+            if output.status.success() {
+                attach_inspect(
+                    &mut list,
+                    &parse_inspect(&String::from_utf8_lossy(&output.stdout)),
+                );
+            }
+        }
     }
     list
 }

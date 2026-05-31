@@ -16,6 +16,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
   const resetShellLabelButton = target.closest<HTMLButtonElement>('[data-reset-shell-label]');
   const renameSensorButton = target.closest<HTMLButtonElement>('[data-rename-sensor]');
   const containerActionButton = target.closest<HTMLButtonElement>('[data-container-action]');
+  const editDescButton = target.closest<HTMLElement>('[data-edit-desc]');
   const shellinButton = target.closest<HTMLButtonElement>('[data-shellin]');
   const resumeButton = target.closest<HTMLButtonElement>('[data-resume]');
   const removeImageButton = target.closest<HTMLButtonElement>('[data-remove-image]');
@@ -54,6 +55,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
       const d = containerActionButton.dataset;
       return containerAction(d.chost || '', d.cengine || '', d.cname || '', d.containerAction || '');
     }
+    if (editDescButton) return editContainerDescription(editDescButton.dataset.editDesc || '');
     if (shellinButton) {
       openTerminal(shellinButton.dataset.shellin || '');
       return;

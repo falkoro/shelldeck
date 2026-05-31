@@ -31,6 +31,8 @@ interface ContainerInfo {
   status: string;
   cpu?: string | null;
   mem?: string | null;
+  started?: string | null;
+  desc?: string | null;
 }
 
 interface RemoteMetrics {
@@ -105,11 +107,78 @@ function containerUptime(status: string): string {
   return `${m[1]}${unit}`;
 }
 
-// Restart + Pull-latest buttons. Hidden via CSS unless shells are unlocked; the click handler
-// confirms and the server re-checks login + unlock + action header. host = remote host id ('' local).
+// Precise uptime from StartedAt: "7d 3h 12m", "14h 4m 9s", "3m 22s", "47s".
+function preciseUptime(startedIso?: string | null): string {
+  if (!startedIso) return '';
+  const start = Date.parse(startedIso);
+  if (!Number.isFinite(start)) return '';
+  let s = Math.max(0, Math.floor((Date.now() - start) / 1000));
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); s -= m * 60;
+  if (d) return `${d}d ${h}h ${m}m`;
+  if (h) return `${h}h ${m}m ${s}s`;
+  if (m) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+// Running containers show precise uptime (from StartedAt); stopped show nothing here.
+function containerAge(c: ContainerInfo): string {
+  if (containerState(c.status) !== 'running') return '';
+  return preciseUptime(c.started) || containerUptime(c.status);
+}
+
+// Descriptions: localStorage override > seed map (our own apps) > the image's label.
+const CONTAINER_DESC_KEY = 'sdContainerDesc';
+const DEFAULT_CONTAINER_DESC: Record<string, string> = {
+  'autonomy-ev-ops': 'AutonomyEV publishing bot — drafts/reviews/publishes articles + Reddit/X',
+  'spot-cloud-chat': 'Spot Cloud website-chat operator + repo-agent bot',
+  'linkedin-ops': 'LinkedIn approval + publishing for the Spot brands',
+  'wsb-digest': 'Daily r/wallstreetbets digest emailer',
+  'smtp-graph-relay': 'SMTP → Microsoft Graph mail relay',
+  'memoh-server': 'Memoh AI House — Discord persona fleet server',
+  'memoh-web': 'Memoh web UI',
+  'memoh-postgres': 'Memoh Postgres database',
+  'memoh-qdrant': 'Memoh Qdrant vector store',
+  'memoh-sparse': 'Memoh sparse-embedding service',
+  'remark42': 'Comments backend (autonomy-ev.com)',
+  'logan-services-tunnel': 'Cloudflare tunnel for the gl502vs sidecar services',
+  'glances': 'System + container monitor (this dashboard reads it)',
+  'plex': 'Plex media server',
+  'sonarr': 'TV series management',
+  'radarr': 'Movie management',
+  'sabnzbd': 'Usenet downloader',
+  'qbittorrent': 'Torrent client',
+  'jackett': 'Indexer proxy',
+  'adguardhome': 'Network-wide ad-blocking DNS',
+  'homeassistant': 'Home automation',
+  'smokeping': 'Network latency monitor',
+};
+function containerDescStore(): Record<string, string> {
+  return storageJson<Record<string, string>>(CONTAINER_DESC_KEY, {});
+}
+function containerDescription(c: ContainerInfo): string {
+  return (containerDescStore()[c.name] || DEFAULT_CONTAINER_DESC[c.name] || c.desc || '').trim();
+}
+function editContainerDescription(name: string): void {
+  if (!name) return;
+  const store = containerDescStore();
+  const current = store[name] || DEFAULT_CONTAINER_DESC[name] || '';
+  const next = window.prompt(`Description for ${name}`, current);
+  if (next === null) return;
+  const clean = next.trim().slice(0, 160);
+  if (clean) store[name] = clean; else delete store[name];
+  localStorage.setItem(CONTAINER_DESC_KEY, JSON.stringify(store));
+  Promise.allSettled([loadContainers(), loadRemoteHosts()]);
+  toast('Description saved');
+}
+(window as any).editContainerDescription = editContainerDescription;
+
+// Restart + Pull-latest as small icon buttons. Hidden via CSS unless shells are unlocked; the
+// click handler confirms and the server re-checks login + unlock + action header.
 function containerActionsHtml(c: ContainerInfo, host: string): string {
   const attrs = `data-cname="${escapeHtml(c.name)}" data-cengine="${escapeHtml(c.engine)}" data-chost="${escapeHtml(host)}"`;
-  return `<div class="container-actions"><button type="button" class="container-action" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}">Restart</button><button type="button" class="container-action" data-container-action="pull" ${attrs} title="Pull latest image and recreate ${escapeHtml(c.name)}">Pull</button></div>`;
+  return `<div class="container-actions"><button type="button" class="container-action ca-restart" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}" aria-label="Restart ${escapeHtml(c.name)}">↻</button><button type="button" class="container-action ca-pull" data-container-action="pull" ${attrs} title="Pull latest image + recreate ${escapeHtml(c.name)}" aria-label="Pull latest ${escapeHtml(c.name)}">⬇</button></div>`;
 }
 
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
@@ -117,11 +186,16 @@ function containerActionsHtml(c: ContainerInfo, host: string): string {
 function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string {
   const stats = containerStatsText(c);
   const statsHtml = stats ? `<div class="ci-stats">${escapeHtml(stats)}</div>` : '';
-  const age = containerUptime(c.status);
+  const age = containerAge(c);
   const ageHtml = age ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(age)}</span>` : '';
+  const desc = containerDescription(c);
+  const descHtml = desc
+    ? `<div class="ci-desc" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(desc)} — click to edit">${escapeHtml(desc)}</div>`
+    : `<div class="ci-desc ci-desc-empty" data-edit-desc="${escapeHtml(c.name)}" title="Add a description">+ description</div>`;
   return `<div class="container-item ${extraClass} state-${containerState(c.status)}">`
     + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small></div>`
-    + `<div class="ci-image">${escapeHtml(c.image)}</div>`
+    + `<div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>`
+    + descHtml
     + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
     + `${statsHtml}${containerActionsHtml(c, host)}</div>`;
 }
@@ -130,15 +204,21 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
 // below. Full status lives in the dot/age tooltips. Keeps long lists short and tidy.
 function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   const state = containerState(c.status);
-  const age = containerUptime(c.status);
+  const age = containerAge(c);
   const memUsed = (c.mem || '').split('/')[0].trim();
   const right = c.cpu ? `${c.cpu}${memUsed ? ` · ${memUsed}` : ''}` : '';
   const rightHtml = right ? `<span class="ci-cpu">${escapeHtml(right)}</span>` : '';
   const badge = age || c.status.split(/[\s(]/)[0];
   const badgeHtml = badge ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(badge)}</span>` : '';
+  // Line 2 shows the description when there is one (image to the tooltip), else the image. Click
+  // to edit/add a description either way.
+  const desc = containerDescription(c);
+  const subText = desc || c.image;
+  const subTitle = desc ? `${desc}\n${c.image} — click to edit` : `${c.image} — click to add a description`;
+  const subClass = desc ? 'ci-image ci-editdesc has-desc' : 'ci-image ci-editdesc';
   return `<div class="container-item remote-container compact state-${state}">`
     + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}</div>`
-    + `<div class="ci-bot"><span class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</span>${badgeHtml}</div>`
+    + `<div class="ci-bot"><span class="${subClass}" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
     + `${containerActionsHtml(c, host)}</div>`;
 }
 
@@ -320,7 +400,8 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
     list.innerHTML = '<div class="muted remote-empty">No remote hosts configured</div>';
     return;
   }
-  list.innerHTML = hosts.map((host) => {
+  const legend = '<div class="remote-legend"><span class="lg"><i class="lg-dot running"></i>running</span><span class="lg"><i class="lg-dot unhealthy"></i>unhealthy</span><span class="lg"><i class="lg-dot stopped"></i>stopped</span><span class="lg"><b class="lg-ic">↻</b>restart</span><span class="lg"><b class="lg-ic">⬇</b>pull</span></div>';
+  list.innerHTML = legend + hosts.map((host) => {
     const containers = host.containers || [];
     const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
     const shownNote = total > containers.length ? ` · showing ${containers.length} of ${total}` : '';
