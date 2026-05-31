@@ -498,6 +498,13 @@ body.shells-locked .container-actions{display:none}
 .skeleton{position:relative;overflow:hidden;background:rgba(255,255,255,.045);border-radius:6px}
 .skeleton::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(139,246,255,.10),transparent);animation:sd-shimmer 1.25s ease-in-out infinite}
 .skel-card{height:60px;margin-bottom:7px;border:1px solid rgba(255,255,255,.06)}
+/* Richer skeletons that mimic the real cards while data loads. */
+.skel-host{border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.skel-line{height:11px;border-radius:5px}
+.skel-bar{height:8px;border-radius:5px}
+.skel-crow{height:32px;border-radius:6px;margin-bottom:7px}
+.skel-w50{width:50%}
+.skel-w70{width:70%}
 .metrics.loading .meter{position:relative}
 .metrics.loading .meter::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(139,246,255,.18),transparent);animation:sd-shimmer 1.25s ease-in-out infinite}
 /* Remote host monitor widget */
