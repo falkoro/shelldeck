@@ -38,6 +38,7 @@ interface PanelSettings {
   remoteHosts: boolean;
   links: boolean;
   tickers: boolean;
+  expandLists: boolean;
 }
 
 interface DashboardSettings {
@@ -90,7 +91,7 @@ let summaryLoading = false;
 let shellsLoading = false;
 let dashboardSettings: DashboardSettings = {
   tickers: [],
-  panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, links: true, tickers: true },
+  panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, links: true, tickers: true, expandLists: false },
 };
 const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
 const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';

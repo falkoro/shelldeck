@@ -1,18 +1,27 @@
 use crate::{
     config::RemoteHostConfig,
-    containers::ContainerInfo,
+    containers::{attach_stats, ContainerInfo},
     remote_metrics::{self, RemoteMetrics, REMOTE_METRICS_SCRIPT},
 };
 use chrono::Utc;
 use futures_util::future::join_all;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tokio::{process::Command, time::timeout};
+use tokio::{io::AsyncWriteExt, process::Command, time::timeout};
 
-const REMOTE_CONTAINER_SCRIPT: &str = r#"
-(docker ps --format 'docker	{{.Names}}	{{.Image}}	{{.Status}}' 2>/dev/null || true)
-(podman ps --format 'podman	{{.Names}}	{{.Image}}	{{.Status}}' 2>/dev/null || true)
-"#;
+// Always-run section: all containers (`ps -a`, so stopped show too) + the host's primary IP.
+// `\t` are real tabs so docker/podman `--format` emits tab-separated rows we split on.
+const PS_SCRIPT: &str = "echo '##SD_PS'\n\
+(docker ps -a --format 'docker\t{{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || true)\n\
+(podman ps -a --format 'podman\t{{.Names}}\t{{.Image}}\t{{.Status}}' 2>/dev/null || true)\n\
+echo '##SD_IP'\n\
+(hostname -I 2>/dev/null || true)\n";
+
+// Per-container CPU/mem — the slow call, so only appended when metrics are enabled.
+const STATS_SCRIPT: &str = "echo '##SD_STATS'\n\
+(docker stats --no-stream --format 'docker\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n\
+(podman stats --no-stream --format 'podman\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n";
 
 #[derive(Serialize)]
 pub struct RemoteHostStatus {
@@ -27,6 +36,8 @@ pub struct RemoteHostStatus {
     // Total containers the host reported, before the display cap — so the UI can show
     // "showing N of M" instead of silently hiding the tail on busy hosts.
     pub container_total: usize,
+    // Primary IP the host reports (`hostname -I` first token); None if it didn't answer.
+    pub ip: Option<String>,
     // Machine metrics (CPU/RAM/load/temps) when remote metrics are enabled and the host is a
     // reachable Linux box; None when disabled or unparseable.
     pub metrics: Option<RemoteMetrics>,
@@ -55,7 +66,7 @@ pub async fn check_all(
 
 async fn check_host(host: RemoteHostConfig, cap: usize, with_metrics: bool) -> RemoteHostStatus {
     let ping_ms = ping_latency_ms(&host.target).await;
-    let (containers, container_total, metrics, ssh_ms, ssh_error) =
+    let (containers, container_total, ip, metrics, ssh_ms, ssh_error) =
         ssh_probe(&host.target, cap, with_metrics).await;
     let online = ping_ms.is_some() || ssh_ms.is_some();
     RemoteHostStatus {
@@ -68,6 +79,7 @@ async fn check_host(host: RemoteHostConfig, cap: usize, with_metrics: bool) -> R
         checked_at: Utc::now().to_rfc3339(),
         containers,
         container_total,
+        ip,
         metrics,
         error: if online {
             ssh_error
@@ -97,6 +109,7 @@ async fn ping_latency_ms(target: &str) -> Option<u128> {
 type ProbeResult = (
     Vec<ContainerInfo>,
     usize,
+    Option<String>,
     Option<RemoteMetrics>,
     Option<u128>,
     Option<String>,
@@ -104,15 +117,38 @@ type ProbeResult = (
 
 async fn ssh_probe(target: &str, cap: usize, with_metrics: bool) -> ProbeResult {
     let started = Instant::now();
-    // One SSH round-trip returns containers and (optionally) the /proc metrics sections.
+    // One SSH round-trip returns the PS + IP sections always, plus per-container stats and the
+    // /proc metrics sections when metrics are enabled (those add the slow `stats` call).
     let script = if with_metrics {
-        format!("{REMOTE_CONTAINER_SCRIPT}{REMOTE_METRICS_SCRIPT}")
+        format!("{PS_SCRIPT}{STATS_SCRIPT}{REMOTE_METRICS_SCRIPT}")
     } else {
-        REMOTE_CONTAINER_SCRIPT.to_string()
+        PS_SCRIPT.to_string()
     };
+    // stats + two /proc samples need more headroom than a bare container check.
+    let budget = if with_metrics { 9000 } else { 6000 };
+    let timed_out = (
+        Vec::new(),
+        0,
+        None,
+        None,
+        None,
+        Some("SSH timed out while checking the host".to_string()),
+    );
+    let spawn_failed = (
+        Vec::new(),
+        0,
+        None,
+        None,
+        None,
+        Some("Could not start SSH for the remote host check".to_string()),
+    );
+
     let mut command = Command::new("ssh");
-    // `-o` flags first, then the validated target. clean_remote_target() already rejects
-    // a leading-dash target, so it can't be parsed as an ssh option.
+    // The script is fed over STDIN to a login shell (`sh -ls`), NOT passed as a command-line
+    // argument — ssh joins remote args with spaces and the remote shell re-parses them, which
+    // mangles a multi-line script (it ate the first `echo` marker). stdin keeps it intact.
+    // `-o` flags first, then the validated target. clean_remote_target() already rejects a
+    // leading-dash target, so it can't be parsed as an ssh option.
     command
         .args([
             "-o",
@@ -123,51 +159,59 @@ async fn ssh_probe(target: &str, cap: usize, with_metrics: bool) -> ProbeResult 
             "NumberOfPasswordPrompts=0",
             target,
             "sh",
-            "-lc",
-            script.as_str(),
+            "-ls",
         ])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
 
-    let Ok(result) = timeout(Duration::from_millis(6000), command.output()).await else {
-        return (
-            Vec::new(),
-            0,
-            None,
-            None,
-            Some("SSH timed out while checking the host".to_string()),
-        );
+    let Ok(mut child) = command.spawn() else {
+        return spawn_failed;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(script.as_bytes()).await;
+        // Drop closes the pipe so `sh -ls` sees EOF and runs.
+    }
+    let Ok(result) = timeout(Duration::from_millis(budget), child.wait_with_output()).await else {
+        return timed_out;
     };
     let Ok(output) = result else {
-        return (
-            Vec::new(),
-            0,
-            None,
-            None,
-            Some("Could not start SSH for the remote host check".to_string()),
-        );
+        return spawn_failed;
     };
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
-        return (Vec::new(), 0, None, None, Some(clean_error(&err)));
+        return (Vec::new(), 0, None, None, None, Some(clean_error(&err)));
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut containers = parse_remote_containers(&stdout);
+    let secs = remote_metrics::sections(&stdout);
+    let mut containers =
+        parse_remote_containers(secs.get("PS").map(String::as_str).unwrap_or_default());
+    if let Some(stats) = secs.get("STATS") {
+        attach_stats(&mut containers, &parse_remote_stats(stats));
+    }
     let total = containers.len();
     containers.truncate(cap.max(1));
+    let ip = secs
+        .get("IP")
+        .and_then(|raw| raw.split_whitespace().next())
+        .map(str::to_string);
     let metrics = if with_metrics {
-        remote_metrics::parse(&stdout)
+        remote_metrics::parse_from(&secs)
     } else {
         None
     };
     (
         containers,
         total,
+        ip,
         metrics,
         Some(started.elapsed().as_millis()),
         None,
     )
 }
 
+// `engine\tname\timage\tstatus` rows from the PS section (`ps -a`).
 fn parse_remote_containers(raw: &str) -> Vec<ContainerInfo> {
     let mut containers: Vec<ContainerInfo> = raw
         .lines()
@@ -185,11 +229,30 @@ fn parse_remote_containers(raw: &str) -> Vec<ContainerInfo> {
                 name: name.to_string(),
                 image: image.to_string(),
                 status: status.to_string(),
+                cpu: None,
+                mem: None,
             })
         })
         .collect();
     containers.sort_by(|a, b| a.engine.cmp(&b.engine).then(a.name.cmp(&b.name)));
     containers
+}
+
+// `engine\tname\tcpu\tmem` rows from the STATS section → name -> (cpu, mem).
+fn parse_remote_stats(raw: &str) -> HashMap<String, (String, String)> {
+    raw.lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(4, '\t');
+            let engine = parts.next()?.trim();
+            let name = parts.next()?.trim().to_string();
+            let cpu = parts.next()?.trim().to_string();
+            let mem = parts.next()?.trim().to_string();
+            if !matches!(engine, "docker" | "podman") || name.is_empty() {
+                return None;
+            }
+            Some((name, (cpu, mem)))
+        })
+        .collect()
 }
 
 fn parse_ping_time_ms(raw: &str) -> Option<u128> {

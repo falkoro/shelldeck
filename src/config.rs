@@ -332,6 +332,7 @@ fn known_sessions() -> Vec<KnownSession> {
         known_session("slot4", "Shell Slot 4", "slot", "ts4", "4", &default_start),
         known_session("slot5", "Shell Slot 5", "slot", "ts5", "5", &default_start),
         known_session("slot6", "Shell Slot 6", "slot", "ts6", "6", &default_start),
+        known_session("slot7", "Shell Slot 7", "slot", "ts7", "7", &default_start),
     ];
 
     for session in agent_presets_from_raw(

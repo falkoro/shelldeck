@@ -1,6 +1,54 @@
 "use strict";
 // Live host machine stats (CPU / RAM / temps), polled from /api/metrics.
 // Mirrors the CachyOS system-monitor widget: at-a-glance CPU%, RAM, and temperatures.
+// running = "Up ..."; flag unhealthy/restarting; everything else (Exited/Created) = stopped.
+function containerState(status) {
+    const s = (status || '').toLowerCase();
+    if (s.includes('unhealthy'))
+        return 'unhealthy';
+    if (s.startsWith('restarting'))
+        return 'unhealthy';
+    if (s.startsWith('up'))
+        return 'running';
+    return 'stopped';
+}
+// "23 running · 2 stopped · 1 unhealthy" — omits zero buckets.
+function containerHealth(containers) {
+    let running = 0;
+    let stopped = 0;
+    let unhealthy = 0;
+    for (const c of containers) {
+        const st = containerState(c.status);
+        if (st === 'unhealthy')
+            unhealthy += 1;
+        else if (st === 'stopped')
+            stopped += 1;
+        else
+            running += 1;
+    }
+    const parts = [];
+    if (running)
+        parts.push(`${running} running`);
+    if (stopped)
+        parts.push(`${stopped} stopped`);
+    if (unhealthy)
+        parts.push(`${unhealthy} unhealthy`);
+    return parts.join(' · ') || 'no containers';
+}
+function containerStatsText(c) {
+    const bits = [];
+    if (c.cpu)
+        bits.push(`${c.cpu} CPU`);
+    if (c.mem)
+        bits.push(c.mem);
+    return bits.join(' · ');
+}
+// Shared row for local + remote container lists. Stopped/unhealthy get a state class for greying.
+function containerRowHtml(c, extraClass = '') {
+    const stats = containerStatsText(c);
+    const statsHtml = stats ? `<small class="container-stats">${escapeHtml(stats)}</small>` : '';
+    return `<div class="container-item ${extraClass} state-${containerState(c.status)}"><div><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.image)}</span></div><small>${escapeHtml(c.engine)}</small><em>${escapeHtml(c.status)}</em>${statsHtml}</div>`;
+}
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics = null;
 function meterLevel(pct) {
@@ -95,8 +143,9 @@ function renderMetrics(m) {
     latestMachineMetrics = m;
     const host = document.getElementById('metricsHost');
     const mhz = m.cpu_mhz ? ` · ${Math.round(m.cpu_mhz).toLocaleString()} MHz` : '';
+    const ip = m.ip ? ` · ${m.ip}` : '';
     if (host)
-        host.textContent = `${m.hostname} · CPU ${m.cpu_cores} cores${mhz} · uptime ${fmtUptime(m.uptime_secs)}`;
+        host.textContent = `${m.hostname}${ip} · CPU ${m.cpu_cores} cores${mhz} · uptime ${fmtUptime(m.uptime_secs)}`;
     setMeter('cpu', m.cpu_pct, `${m.cpu_pct.toFixed(0)}%`);
     setMeter('mem', m.mem_pct, `${fmtGiB(m.mem_used_kb)} / ${fmtGiB(m.mem_total_kb)} GiB`);
     const load = document.getElementById('metricLoad');
@@ -127,10 +176,11 @@ function renderContainers(containers) {
     if (!list)
         return;
     if (!containers.length) {
-        list.innerHTML = '<div class="muted container-empty">No running containers</div>';
+        list.innerHTML = '<div class="muted container-empty">No containers</div>';
         return;
     }
-    list.innerHTML = containers.map((container) => `<div class="container-item"><div><b>${escapeHtml(container.name)}</b><span>${escapeHtml(container.image)}</span></div><small>${escapeHtml(container.engine)}</small><em>${escapeHtml(container.status)}</em></div>`).join('');
+    const summary = `<div class="container-health">${escapeHtml(containerHealth(containers))}</div>`;
+    list.innerHTML = summary + containers.map((c) => containerRowHtml(c)).join('');
 }
 function remoteProbeText(host) {
     if (typeof host.ping_ms === 'number')
@@ -174,14 +224,14 @@ function renderRemoteHosts(hosts) {
     list.innerHTML = hosts.map((host) => {
         const containers = host.containers || [];
         const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
-        const countLabel = total === 1 ? '1 container' : `${total} containers`;
-        const shownNote = total > containers.length ? ` · showing ${containers.length}` : '';
+        const shownNote = total > containers.length ? ` · showing ${containers.length} of ${total}` : '';
         const containerHtml = containers.length
-            ? `<div class="remote-count">${escapeHtml(countLabel)}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((container) => `<div class="container-item remote-container"><div><b>${escapeHtml(container.name)}</b><span>${escapeHtml(container.image)}</span></div><small>${escapeHtml(container.engine)}</small><em>${escapeHtml(container.status)}</em></div>`).join('')}</div>`
-            : `<div class="muted remote-empty">${host.online ? 'No running containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
+            ? `<div class="remote-count">${escapeHtml(containerHealth(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => containerRowHtml(c, 'remote-container')).join('')}</div>`
+            : `<div class="muted remote-empty">${host.online ? 'No containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
         const error = host.error && host.online ? `<div class="remote-error">${escapeHtml(host.error)}</div>` : '';
         const metricsHtml = host.metrics ? remoteMetricsHtml(host.metrics) : '';
-        return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${metricsHtml}${containerHtml}${error}</div>`;
+        const ipText = host.ip ? ` · ${host.ip}` : '';
+        return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'}${escapeHtml(ipText)} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${metricsHtml}${containerHtml}${error}</div>`;
     }).join('');
 }
 async function loadMetrics() {

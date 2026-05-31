@@ -10,6 +10,7 @@ pub struct Temp {
 #[derive(Serialize)]
 pub struct Metrics {
     pub hostname: String,
+    pub ip: String,
     pub cpu_pct: f64,
     pub cpu_cores: usize,
     pub cpu_mhz: f64,
@@ -23,6 +24,19 @@ pub struct Metrics {
     pub swap_used_kb: u64,
     pub uptime_secs: u64,
     pub temps: Vec<Temp>,
+}
+
+// Primary outbound IP, found by asking the kernel which source address it would use to reach a
+// public address. No packets are sent (UDP connect just selects the route); falls back to "".
+fn local_ip() -> String {
+    use std::net::UdpSocket;
+    UdpSocket::bind("0.0.0.0:0")
+        .and_then(|sock| {
+            sock.connect("1.1.1.1:80")?;
+            sock.local_addr()
+        })
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_default()
 }
 
 // Aggregate "cpu" jiffies from /proc/stat as (idle, total).
@@ -184,6 +198,7 @@ pub async fn gather() -> Metrics {
 
     Metrics {
         hostname,
+        ip: local_ip(),
         cpu_pct,
         cpu_cores,
         cpu_mhz,

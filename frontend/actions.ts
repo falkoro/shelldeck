@@ -31,6 +31,7 @@ function applyDashboardSettings(settings: DashboardSettings): void {
     tickerBar.hidden = false;
     if (!panels.tickers) tickerBar.innerHTML = '<span class="ticker-empty">Tickers hidden</span>';
   }
+  document.body.classList.toggle('expand-lists', !!panels.expandLists);
 }
 
 async function loadDashboardSettings(): Promise<void> {
@@ -67,7 +68,7 @@ function openSettingsEditor(focus?: 'tickers'): void {
   overlay.className = 'links-editor-modal settings-editor-modal';
   overlay.id = 'settingsEditor';
   const panels = dashboardSettings.panels;
-  overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock/crypto tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label></div><label for="settingsTickers">Tickers</label><textarea id="settingsTickers" spellcheck="false" placeholder="MSFT, NVDA, BTC-USD"></textarea><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
+  overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock/crypto tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label><label><input type="checkbox" name="expandLists" ${panels.expandLists ? 'checked' : ''}> Expand lists (no scrollbars)</label></div><label for="settingsTickers">Tickers</label><textarea id="settingsTickers" spellcheck="false" placeholder="MSFT, NVDA, BTC-USD"></textarea><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
   document.body.appendChild(overlay);
   const form = overlay.querySelector<HTMLFormElement>('form')!;
   const textarea = overlay.querySelector<HTMLTextAreaElement>('#settingsTickers')!;
@@ -87,6 +88,7 @@ function openSettingsEditor(focus?: 'tickers'): void {
         containers: data.has('containers'),
         links: data.has('links'),
         tickers: data.has('tickers'),
+        expandLists: data.has('expandLists'),
       },
     }).then(close).catch((error: Error) => toast(error.message));
   });
