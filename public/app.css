@@ -337,6 +337,7 @@ body.preview-fullscreen-open{overflow:hidden}
 .term-keybar{display:none;gap:5px;padding:5px 6px;background:#0b121a;border-bottom:1px solid rgba(139,246,255,.14);overflow-x:auto;-webkit-overflow-scrolling:touch;flex:0 0 auto}
 .term-key{flex:0 0 auto;min-width:42px;min-height:36px;padding:6px 12px;background:rgba(139,246,255,.06);border:1px solid rgba(139,246,255,.28);border-radius:6px;color:#c9fff3;font:600 14px/1 "Cascadia Mono","JetBrains Mono",monospace;cursor:pointer;touch-action:manipulation;display:inline-flex;align-items:center;justify-content:center}
 .term-key:active{background:rgba(139,246,255,.22);border-color:rgba(139,246,255,.5)}
+.term-key.armed{background:rgba(139,246,255,.34);border-color:#8bf6ff;color:#eaffff;box-shadow:0 0 0 1px rgba(139,246,255,.45)}
 .term-window.mobile .term-keybar{display:flex}
 @media (max-width:760px){
   .term-keybar{display:flex}
