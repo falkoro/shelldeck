@@ -188,6 +188,7 @@ document.getElementById('safeShotBtn')?.addEventListener('click', () => createSa
 document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
 document.getElementById('editRemoteHostsBtn')?.addEventListener('click', () => openRemoteHostsEditor().catch((error: Error) => toast(error.message)));
 document.getElementById('refreshSummaryBtn')?.addEventListener('click', () => refreshSummaries().catch((error: Error) => toast(error.message)));
+q<HTMLButtonElement>('#refreshShellsTopBtn').title = 'Refresh shells';
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error: Error) => toast(error.message)));
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
 q('#densityToggle').addEventListener('click', toggleDensity);

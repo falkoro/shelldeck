@@ -35,6 +35,29 @@ const DEFAULT_H = 540;
 const MOBILE_BREAKPOINT = 760;
 const TERMINAL_PASTE_CHUNK_BYTES = 4096;
 
+// On-screen keys for the mobile terminal — a phone soft-keyboard can't send these,
+// yet they're essential for driving tmux / vim / coding agents. Shown only on mobile.
+const TERMINAL_KEY_SEQUENCES: Record<string, string> = {
+  esc: '\x1b',
+  tab: '\t',
+  'ctrl-c': '\x03',
+  up: '\x1b[A',
+  down: '\x1b[B',
+  left: '\x1b[D',
+  right: '\x1b[C',
+};
+
+const TERMINAL_KEYBAR_HTML = `
+    <div class="term-keybar" data-keybar>
+      <button type="button" class="term-key" data-key="esc">Esc</button>
+      <button type="button" class="term-key" data-key="tab">Tab</button>
+      <button type="button" class="term-key" data-key="ctrl-c" title="Ctrl-C (interrupt)">^C</button>
+      <button type="button" class="term-key" data-key="up" aria-label="Arrow up">↑</button>
+      <button type="button" class="term-key" data-key="down" aria-label="Arrow down">↓</button>
+      <button type="button" class="term-key" data-key="left" aria-label="Arrow left">←</button>
+      <button type="button" class="term-key" data-key="right" aria-label="Arrow right">→</button>
+    </div>`;
+
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
@@ -353,7 +376,7 @@ function createTermWindow(name: string): TermWindow {
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
         <button type="button" class="term-btn term-detach" data-act="close" title="Detach this view and return to the dashboard — the tmux session keeps running" aria-label="Detach terminal view and return to the dashboard (session keeps running)"><span class="term-detach-label">Detach</span></button>
       </div>
-    </div>
+    </div>${TERMINAL_KEYBAR_HTML}
     <div class="term-host" data-host></div>
   `;
 
@@ -361,6 +384,7 @@ function createTermWindow(name: string): TermWindow {
   const status = el.querySelector<HTMLElement>('[data-role="tstatus"]')!;
   const bar = el.querySelector<HTMLElement>('.term-titlebar')!;
   const controls = el.querySelector<HTMLElement>('.term-controls')!;
+  const keybar = el.querySelector<HTMLElement>('[data-keybar]')!;
 
   document.body.appendChild(el);
 
@@ -418,6 +442,17 @@ function createTermWindow(name: string): TermWindow {
       else if (act === 'max') toggleMaximize(tw);
       else if (act === 'reset') resetWindow(tw);
       else if (act === 'close') closeWindow(tw);
+    });
+  });
+
+  // On-screen keys (mobile): handle on pointerdown + preventDefault so the xterm
+  // textarea keeps focus and the soft keyboard never dismisses between taps.
+  keybar.querySelectorAll<HTMLButtonElement>('.term-key').forEach((btn) => {
+    btn.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const seq = TERMINAL_KEY_SEQUENCES[btn.dataset.key || ''];
+      if (seq) sendTerminalText(tw, seq);
+      tw.term?.focus?.();
     });
   });
 
