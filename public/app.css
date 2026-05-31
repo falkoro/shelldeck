@@ -428,6 +428,12 @@ body.preview-fullscreen-open{overflow:hidden}
 .container-item span{font-size:11px;color:var(--muted);margin-top:2px}
 .container-item small{align-self:start;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:1px 6px;color:#c9fff3;font-size:10px;text-transform:uppercase}
 .container-item em{grid-column:1 / -1;color:var(--muted);font-style:normal;font-size:11px}
+.container-item .container-stats{grid-column:1 / -1;border:0;padding:0;text-transform:none;color:#9fe9dd;font-size:10.5px;font-variant-numeric:tabular-nums;letter-spacing:0}
+.container-item.state-stopped{opacity:.5}
+.container-item.state-stopped em{color:#9aa6b2}
+.container-item.state-unhealthy{border-color:rgba(255,106,122,.45)}
+.container-item.state-unhealthy em{color:#ffb3bd}
+.container-health{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-bottom:2px}
 /* Remote host monitor widget */
 .remote-list{display:flex;flex-direction:column;gap:8px}
 .remote-empty{font-size:12px}
@@ -441,7 +447,11 @@ body.preview-fullscreen-open{overflow:hidden}
 .remote-head b{font-size:12.5px;color:var(--text)}
 .remote-head small{font-size:11px;color:var(--muted);margin-top:2px}
 .remote-count{font-size:11px;color:var(--muted);margin:1px 0 2px}
-.remote-containers{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto}
+.remote-containers{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(139,246,255,.25) transparent}
+.remote-containers::-webkit-scrollbar{width:6px}
+.remote-containers::-webkit-scrollbar-thumb{background:rgba(139,246,255,.25);border-radius:6px}
+/* "Expand lists (no scrollbars)" — let the lists grow to full height instead of scrolling. */
+.expand-lists .remote-containers{max-height:none;overflow:visible}
 .remote-container{padding:7px;background:#071017}
 .remote-error{color:#ffc2cd;font-size:11px;line-height:1.35;overflow-wrap:anywhere}
 .remote-metrics{display:grid;gap:5px}

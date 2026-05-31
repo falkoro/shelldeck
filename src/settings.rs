@@ -13,6 +13,9 @@ pub struct PanelSettings {
     pub remote_hosts: bool,
     pub links: bool,
     pub tickers: bool,
+    // When true, container/host lists drop their max-height + scrollbar and expand fully.
+    #[serde(default, rename = "expandLists")]
+    pub expand_lists: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -32,6 +35,7 @@ impl DashboardSettings {
                 remote_hosts: true,
                 links: true,
                 tickers: true,
+                expand_lists: false,
             },
         }
     }
@@ -109,6 +113,11 @@ fn parse_file(raw: &str, config: &Config) -> Option<DashboardSettings> {
                     .get("tickers")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(settings.panels.tickers);
+                settings.panels.expand_lists = panels
+                    .get("expandLists")
+                    .or_else(|| panels.get("expand_lists"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(settings.panels.expand_lists);
             }
             Some(normalize_settings(settings))
         })

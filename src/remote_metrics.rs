@@ -35,8 +35,9 @@ pub struct RemoteMetrics {
 }
 
 // Split the blob into the `##SD_*` sections the remote script emits. Lines before the first
-// marker (e.g. leftover container rows) are dropped.
-fn sections(blob: &str) -> std::collections::HashMap<&str, String> {
+// marker (e.g. leftover container rows) are dropped. Shared with remote.rs, which reads the
+// PS/STATS/IP sections from the same combined SSH output.
+pub(crate) fn sections(blob: &str) -> std::collections::HashMap<&str, String> {
     let mut map: std::collections::HashMap<&str, String> = std::collections::HashMap::new();
     let mut current: Option<&str> = None;
     for line in blob.lines() {
@@ -106,8 +107,7 @@ fn parse_temps(raw: &str) -> Vec<Temp> {
 
 // Parse the sectioned blob. Returns None when the host produced no usable metrics (e.g. a
 // non-Linux target, or `with_metrics` disabled so the script was never appended).
-pub fn parse(blob: &str) -> Option<RemoteMetrics> {
-    let s = sections(blob);
+pub(crate) fn parse_from(s: &std::collections::HashMap<&str, String>) -> Option<RemoteMetrics> {
     let stat1 = s.get("STAT1")?;
     let stat2 = s.get("STAT2")?;
     let mem = s.get("MEM").map(String::as_str).unwrap_or_default();
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn parses_cpu_mem_load_uptime_cores() {
-        let m = parse(SAMPLE).expect("metrics");
+        let m = parse_from(&sections(SAMPLE)).expect("metrics");
         // total delta = 1140-1150? compute: stat1 total=1150 idle=1000; stat2 total=1270 idle=1060
         // dt=120, di=60 -> busy 60/120 = 50%
         assert_eq!(m.cpu_pct.round() as i64, 50);
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn temps_filtered_sorted_and_labelled() {
-        let m = parse(SAMPLE).expect("metrics");
+        let m = parse_from(&sections(SAMPLE)).expect("metrics");
         // 999 °C bogus row dropped; hottest first; chip prefixed when not already in label.
         assert_eq!(m.temps.len(), 2);
         assert_eq!(m.temps[0].label, "k10temp Tctl");
@@ -178,6 +178,6 @@ mod tests {
 
     #[test]
     fn returns_none_without_proc_sections() {
-        assert!(parse("docker\tweb\timg\tUp 2 hours\n").is_none());
+        assert!(parse_from(&sections("docker\tweb\timg\tUp 2 hours\n")).is_none());
     }
 }
