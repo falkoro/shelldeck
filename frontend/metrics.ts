@@ -126,6 +126,22 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
     + `${statsHtml}${containerActionsHtml(c, host)}</div>`;
 }
 
+// Denser 2-line row for the remote host cards: status dot + name + cpu/mem on top, image + age
+// below. Full status lives in the dot/age tooltips. Keeps long lists short and tidy.
+function compactContainerRowHtml(c: ContainerInfo, host: string): string {
+  const state = containerState(c.status);
+  const age = containerUptime(c.status);
+  const memUsed = (c.mem || '').split('/')[0].trim();
+  const right = c.cpu ? `${c.cpu}${memUsed ? ` · ${memUsed}` : ''}` : '';
+  const rightHtml = right ? `<span class="ci-cpu">${escapeHtml(right)}</span>` : '';
+  const badge = age || c.status.split(/[\s(]/)[0];
+  const badgeHtml = badge ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(badge)}</span>` : '';
+  return `<div class="container-item remote-container compact state-${state}">`
+    + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}</div>`
+    + `<div class="ci-bot"><span class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</span>${badgeHtml}</div>`
+    + `${containerActionsHtml(c, host)}</div>`;
+}
+
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics: MachineMetrics | null = null;
 
@@ -135,6 +151,15 @@ function meterLevel(pct: number): string {
 
 function tempLevel(c: number): string {
   return c >= 85 ? 'crit' : c >= 70 ? 'warn' : 'ok';
+}
+
+// Only the temps that matter — CPU, GPU, NVMe. Drops ACPI zones, Wi-Fi/chipset noise.
+function isCoreSensor(rawLabel: string): boolean {
+  const l = rawLabel.toLowerCase();
+  if (/nvme/.test(l)) return true;
+  if (/k10temp|coretemp|tctl|tdie|\bcpu\b|package id|\bcore\s*\d/.test(l)) return true;
+  if (/amdgpu|nouveau|nvidia|radeon|\bgpu\b/.test(l)) return true;
+  return false;
 }
 
 function fmtGiB(kb: number): string {
@@ -211,6 +236,7 @@ function setMeter(name: string, pct: number, text: string): void {
 
 function renderMetrics(m: MachineMetrics): void {
   latestMachineMetrics = m;
+  document.querySelector('.metrics')?.classList.remove('loading');
   const host = document.getElementById('metricsHost');
   const mhz = m.cpu_mhz ? ` · ${Math.round(m.cpu_mhz).toLocaleString()} MHz` : '';
   const ip = m.ip ? ` · ${m.ip}` : '';
@@ -230,9 +256,9 @@ function renderMetrics(m: MachineMetrics): void {
       return;
     }
     temps.hidden = false;
-    const list = (m.temps || []).slice().sort((a, b) => b.celsius - a.celsius);
+    const list = (m.temps || []).filter((t) => isCoreSensor(t.label)).sort((a, b) => b.celsius - a.celsius);
     if (!list.length) {
-      temps.innerHTML = '<div class="muted sensor-empty">No thermal sensors reported</div>';
+      temps.innerHTML = '<div class="muted sensor-empty">No CPU/GPU/NVMe sensors reported</div>';
     } else {
       temps.innerHTML = `<div class="sensor-panel"><div class="sensor-panel-head"><b>Thermal sensors</b><small>${list.length} live readings</small></div><div class="sensor-list">${list.map((t) => {
         const display = sensorDisplayLabel(t.label);
@@ -276,8 +302,9 @@ function remoteMetricsHtml(m: RemoteMetrics): string {
   const up = m.uptime_secs ? ` · up ${fmtUptime(m.uptime_secs)}` : '';
   const meta = `${cores}load ${m.load1.toFixed(2)} · ${m.load5.toFixed(2)} · ${m.load15.toFixed(2)}${up}`;
   let temps = '';
-  if (dashboardSettings.panels.machineSensors && (m.temps || []).length) {
-    const chips = m.temps.slice(0, 5).map((t) =>
+  const coreTemps = (m.temps || []).filter((t) => isCoreSensor(t.label));
+  if (dashboardSettings.panels.machineSensors && coreTemps.length) {
+    const chips = coreTemps.slice(0, 5).map((t) =>
       `<span class="rm-temp ${tempLevel(t.celsius)}" title="${escapeHtml(t.label)}">${escapeHtml(sensorDisplayLabel(t.label))} ${formatTemp(t.celsius)}</span>`).join('');
     temps = `<div class="rm-temps">${chips}</div>`;
   }
@@ -298,7 +325,7 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
     const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
     const shownNote = total > containers.length ? ` · showing ${containers.length} of ${total}` : '';
     const containerHtml = containers.length
-      ? `<div class="remote-count">${escapeHtml(containerHealth(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => containerRowHtml(c, 'remote-container', host.id)).join('')}</div>`
+      ? `<div class="remote-count">${escapeHtml(containerHealth(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => compactContainerRowHtml(c, host.id)).join('')}</div>`
       : `<div class="muted remote-empty">${host.online ? 'No containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
     const error = host.error && host.online ? `<div class="remote-error">${escapeHtml(host.error)}</div>` : '';
     const metricsHtml = host.metrics ? remoteMetricsHtml(host.metrics) : '';

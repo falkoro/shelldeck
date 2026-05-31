@@ -43,6 +43,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .dot.on{background:var(--green);box-shadow:0 0 12px var(--green)}
 .workspace{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:14px;align-items:start}
 .sidebar{position:sticky;top:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:-2px}
+.sidebar-head-title{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sidebar-gear{padding:6px 10px}
 .main-stack{display:flex;flex-direction:column;gap:12px;min-width:0}
 .panel{border:1px solid rgba(139,246,255,.18);background:#0b121a;border-radius:8px;padding:12px;min-width:0}
 .panel-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
@@ -444,6 +447,24 @@ body.preview-fullscreen-open{overflow:hidden}
 .container-action[data-container-action="restart"]{border-color:rgba(255,191,73,.3);color:var(--amber)}
 /* Container actions are mutating — only available once shells are unlocked. */
 body.shells-locked .container-actions{display:none}
+/* Condensed 2-line container row for remote host cards. */
+.container-item.compact{padding:6px 9px;gap:2px}
+.container-item.compact .ci-top{display:flex;align-items:center;gap:7px;min-width:0}
+.container-item.compact .ci-top b{flex:1;min-width:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.container-item.compact .ci-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.container-item.compact.state-unhealthy .ci-dot{background:var(--red);box-shadow:0 0 8px var(--red)}
+.container-item.compact.state-stopped .ci-dot{background:#56616b;box-shadow:none}
+.container-item.compact .ci-cpu{flex:0 0 auto;font-size:10.5px;color:#9fe9dd;font-variant-numeric:tabular-nums}
+.container-item.compact .ci-bot{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.container-item.compact .ci-bot .ci-image{flex:1;min-width:0;font-size:10.5px}
+.container-item.compact.state-stopped{opacity:.5}
+/* Loading skeletons + shimmer */
+@keyframes sd-shimmer{100%{transform:translateX(100%)}}
+.skeleton{position:relative;overflow:hidden;background:rgba(255,255,255,.045);border-radius:6px}
+.skeleton::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(139,246,255,.10),transparent);animation:sd-shimmer 1.25s ease-in-out infinite}
+.skel-card{height:60px;margin-bottom:7px;border:1px solid rgba(255,255,255,.06)}
+.metrics.loading .meter{position:relative}
+.metrics.loading .meter::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(139,246,255,.18),transparent);animation:sd-shimmer 1.25s ease-in-out infinite}
 /* Remote host monitor widget */
 .remote-list{display:flex;flex-direction:column;gap:8px}
 .remote-empty{font-size:12px}
