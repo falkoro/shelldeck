@@ -474,6 +474,14 @@ body.shells-locked .container-actions{display:none}
 .remote-legend .lg-dot.stopped{background:#56616b}
 .remote-legend .lg-ic{color:#c9fff3;font-weight:400;font-size:12px}
 .remote-legend .lg-ic+*,.remote-legend .lg-ic{line-height:1}
+/* Never truncate — wrap names, images, descriptions, status instead of ellipsis. */
+.container-item .ci-row1 b,.container-item.compact .ci-top b{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.container-item .ci-image,.container-item .ci-desc,.container-item .ci-row2 em{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.container-item.compact .ci-bot{align-items:flex-start}
+.container-item.compact .ci-cpu{white-space:nowrap}
+/* Action buttons now ride inline in the top row (saves a row); align to the right. */
+.ci-top .container-actions,.ci-row1 .container-actions{margin:0;flex:0 0 auto;margin-left:auto}
+.container-item .ci-row1{align-items:flex-start}
 /* Condensed 2-line container row for remote host cards. */
 .container-item.compact{padding:6px 9px;gap:2px}
 .container-item.compact .ci-top{display:flex;align-items:center;gap:7px;min-width:0}

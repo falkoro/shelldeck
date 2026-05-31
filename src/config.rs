@@ -31,6 +31,7 @@ pub struct Config {
     pub trust_cf_access_email: bool,
     pub allow_cloudflare_login: bool,
     pub skip_login: bool,
+    pub skip_unlock: bool,
     pub bypass_login_ips: Vec<String>,
     pub unlock_password: String,
     pub root_dir: PathBuf,
@@ -127,6 +128,9 @@ impl Config {
             // (allowed IP / Cloudflare Access). Only enable when an external layer like
             // Cloudflare Access already authenticates who can reach the dashboard.
             skip_login: env::var("DASHBOARD_SKIP_LOGIN").ok().as_deref() == Some("1"),
+            // Drop the second-password "shell unlock" gate (trust the network gate). For single-user
+            // setups behind Cloudflare Access + an IP allowlist. Default off.
+            skip_unlock: env_flag("DASHBOARD_SKIP_UNLOCK"),
             bypass_login_ips: split_env("DASHBOARD_BYPASS_LOGIN_IPS"),
             unlock_password: env::var("DASHBOARD_UNLOCK_PASSWORD")
                 .unwrap_or_else(|_| "change-me".to_string()),

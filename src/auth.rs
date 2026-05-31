@@ -114,6 +114,11 @@ pub fn authenticated(config: &Config, headers: &HeaderMap, remote: Option<&str>)
 }
 
 pub fn unlocked(config: &Config, headers: &HeaderMap) -> bool {
+    // DASHBOARD_SKIP_UNLOCK trusts the network gate (allowed IP / Cloudflare Access) and drops the
+    // second-password gate entirely — for single-user setups already behind Access + IP allowlist.
+    if config.skip_unlock {
+        return true;
+    }
     verify_token(
         config,
         webutil::parse_cookie(headers, UNLOCK_COOKIE),
