@@ -287,6 +287,15 @@ body.preview-fullscreen-open{overflow:hidden}
   .terminal-card pre{max-height:46vh}
   .legend-grid{grid-template-columns:1fr}
   .settings-grid{grid-template-columns:1fr}
+  /* Compact the Shells toolbar: stop every control eating a full row; collapse the
+     icon actions (Grid/Follow/Compact/Summary/Refresh) to a tidy row of icon buttons. */
+  .shell-tools{justify-content:flex-start;gap:6px;align-items:center}
+  .shell-tools>*{flex:0 0 auto}
+  .shell-tools button{width:auto;margin-top:0}
+  .shell-tools #streamState{flex:1 1 100%}
+  .shell-tools #lineCount{width:auto}
+  #viewToggle,#followToggle,#densityToggle,#refreshSummaryBtn,#refreshShellsTopBtn{min-width:44px;min-height:40px;padding:8px;justify-content:center}
+  #viewToggle span,#followToggle span,#densityToggle span,#refreshSummaryBtn span,#refreshShellsTopBtn span{display:none}
 }
 /* Current Work summary pinned on top of the shells column */
 .summary-top .panel-header{margin-bottom:10px}
@@ -324,7 +333,13 @@ body.preview-fullscreen-open{overflow:hidden}
 .term-host{flex:1 1 auto;min-height:0;padding:4px 6px 2px}
 .term-host .xterm{height:100%}
 .term-resize-handle{position:absolute;right:0;bottom:0;width:15px;height:15px;cursor:se-resize;background:linear-gradient(135deg,transparent 35%,rgba(139,246,255,.35) 36%);z-index:12;border-bottom-right-radius:6px}
+/* On-screen Esc/Tab/Ctrl-C/arrow keys — only shown when the terminal is in mobile mode */
+.term-keybar{display:none;gap:5px;padding:5px 6px;background:#0b121a;border-bottom:1px solid rgba(139,246,255,.14);overflow-x:auto;-webkit-overflow-scrolling:touch;flex:0 0 auto}
+.term-key{flex:0 0 auto;min-width:42px;min-height:36px;padding:6px 12px;background:rgba(139,246,255,.06);border:1px solid rgba(139,246,255,.28);border-radius:6px;color:#c9fff3;font:600 14px/1 "Cascadia Mono","JetBrains Mono",monospace;cursor:pointer;touch-action:manipulation;display:inline-flex;align-items:center;justify-content:center}
+.term-key:active{background:rgba(139,246,255,.22);border-color:rgba(139,246,255,.5)}
+.term-window.mobile .term-keybar{display:flex}
 @media (max-width:760px){
+  .term-keybar{display:flex}
   .term-window,.term-window.mobile{
     left:max(0px,env(safe-area-inset-left))!important;
     right:max(0px,env(safe-area-inset-right))!important;

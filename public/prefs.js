@@ -65,10 +65,16 @@ function cycleHistory(name, direction) {
 function applyPrefs() {
     document.body.classList.toggle('density-compact', density === 'compact');
     document.body.classList.toggle('density-comfortable', density === 'comfortable');
-    q('#viewToggle').innerHTML = viewMode === 'focus' ? `${icon('focus')}<span>Focus</span>` : `${icon('grid')}<span>Grid</span>`;
-    q('#densityToggle').innerHTML = `${icon('rows')}<span>${density === 'compact' ? 'Compact' : 'Comfort'}</span>`;
-    q('#followToggle').classList.toggle('active', followOutput);
-    q('#followToggle').innerHTML = `${icon('follow')}<span>${followOutput ? 'Follow' : 'Paused'}</span>`;
+    const viewToggle = q('#viewToggle');
+    viewToggle.innerHTML = viewMode === 'focus' ? `${icon('focus')}<span>Focus</span>` : `${icon('grid')}<span>Grid</span>`;
+    viewToggle.title = viewMode === 'focus' ? 'View: focus — tap for grid' : 'View: grid — tap for focus';
+    const densityToggle = q('#densityToggle');
+    densityToggle.innerHTML = `${icon('rows')}<span>${density === 'compact' ? 'Compact' : 'Comfort'}</span>`;
+    densityToggle.title = density === 'compact' ? 'Density: compact — tap for comfort' : 'Density: comfort — tap for compact';
+    const followToggle = q('#followToggle');
+    followToggle.classList.toggle('active', followOutput);
+    followToggle.innerHTML = `${icon('follow')}<span>${followOutput ? 'Follow' : 'Paused'}</span>`;
+    followToggle.title = followOutput ? 'Output follow: on' : 'Output follow: paused';
     q('#lineCount').value = String(terminalLines);
     q('#authState').textContent = 'dashboard signed in';
     q('#shells').classList.toggle('focus-mode', viewMode === 'focus');
