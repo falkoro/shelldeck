@@ -13,20 +13,35 @@ const TERMINAL_KEY_SEQUENCES = {
     esc: '\x1b',
     tab: '\t',
     'ctrl-c': '\x03',
+    home: '\x1b[H',
+    end: '\x1b[F',
     up: '\x1b[A',
     down: '\x1b[B',
     left: '\x1b[D',
     right: '\x1b[C',
 };
+// When the sticky Ctrl key is armed, an arrow tap sends the Ctrl-modified form
+// (xterm modifier 5 = Ctrl) — i.e. word-jump in readline-based shells.
+const TERMINAL_CTRL_ARROW_SEQUENCES = {
+    up: '\x1b[1;5A',
+    down: '\x1b[1;5B',
+    left: '\x1b[1;5D',
+    right: '\x1b[1;5C',
+};
+// NB: use data-termkey, NOT data-key — the dashboard force-disables every [data-key]
+// button (the per-pane send-key controls) via updateUnlockState(), which would kill these.
 const TERMINAL_KEYBAR_HTML = `
     <div class="term-keybar" data-keybar>
-      <button type="button" class="term-key" data-key="esc">Esc</button>
-      <button type="button" class="term-key" data-key="tab">Tab</button>
-      <button type="button" class="term-key" data-key="ctrl-c" title="Ctrl-C (interrupt)">^C</button>
-      <button type="button" class="term-key" data-key="up" aria-label="Arrow up">↑</button>
-      <button type="button" class="term-key" data-key="down" aria-label="Arrow down">↓</button>
-      <button type="button" class="term-key" data-key="left" aria-label="Arrow left">←</button>
-      <button type="button" class="term-key" data-key="right" aria-label="Arrow right">→</button>
+      <button type="button" class="term-key" data-termkey="esc">Esc</button>
+      <button type="button" class="term-key" data-termkey="tab">Tab</button>
+      <button type="button" class="term-key" data-termkey="ctrl" title="Ctrl — tap, then a letter (e.g. d → Ctrl-D) or an arrow (word jump)">Ctrl</button>
+      <button type="button" class="term-key" data-termkey="ctrl-c" title="Ctrl-C (interrupt)">^C</button>
+      <button type="button" class="term-key" data-termkey="home" title="Home (start of line)">Home</button>
+      <button type="button" class="term-key" data-termkey="end" title="End (end of line)">End</button>
+      <button type="button" class="term-key" data-termkey="up" aria-label="Arrow up">↑</button>
+      <button type="button" class="term-key" data-termkey="down" aria-label="Arrow down">↓</button>
+      <button type="button" class="term-key" data-termkey="left" aria-label="Arrow left">←</button>
+      <button type="button" class="term-key" data-termkey="right" aria-label="Arrow right">→</button>
     </div>`;
 function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -376,6 +391,18 @@ function createTermWindow(name) {
         ws: null, ro: null, fitTimer: 0, lastCols: 0, lastRows: 0,
         x: baseX, y: baseY, w: baseW, h: baseH,
         minimized: false, maximized: false, preMax: null,
+        ctrlArmed: false, ctrlTimer: 0,
+    };
+    // Sticky Ctrl modifier for the mobile key bar: tap Ctrl to arm, then the next
+    // typed letter becomes its control code (handled in onData) or the next arrow
+    // tap sends Ctrl+arrow. Auto-disarms after a few seconds so it never sticks.
+    const ctrlKeyBtn = keybar.querySelector('[data-termkey="ctrl"]');
+    const setCtrlArmed = (on) => {
+        tw.ctrlArmed = on;
+        ctrlKeyBtn?.classList.toggle('armed', on);
+        window.clearTimeout(tw.ctrlTimer);
+        if (on)
+            tw.ctrlTimer = window.setTimeout(() => setCtrlArmed(false), 4000);
     };
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}/api/term?name=${encodeURIComponent(name)}&cols=${term.cols}&rows=${term.rows}`);
@@ -391,8 +418,20 @@ function createTermWindow(name) {
         else
             term.write(new Uint8Array(ev.data));
     };
-    term.onData((d) => { if (ws.readyState === WebSocket.OPEN)
-        ws.send(enc.encode(d)); });
+    term.onData((d) => {
+        if (ws.readyState !== WebSocket.OPEN)
+            return;
+        // Armed Ctrl: fold a single typed letter into its control code (a/A → ^A …).
+        if (tw.ctrlArmed && d.length === 1) {
+            const code = d.toUpperCase().charCodeAt(0);
+            setCtrlArmed(false);
+            if (code >= 0x40 && code <= 0x5f) {
+                ws.send(enc.encode(String.fromCharCode(code & 0x1f)));
+                return;
+            }
+        }
+        ws.send(enc.encode(d));
+    });
     setupTerminalClipboard(tw);
     el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
     host.addEventListener('dragover', (event) => {
@@ -423,9 +462,17 @@ function createTermWindow(name) {
     keybar.querySelectorAll('.term-key').forEach((btn) => {
         btn.addEventListener('pointerdown', (event) => {
             event.preventDefault();
-            const seq = TERMINAL_KEY_SEQUENCES[btn.dataset.key || ''];
+            const key = btn.dataset.termkey || '';
+            if (key === 'ctrl') {
+                setCtrlArmed(!tw.ctrlArmed);
+                tw.term?.focus?.();
+                return;
+            }
+            const seq = (tw.ctrlArmed && TERMINAL_CTRL_ARROW_SEQUENCES[key]) || TERMINAL_KEY_SEQUENCES[key];
             if (seq)
                 sendTerminalText(tw, seq);
+            if (tw.ctrlArmed)
+                setCtrlArmed(false);
             tw.term?.focus?.();
         });
     });
