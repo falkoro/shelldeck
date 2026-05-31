@@ -64,13 +64,18 @@ function containerActionsHtml(c, host) {
     const attrs = `data-cname="${escapeHtml(c.name)}" data-cengine="${escapeHtml(c.engine)}" data-chost="${escapeHtml(host)}"`;
     return `<div class="container-actions"><button type="button" class="container-action" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}">Restart</button><button type="button" class="container-action" data-container-action="pull" ${attrs} title="Pull latest image and recreate ${escapeHtml(c.name)}">Pull</button></div>`;
 }
-// Shared row for local + remote container lists. Stopped/unhealthy get a state class for greying.
+// Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
+// then actions. Stopped/unhealthy get a state class for greying/highlighting.
 function containerRowHtml(c, extraClass = '', host = '') {
     const stats = containerStatsText(c);
-    const statsHtml = stats ? `<small class="container-stats">${escapeHtml(stats)}</small>` : '';
+    const statsHtml = stats ? `<div class="ci-stats">${escapeHtml(stats)}</div>` : '';
     const age = containerUptime(c.status);
     const ageHtml = age ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(age)}</span>` : '';
-    return `<div class="container-item ${extraClass} state-${containerState(c.status)}"><div><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.image)}</span></div><small>${escapeHtml(c.engine)}</small><em>${escapeHtml(c.status)}</em>${ageHtml}${statsHtml}${containerActionsHtml(c, host)}</div>`;
+    return `<div class="container-item ${extraClass} state-${containerState(c.status)}">`
+        + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small></div>`
+        + `<div class="ci-image">${escapeHtml(c.image)}</div>`
+        + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
+        + `${statsHtml}${containerActionsHtml(c, host)}</div>`;
 }
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics = null;
@@ -170,7 +175,7 @@ function renderMetrics(m) {
     if (host)
         host.textContent = `${m.hostname}${ip} · CPU ${m.cpu_cores} cores${mhz} · uptime ${fmtUptime(m.uptime_secs)}`;
     setMeter('cpu', m.cpu_pct, `${m.cpu_pct.toFixed(0)}%`);
-    setMeter('mem', m.mem_pct, `${fmtGiB(m.mem_used_kb)} / ${fmtGiB(m.mem_total_kb)} GiB`);
+    setMeter('mem', m.mem_pct, `${fmtGiB(m.mem_used_kb)} / ${fmtGiB(m.mem_total_kb)} GiB · ${m.mem_pct.toFixed(0)}%`);
     const load = document.getElementById('metricLoad');
     if (load)
         load.textContent = `load ${m.load1.toFixed(2)} · ${m.load5.toFixed(2)} · ${m.load15.toFixed(2)}`;
@@ -234,7 +239,7 @@ function remoteMetricsHtml(m) {
         temps = `<div class="rm-temps">${chips}</div>`;
     }
     const row = (label, pct, text) => `<div class="rm-line"><span>${label}</span><div class="meter"><i class="${meterLevel(pct)}" style="width:${pct.toFixed(0)}%"></i></div><b>${escapeHtml(text)}</b></div>`;
-    return `<div class="remote-metrics">${row('CPU', cpu, `${cpu.toFixed(0)}%`)}${row('RAM', memPct, `${fmtGiB(m.mem_used_kb)}/${fmtGiB(m.mem_total_kb)}G`)}<div class="rm-meta">${escapeHtml(meta)}</div>${temps}</div>`;
+    return `<div class="remote-metrics">${row('CPU', cpu, `${cpu.toFixed(0)}%`)}${row('RAM', memPct, `${fmtGiB(m.mem_used_kb)}/${fmtGiB(m.mem_total_kb)}G · ${memPct.toFixed(0)}%`)}<div class="rm-meta">${escapeHtml(meta)}</div>${temps}</div>`;
 }
 function renderRemoteHosts(hosts) {
     const list = document.getElementById('remoteHostList');

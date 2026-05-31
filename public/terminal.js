@@ -196,6 +196,71 @@ function handleTerminalDrop(tw, event) {
         toast(error.message);
     });
 }
+function copyTerminalSelection(tw) {
+    const selection = tw.term?.getSelection?.() || '';
+    if (!selection)
+        return;
+    navigator.clipboard?.writeText(selection).catch(() => { });
+    tw.statusEl.textContent = `copied ${selection.length.toLocaleString()} chars`;
+}
+// Read the rich clipboard (so images paste too); fall back to text-only when the browser blocks
+// clipboard.read() (e.g. no permission). Mirrors the native paste handler's behaviour.
+async function pasteTerminalClipboard(tw) {
+    try {
+        const items = await navigator.clipboard.read();
+        const files = [];
+        let text = '';
+        for (const item of items) {
+            const imageType = item.types.find((type) => type.startsWith('image/'));
+            if (imageType) {
+                files.push(new File([await item.getType(imageType)], 'pasted-image.png', { type: imageType }));
+            }
+            else if (item.types.includes('text/plain')) {
+                text = await (await item.getType('text/plain')).text();
+            }
+        }
+        if (files.length)
+            return insertTerminalImages(tw, files);
+        if (text) {
+            sendTerminalText(tw, terminalPasteText(tw, text));
+            tw.statusEl.textContent = `pasted ${text.length.toLocaleString()} chars`;
+            return;
+        }
+    }
+    catch { /* clipboard.read unsupported/blocked — fall back to text */ }
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text)
+            return;
+        sendTerminalText(tw, terminalPasteText(tw, text));
+        tw.statusEl.textContent = `pasted ${text.length.toLocaleString()} chars`;
+    }
+    catch {
+        tw.statusEl.textContent = 'clipboard blocked — try right-click paste';
+    }
+}
+// Wire Ctrl/Cmd+C (copy selection, leaving plain Ctrl+C as SIGINT when nothing is selected),
+// Ctrl/Cmd+Shift+C (always copy), and Ctrl/Cmd+V / +Shift+V (paste text or image).
+function setupTerminalClipboard(tw) {
+    if (typeof tw.term?.attachCustomKeyEventHandler !== 'function')
+        return;
+    tw.term.attachCustomKeyEventHandler((event) => {
+        if (event.type !== 'keydown' || !(event.ctrlKey || event.metaKey))
+            return true;
+        const key = event.key.toLowerCase();
+        if (key === 'c' && (event.shiftKey || tw.term.hasSelection())) {
+            event.preventDefault();
+            copyTerminalSelection(tw);
+            return false;
+        }
+        if (key === 'v') {
+            event.preventDefault();
+            pasteTerminalClipboard(tw).catch(() => { });
+            return false;
+        }
+        return true;
+    });
+}
 function makeDraggable(tw, bar) {
     bar.addEventListener('mousedown', (ev) => {
         if (ev.target.closest('button'))
@@ -306,6 +371,7 @@ function createTermWindow(name) {
     };
     term.onData((d) => { if (ws.readyState === WebSocket.OPEN)
         ws.send(enc.encode(d)); });
+    setupTerminalClipboard(tw);
     el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
     host.addEventListener('dragover', (event) => {
         if (terminalDroppedImages(event).length)

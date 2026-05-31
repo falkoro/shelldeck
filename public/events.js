@@ -223,6 +223,81 @@ if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
     });
     shellTools.appendChild(restoreAllBtn);
 }
+// Rotating keyboard-shortcut tip in the spare space of the shell toolbar.
+const SHELL_TIPS = [
+    'Tip: r refresh · g grid/focus · c density',
+    'Tip: f follow output · [ ] cycle shells',
+    'Tip: ? lists all shortcuts',
+    'Tip: unlock shells to Restart / Pull containers',
+    'Tip: ⚙ Configure hides sidebar panels (e.g. Machine)',
+];
+if (shellTools && !document.querySelector('#shellTip')) {
+    const tip = document.createElement('span');
+    tip.id = 'shellTip';
+    tip.className = 'shell-tip';
+    tip.textContent = SHELL_TIPS[0];
+    // Insert right after the stream-state pill so it uses the empty space, not the button cluster.
+    shellTools.insertBefore(tip, shellTools.children[1] || null);
+    let tipIndex = 0;
+    setInterval(() => {
+        tipIndex = (tipIndex + 1) % SHELL_TIPS.length;
+        tip.style.opacity = '0';
+        setTimeout(() => { tip.textContent = SHELL_TIPS[tipIndex]; tip.style.opacity = ''; }, 250);
+    }, 7000);
+}
+// Step the selected shell to the previous/next tab.
+function cycleShell(direction) {
+    const tabs = Array.from(document.querySelectorAll('[data-shell-tab]'))
+        .map((el) => el.dataset.shellTab || '')
+        .filter(Boolean);
+    if (!tabs.length)
+        return;
+    const current = Math.max(0, tabs.indexOf(selectedSession));
+    const next = tabs[(current + direction + tabs.length) % tabs.length];
+    if (next)
+        selectSession(next);
+}
+// Single-key shortcuts, active only when focus isn't in a field, the terminal, or with a modifier.
+document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey)
+        return;
+    const el = document.activeElement;
+    const busy = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+        || el instanceof HTMLSelectElement || (el instanceof HTMLElement && (el.isContentEditable || !!el.closest('.term-window')));
+    if (busy)
+        return;
+    switch (event.key) {
+        case 'r':
+            event.preventDefault();
+            document.getElementById('refreshShellsTopBtn')?.click();
+            break;
+        case 'g':
+            event.preventDefault();
+            document.getElementById('viewToggle')?.click();
+            break;
+        case 'c':
+            event.preventDefault();
+            document.getElementById('densityToggle')?.click();
+            break;
+        case 'f':
+            event.preventDefault();
+            document.getElementById('followToggle')?.click();
+            break;
+        case '[':
+            event.preventDefault();
+            cycleShell(-1);
+            break;
+        case ']':
+            event.preventDefault();
+            cycleShell(1);
+            break;
+        case '?':
+            event.preventDefault();
+            toast('Shortcuts — r: refresh · g: grid/focus · c: density · f: follow · [ ]: cycle shells');
+            break;
+        default: break;
+    }
+});
 q('#lineCount').addEventListener('change', (event) => setTerminalLines(Number(event.target.value)));
 imageFile.addEventListener('change', () => {
     handleImageFiles(imageFile.files || undefined, pendingImageTarget).catch((error) => toast(error.message)).finally(() => {
