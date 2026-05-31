@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod container_actions;
 mod containers;
 mod links;
 mod metrics;

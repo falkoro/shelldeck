@@ -43,11 +43,34 @@ function containerStatsText(c) {
         bits.push(c.mem);
     return bits.join(' · ');
 }
+// Compact age from a docker status string, e.g. "Up 7 days (healthy)" → "7d", "Up About an hour"
+// → "~1h", "Exited (0) 3 minutes ago" → "" (stopped, no age badge).
+function containerUptime(status) {
+    if (!/^up\b/i.test(status))
+        return '';
+    if (/about an hour/i.test(status))
+        return '~1h';
+    if (/less than a (second|minute)/i.test(status))
+        return '<1m';
+    const m = /(\d+)\s*(second|minute|hour|day|week|month|year)/i.exec(status);
+    if (!m)
+        return '';
+    const unit = { second: 's', minute: 'm', hour: 'h', day: 'd', week: 'w', month: 'mo', year: 'y' }[m[2].toLowerCase()] || '';
+    return `${m[1]}${unit}`;
+}
+// Restart + Pull-latest buttons. Hidden via CSS unless shells are unlocked; the click handler
+// confirms and the server re-checks login + unlock + action header. host = remote host id ('' local).
+function containerActionsHtml(c, host) {
+    const attrs = `data-cname="${escapeHtml(c.name)}" data-cengine="${escapeHtml(c.engine)}" data-chost="${escapeHtml(host)}"`;
+    return `<div class="container-actions"><button type="button" class="container-action" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}">Restart</button><button type="button" class="container-action" data-container-action="pull" ${attrs} title="Pull latest image and recreate ${escapeHtml(c.name)}">Pull</button></div>`;
+}
 // Shared row for local + remote container lists. Stopped/unhealthy get a state class for greying.
-function containerRowHtml(c, extraClass = '') {
+function containerRowHtml(c, extraClass = '', host = '') {
     const stats = containerStatsText(c);
     const statsHtml = stats ? `<small class="container-stats">${escapeHtml(stats)}</small>` : '';
-    return `<div class="container-item ${extraClass} state-${containerState(c.status)}"><div><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.image)}</span></div><small>${escapeHtml(c.engine)}</small><em>${escapeHtml(c.status)}</em>${statsHtml}</div>`;
+    const age = containerUptime(c.status);
+    const ageHtml = age ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(age)}</span>` : '';
+    return `<div class="container-item ${extraClass} state-${containerState(c.status)}"><div><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.image)}</span></div><small>${escapeHtml(c.engine)}</small><em>${escapeHtml(c.status)}</em>${ageHtml}${statsHtml}${containerActionsHtml(c, host)}</div>`;
 }
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics = null;
@@ -226,7 +249,7 @@ function renderRemoteHosts(hosts) {
         const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
         const shownNote = total > containers.length ? ` · showing ${containers.length} of ${total}` : '';
         const containerHtml = containers.length
-            ? `<div class="remote-count">${escapeHtml(containerHealth(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => containerRowHtml(c, 'remote-container')).join('')}</div>`
+            ? `<div class="remote-count">${escapeHtml(containerHealth(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => containerRowHtml(c, 'remote-container', host.id)).join('')}</div>`
             : `<div class="muted remote-empty">${host.online ? 'No containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
         const error = host.error && host.online ? `<div class="remote-error">${escapeHtml(host.error)}</div>` : '';
         const metricsHtml = host.metrics ? remoteMetricsHtml(host.metrics) : '';
@@ -260,6 +283,29 @@ async function loadRemoteHosts() {
     const payload = await response.json();
     renderRemoteHosts(payload.hosts || []);
 }
+// Restart / pull-latest a container. Confirms first; server re-checks login + unlock + action header.
+async function containerAction(host, engine, name, action) {
+    if (!shellUnlocked) {
+        toast('Unlock shells first to manage containers');
+        return;
+    }
+    if (!name || !engine)
+        return;
+    const verb = action === 'pull' ? 'Pull latest image for' : 'Restart';
+    const where = host ? ` on ${host}` : '';
+    if (!window.confirm(`${verb} "${name}"${where}?`))
+        return;
+    toast(`${action === 'pull' ? 'Pulling' : 'Restarting'} ${name}…`);
+    try {
+        const payload = await postJson('/api/container-action', { host, engine, name, action });
+        toast(payload.message || `${name}: done`);
+    }
+    catch (error) {
+        toast(error.message || 'Action failed');
+    }
+    await Promise.allSettled([loadContainers(), loadRemoteHosts()]);
+}
+window.containerAction = containerAction;
 window.loadMetrics = loadMetrics;
 window.loadContainers = loadContainers;
 window.loadRemoteHosts = loadRemoteHosts;
