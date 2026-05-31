@@ -40,20 +40,12 @@ async function loadDashboardSettings(): Promise<void> {
   applyDashboardSettings(await response.json() as DashboardSettings);
 }
 
-function parseTickerText(text: string): string[] {
-  return text
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function focusSettingsEditor(focus?: 'tickers'): void {
   const editor = document.getElementById('settingsEditor');
   if (!editor) return;
-  const tickers = editor.querySelector<HTMLTextAreaElement>('#settingsTickers');
+  const tickers = editor.querySelector<HTMLInputElement>('#tickerInput');
   if (focus === 'tickers' && tickers) {
     tickers.focus();
-    tickers.select();
     return;
   }
   editor.querySelector<HTMLInputElement>('input[name="machine"]')?.focus();
@@ -68,11 +60,38 @@ function openSettingsEditor(focus?: 'tickers'): void {
   overlay.className = 'links-editor-modal settings-editor-modal';
   overlay.id = 'settingsEditor';
   const panels = dashboardSettings.panels;
-  overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock/crypto tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label><label><input type="checkbox" name="expandLists" ${panels.expandLists ? 'checked' : ''}> Expand lists (no scrollbars)</label></div><label for="settingsTickers">Tickers</label><textarea id="settingsTickers" spellcheck="false" placeholder="MSFT, NVDA, BTC-USD"></textarea><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
+  overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock/crypto tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label><label><input type="checkbox" name="expandLists" ${panels.expandLists ? 'checked' : ''}> Expand lists (no scrollbars)</label></div><label>Tickers</label><div class="ticker-editor"><div class="ticker-chips" id="tickerChips"></div><div class="ticker-add"><input id="tickerInput" type="text" spellcheck="false" autocapitalize="characters" placeholder="Add symbol — e.g. NVDA, BTC-USD"><button type="button" id="addTickerBtn"><span class="ticker-add-plus">+</span> Add</button></div><p class="muted ticker-hint">Enter to add · Yahoo Finance symbols · max 16</p></div><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
   document.body.appendChild(overlay);
   const form = overlay.querySelector<HTMLFormElement>('form')!;
-  const textarea = overlay.querySelector<HTMLTextAreaElement>('#settingsTickers')!;
-  textarea.value = (dashboardSettings.tickers || []).join('\n');
+  const chipsEl = overlay.querySelector<HTMLElement>('#tickerChips')!;
+  const input = overlay.querySelector<HTMLInputElement>('#tickerInput')!;
+  const editTickers = (dashboardSettings.tickers || []).slice();
+  const renderChips = (): void => {
+    chipsEl.innerHTML = editTickers.length
+      ? editTickers.map((sym, i) => `<span class="ticker-chip">${escapeHtml(sym)}<button type="button" data-remove-ticker="${i}" title="Remove ${escapeHtml(sym)}" aria-label="Remove ${escapeHtml(sym)}">×</button></span>`).join('')
+      : '<span class="muted ticker-empty-chip">No tickers yet — add one below</span>';
+  };
+  const addTicker = (): void => {
+    const sym = input.value.trim().toUpperCase().replace(/[^A-Z0-9.\-_=^]/g, '').slice(0, 24);
+    input.value = '';
+    if (!sym) return;
+    if (editTickers.includes(sym)) { toast(`${sym} already added`); return; }
+    if (editTickers.length >= 16) { toast('Max 16 tickers'); return; }
+    editTickers.push(sym);
+    renderChips();
+    input.focus();
+  };
+  renderChips();
+  chipsEl.addEventListener('click', (event: MouseEvent) => {
+    const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-remove-ticker]');
+    if (!btn) return;
+    editTickers.splice(Number(btn.dataset.removeTicker), 1);
+    renderChips();
+  });
+  input.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); addTicker(); }
+  });
+  overlay.querySelector('#addTickerBtn')?.addEventListener('click', addTicker);
   const close = (): void => overlay.remove();
   overlay.querySelector('[data-close-settings]')?.addEventListener('click', close);
   overlay.addEventListener('mousedown', (event: MouseEvent) => { if (event.target === overlay) close(); });
@@ -80,7 +99,7 @@ function openSettingsEditor(focus?: 'tickers'): void {
     event.preventDefault();
     const data = new FormData(form);
     saveDashboardSettings({
-      tickers: parseTickerText(textarea.value),
+      tickers: editTickers,
       panels: {
         machine: data.has('machine'),
         machineSensors: data.has('machineSensors'),
