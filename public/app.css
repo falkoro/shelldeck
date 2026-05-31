@@ -444,3 +444,13 @@ body.preview-fullscreen-open{overflow:hidden}
 .remote-containers{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto}
 .remote-container{padding:7px;background:#071017}
 .remote-error{color:#ffc2cd;font-size:11px;line-height:1.35;overflow-wrap:anywhere}
+.remote-metrics{display:grid;gap:5px}
+.remote-metrics .rm-line{display:flex;align-items:center;gap:6px}
+.remote-metrics .rm-line>span{flex:0 0 28px;font-size:11px;color:var(--muted)}
+.remote-metrics .rm-line .meter{flex:1}
+.remote-metrics .rm-line>b{flex:0 0 auto;font-size:11px;color:var(--text);font-variant-numeric:tabular-nums}
+.remote-metrics .rm-meta{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.remote-metrics .rm-temps{display:flex;flex-wrap:wrap;gap:4px}
+.remote-metrics .rm-temp{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(139,246,255,.08);color:var(--muted);white-space:nowrap}
+.remote-metrics .rm-temp.warn{color:var(--amber)}
+.remote-metrics .rm-temp.crit{color:var(--red)}

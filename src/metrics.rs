@@ -26,7 +26,7 @@ pub struct Metrics {
 }
 
 // Aggregate "cpu" jiffies from /proc/stat as (idle, total).
-fn cpu_sample(stat: &str) -> Option<(u64, u64)> {
+pub(crate) fn cpu_sample(stat: &str) -> Option<(u64, u64)> {
     let line = stat.lines().find(|l| l.starts_with("cpu "))?;
     let nums: Vec<u64> = line
         .split_whitespace()
@@ -62,7 +62,7 @@ async fn cpu_percent() -> f64 {
     (((dt - di) as f64) / (dt as f64) * 100.0).clamp(0.0, 100.0)
 }
 
-fn meminfo_kb(info: &str, key: &str) -> u64 {
+pub(crate) fn meminfo_kb(info: &str, key: &str) -> u64 {
     info.lines()
         .find(|l| l.starts_with(key))
         .and_then(|l| l.split_whitespace().nth(1))
