@@ -48,6 +48,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .panel-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
 .panel-header p{margin-top:4px;font-size:13px}
 .shell-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.shell-tip{margin-right:auto;font-size:11px;color:var(--muted);opacity:.85;transition:opacity .25s ease;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42ch}
+@media (max-width:900px){.shell-tip{display:none}}
 .stream-pill.on{border-color:rgba(114,247,200,.42);color:#bfffe6}
 .quick-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:rgba(255,200,87,.24);background:#10151a}
 .quick-strip code{display:block;margin-top:6px;white-space:normal;word-break:break-word;font-size:12px}
@@ -422,20 +424,21 @@ body.preview-fullscreen-open{overflow:hidden}
 .subpanel-header p{margin-top:2px;font-size:11.5px}
 .container-list{display:flex;flex-direction:column;gap:7px}
 .container-empty{font-size:12px}
-.container-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;border:1px solid rgba(255,255,255,.08);background:rgba(7,16,23,.55);border-radius:6px;padding:8px;min-width:0}
-.container-item b,.container-item span,.container-item em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.container-item b{font-size:12.5px;color:var(--text)}
-.container-item span{font-size:11px;color:var(--muted);margin-top:2px}
-.container-item small{align-self:start;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:1px 6px;color:#c9fff3;font-size:10px;text-transform:uppercase}
-.container-item em{grid-column:1 / -1;color:var(--muted);font-style:normal;font-size:11px}
-.container-item .container-stats{grid-column:1 / -1;border:0;padding:0;text-transform:none;color:#9fe9dd;font-size:10.5px;font-variant-numeric:tabular-nums;letter-spacing:0}
-.container-item.state-stopped{opacity:.5}
-.container-item.state-stopped em{color:#9aa6b2}
+.container-item{display:flex;flex-direction:column;gap:3px;border:1px solid rgba(255,255,255,.08);background:rgba(7,16,23,.55);border-radius:6px;padding:8px;min-width:0}
+.container-item .ci-row1{display:flex;align-items:center;gap:8px;min-width:0}
+.container-item .ci-row1 b{flex:1;min-width:0;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.container-item .ci-engine{flex:0 0 auto;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:1px 6px;color:#c9fff3;font-size:10px;text-transform:uppercase}
+.container-item .ci-image{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.container-item .ci-row2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.container-item .ci-row2 em{font-style:normal;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.container-item .ci-stats{color:#9fe9dd;font-size:10.5px;font-variant-numeric:tabular-nums}
+.container-item.state-stopped{opacity:.55}
+.container-item.state-stopped .ci-row2 em{color:#9aa6b2}
 .container-item.state-unhealthy{border-color:rgba(255,106,122,.45)}
-.container-item.state-unhealthy em{color:#ffb3bd}
+.container-item.state-unhealthy .ci-row2 em{color:#ffb3bd}
 .container-health{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-bottom:2px}
-.container-item .container-age{align-self:start;justify-self:end;font-size:10px;color:#9fe9dd;font-variant-numeric:tabular-nums;border:1px solid rgba(139,246,255,.18);border-radius:999px;padding:1px 6px}
-.container-actions{grid-column:1 / -1;display:flex;gap:6px;justify-content:flex-end;margin-top:2px}
+.container-item .container-age{flex:0 0 auto;font-size:10px;color:#9fe9dd;font-variant-numeric:tabular-nums;border:1px solid rgba(139,246,255,.18);border-radius:999px;padding:1px 6px}
+.container-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:2px}
 .container-action{font-size:10.5px;padding:2px 9px;border-radius:6px;border:1px solid rgba(139,246,255,.22);background:rgba(139,246,255,.06);color:#c9fff3;cursor:pointer}
 .container-action:hover{background:rgba(139,246,255,.16)}
 .container-action[data-container-action="restart"]{border-color:rgba(255,191,73,.3);color:var(--amber)}
