@@ -624,7 +624,12 @@ async fn api_remote_hosts(
     let hosts = remote_hosts::load(state.config.clone()).await;
     webutil::json_response(
         StatusCode::OK,
-        &remote::check_all(hosts, state.config.remote_container_cap).await,
+        &remote::check_all(
+            hosts,
+            state.config.remote_container_cap,
+            state.config.remote_metrics,
+        )
+        .await,
     )
 }
 

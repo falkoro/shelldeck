@@ -30,6 +30,19 @@ interface ContainerInfo {
   status: string;
 }
 
+interface RemoteMetrics {
+  cpu_pct: number;
+  cpu_cores: number;
+  load1: number;
+  load5: number;
+  load15: number;
+  mem_total_kb: number;
+  mem_used_kb: number;
+  mem_pct: number;
+  uptime_secs: number;
+  temps: MetricTemp[];
+}
+
 interface RemoteHostStatus {
   id: string;
   label: string;
@@ -40,6 +53,7 @@ interface RemoteHostStatus {
   checked_at: string;
   containers: ContainerInfo[];
   container_total?: number;
+  metrics?: RemoteMetrics | null;
   error?: string | null;
 }
 
@@ -181,6 +195,26 @@ function remoteCheckedText(host: RemoteHostStatus): string {
   return `${remoteProbeText(host)} · ${age < 5 ? 'now' : `${age}s ago`}`;
 }
 
+// Compact CPU/RAM/load (+ optional temps) block for a remote host card. Reuses the same
+// .meter bar styling as the local Machine widget, but with static widths since there are
+// many cards. Temps follow the machineSensors panel toggle, like the local widget.
+function remoteMetricsHtml(m: RemoteMetrics): string {
+  const cpu = Math.max(0, Math.min(100, m.cpu_pct));
+  const memPct = Math.max(0, Math.min(100, m.mem_pct));
+  const cores = m.cpu_cores ? `${m.cpu_cores} cores · ` : '';
+  const up = m.uptime_secs ? ` · up ${fmtUptime(m.uptime_secs)}` : '';
+  const meta = `${cores}load ${m.load1.toFixed(2)} · ${m.load5.toFixed(2)} · ${m.load15.toFixed(2)}${up}`;
+  let temps = '';
+  if (dashboardSettings.panels.machineSensors && (m.temps || []).length) {
+    const chips = m.temps.slice(0, 5).map((t) =>
+      `<span class="rm-temp ${tempLevel(t.celsius)}" title="${escapeHtml(t.label)}">${escapeHtml(sensorDisplayLabel(t.label))} ${formatTemp(t.celsius)}</span>`).join('');
+    temps = `<div class="rm-temps">${chips}</div>`;
+  }
+  const row = (label: string, pct: number, text: string) =>
+    `<div class="rm-line"><span>${label}</span><div class="meter"><i class="${meterLevel(pct)}" style="width:${pct.toFixed(0)}%"></i></div><b>${escapeHtml(text)}</b></div>`;
+  return `<div class="remote-metrics">${row('CPU', cpu, `${cpu.toFixed(0)}%`)}${row('RAM', memPct, `${fmtGiB(m.mem_used_kb)}/${fmtGiB(m.mem_total_kb)}G`)}<div class="rm-meta">${escapeHtml(meta)}</div>${temps}</div>`;
+}
+
 function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
   const list = document.getElementById('remoteHostList');
   if (!list) return;
@@ -197,7 +231,8 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
       ? `<div class="remote-count">${escapeHtml(countLabel)}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((container) => `<div class="container-item remote-container"><div><b>${escapeHtml(container.name)}</b><span>${escapeHtml(container.image)}</span></div><small>${escapeHtml(container.engine)}</small><em>${escapeHtml(container.status)}</em></div>`).join('')}</div>`
       : `<div class="muted remote-empty">${host.online ? 'No running containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
     const error = host.error && host.online ? `<div class="remote-error">${escapeHtml(host.error)}</div>` : '';
-    return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${containerHtml}${error}</div>`;
+    const metricsHtml = host.metrics ? remoteMetricsHtml(host.metrics) : '';
+    return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${metricsHtml}${containerHtml}${error}</div>`;
   }).join('');
 }
 

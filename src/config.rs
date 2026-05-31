@@ -55,6 +55,9 @@ pub struct Config {
     pub remote_hosts: Vec<RemoteHostConfig>,
     pub remote_hosts_file: PathBuf,
     pub remote_container_cap: usize,
+    // Gather CPU/RAM/load/temps for remote hosts over SSH (one extra /proc read per poll).
+    // Default on; set DASHBOARD_REMOTE_METRICS=0 to keep remote cards to ping + containers only.
+    pub remote_metrics: bool,
     pub allowed_origins: Vec<String>,
     pub show_unknown_sessions: bool,
     pub known_sessions: Vec<KnownSession>,
@@ -190,6 +193,10 @@ impl Config {
                 .and_then(|v| v.parse().ok())
                 .filter(|cap| *cap > 0)
                 .unwrap_or(100),
+            // Default on; only disabled when explicitly set to a falsy value.
+            remote_metrics: env::var("DASHBOARD_REMOTE_METRICS")
+                .map(|v| parse_flag(&v))
+                .unwrap_or(true),
             // Extra browser Origins allowed to open the /api/term WebSocket (beyond same-host).
             allowed_origins: split_env("DASHBOARD_ALLOWED_ORIGINS"),
             show_unknown_sessions: env_flag("DASHBOARD_SHOW_UNKNOWN_SESSIONS"),

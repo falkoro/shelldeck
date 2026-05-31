@@ -7,6 +7,7 @@ mod pages;
 mod ratelimit;
 mod remote;
 mod remote_hosts;
+mod remote_metrics;
 mod routes;
 mod settings;
 mod share;
