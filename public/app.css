@@ -245,6 +245,18 @@ body.preview-fullscreen-open{overflow:hidden}
 .settings-grid label{display:flex;align-items:center;gap:8px;margin:0;color:var(--text);font-size:13px}
 .settings-grid .settings-subsetting{color:var(--muted);padding-left:18px}
 .settings-grid input{width:auto;min-height:0}
+.ticker-editor{margin:6px 0 4px}
+.ticker-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;padding:6px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(7,16,23,.5)}
+.ticker-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-variant-numeric:tabular-nums;background:rgba(139,246,255,.1);border:1px solid rgba(139,246,255,.22);color:#c9fff3;border-radius:999px;padding:2px 4px 2px 9px}
+.ticker-chip button{border:0;background:rgba(255,255,255,.06);color:var(--muted);border-radius:999px;width:17px;height:17px;line-height:15px;padding:0;cursor:pointer;font-size:13px}
+.ticker-chip button:hover{background:rgba(255,106,122,.25);color:#ffd0d6}
+.ticker-empty-chip{font-size:12px;align-self:center;padding:2px 4px}
+.ticker-add{display:flex;gap:7px;margin-top:7px}
+.ticker-add input{flex:1;min-width:0;text-transform:uppercase}
+.ticker-add input::placeholder{text-transform:none}
+.ticker-add button{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:6px 12px}
+.ticker-add-plus{font-size:15px;line-height:1}
+.ticker-hint{font-size:11px;margin:5px 0 0}
 /* Button legend */
 .legend{margin:0 0 8px;border:1px solid rgba(139,246,255,.18);border-radius:8px;background:#0b121a;font-size:12.5px}
 .legend>summary{cursor:pointer;padding:8px 10px;color:var(--muted);font-weight:600;list-style:none}
