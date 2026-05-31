@@ -205,8 +205,8 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
 function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   const state = containerState(c.status);
   const age = containerAge(c);
-  const memUsed = (c.mem || '').split('/')[0].trim();
-  const right = c.cpu ? `${c.cpu}${memUsed ? ` · ${memUsed}` : ''}` : '';
+  // Show full "used / limit" (the limit is the container's RAM cap = its max), like the local panel.
+  const right = c.cpu ? `${c.cpu}${c.mem ? ` · ${c.mem}` : ''}` : '';
   const rightHtml = right ? `<span class="ci-cpu">${escapeHtml(right)}</span>` : '';
   const badge = age || c.status.split(/[\s(]/)[0];
   const badgeHtml = badge ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(badge)}</span>` : '';
