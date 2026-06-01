@@ -276,20 +276,22 @@ function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   const rightHtml = chips ? `<span class="ci-cpu">${chips}</span>` : '';
   const badge = age || c.status.split(/[\s(]/)[0];
   const badgeHtml = badge ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(badge)}</span>` : '';
-  // Line 2 shows the description when there is one (image to the tooltip), else the image. Click
-  // to edit/add a description either way.
+  // Line 2 shows the description when there is one (image to the tooltip), else the image.
+  // Compact remote rows are passive except for their explicit action buttons.
   const desc = containerDescription(c);
   const subText = desc || c.image;
-  const subTitle = desc ? `${desc}\n${c.image} — click to edit` : `${c.image} — click to add a description`;
-  const subClass = desc ? 'ci-image ci-editdesc has-desc' : 'ci-image ci-editdesc';
+  const subTitle = desc ? `${desc}\n${c.image}` : c.image;
+  const subClass = desc ? 'ci-image has-desc' : 'ci-image';
   return `<div class="container-item remote-container compact state-${state}">`
     + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
-    + `<div class="ci-bot"><span class="${subClass}" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
+    + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
     + `</div>`;
 }
 
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics: MachineMetrics | null = null;
+let remoteHostsLoaded = false;
+let remoteHostsLoading = false;
 
 function meterLevel(pct: number): string {
   return pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : 'ok';
@@ -484,6 +486,16 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
   }).join('');
 }
 
+function remoteHostsLoadingHtml(): string {
+  return `<div class="remote-loading"><div><b>Checking remote hosts</b><span>Checking...</span></div><div class="skeleton skel-line skel-w70"></div><div class="skeleton skel-bar"></div><div class="skeleton skel-crow"></div><div class="skeleton skel-crow"></div></div>`;
+}
+
+function renderRemoteHostsError(message: string): void {
+  const list = document.getElementById('remoteHostList');
+  if (!list) return;
+  list.innerHTML = `<div class="remote-error remote-load-error">${escapeHtml(message)}</div>`;
+}
+
 async function loadMetrics(): Promise<void> {
   if (!document.getElementById('metricsPanel') || !dashboardSettings.panels.machine) return;
   const response = await fetch('/api/metrics', { cache: 'no-store', credentials: 'same-origin' });
@@ -500,11 +512,32 @@ async function loadContainers(): Promise<void> {
 }
 
 async function loadRemoteHosts(): Promise<void> {
-  if (!document.getElementById('remotePanel') || !dashboardSettings.panels.remoteHosts) return;
-  const response = await fetch('/api/remote-hosts', { cache: 'no-store', credentials: 'same-origin' });
-  if (!response.ok) return;
-  const payload = await response.json() as { hosts?: RemoteHostStatus[] };
-  renderRemoteHosts(payload.hosts || []);
+  const panel = document.getElementById('remotePanel');
+  const list = document.getElementById('remoteHostList');
+  if (!panel || !list || !dashboardSettings.panels.remoteHosts) return;
+  if (remoteHostsLoading) return;
+  remoteHostsLoading = true;
+  panel.classList.add('loading');
+  list.setAttribute('aria-busy', 'true');
+  if (!remoteHostsLoaded) list.innerHTML = remoteHostsLoadingHtml();
+  try {
+    const response = await fetch('/api/remote-hosts', { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`Remote hosts returned ${response.status}`);
+    const payload = await response.json() as { hosts?: RemoteHostStatus[] };
+    remoteHostsLoaded = true;
+    renderRemoteHosts(payload.hosts || []);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not load remote hosts';
+    if (!remoteHostsLoaded) {
+      renderRemoteHostsError(message);
+    } else if (!list.querySelector('.remote-stale-error')) {
+      list.insertAdjacentHTML('afterbegin', `<div class="remote-error remote-stale-error">Remote refresh failed: ${escapeHtml(message)}</div>`);
+    }
+  } finally {
+    remoteHostsLoading = false;
+    panel.classList.remove('loading');
+    list.removeAttribute('aria-busy');
+  }
 }
 
 // Restart / pull-latest a container. Confirms first; server re-checks login + unlock + action header.

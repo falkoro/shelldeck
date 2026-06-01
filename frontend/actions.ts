@@ -336,7 +336,7 @@ function drawSafeShot(): HTMLCanvasElement {
   ctx.strokeStyle = 'rgba(139,246,255,.16)';
   ctx.stroke();
   line(mainX + 30, actionY + 17, 230, 'rgba(207,234,255,.24)');
-  button(mainX + mainW - 274, actionY + 6, 'Start', 78);
+  button(mainX + mainW - 274, actionY + 6, 'Create', 78);
   button(mainX + mainW - 188, actionY + 6, 'Restart', 86);
   button(mainX + mainW - 94, actionY + 6, 'Attach', 76);
 

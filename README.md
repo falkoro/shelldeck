@@ -16,7 +16,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Copy / Send / Paste / keys** — copy attach commands or pane output, send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, browser-native microphone dictation, image paste, and command history. Image paste/drop works in both the composer cards and **Shell in** terminals.
 - **Browser memory** — remembers the selected shell, command history, view/density/line preferences, shell order/sizes, onboarding dismissal, and floating terminal window positions in local browser storage.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
-- **Agent presets** — optional Start/Restart entries for iFlow/Flow, Gemini CLI, Qwen Code, goose, Aider, OpenCode, Codex, Grok, Claude Code, and custom commands.
+- **Agent presets** — optional Create/Stop/Restart entries for iFlow/Flow, Gemini CLI, Qwen Code, goose, Aider, OpenCode, Codex, Grok, Claude Code, and custom commands.
 - **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`, then editable in `links.json`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`, then editable in `dashboard-config.json`).
 - **Configurable widgets** — Machine, remote hosts, local containers, Links, and the ticker bar can be shown/hidden from **Configure**, with JSON persistence for agent-driven setup. Remote-host widgets and quick links are fully self-service: add/edit/remove them from the sidebar (Homarr-style) without touching env or restarting.
 - **Machine metrics and containers** — sidebar widgets show live CPU, CPU MHz, RAM, load average, hardware temperatures, local Docker/Podman containers, plus optional SSH-based remote host ping/container checks.
@@ -87,7 +87,7 @@ Setup: install `ffmpeg` and `whisper-cli` (build whisper.cpp, or your distro/AUR
 
 ### Agent Presets And Open-Source CLIs
 
-ShellDeck shows the configured slots, presets, and custom sessions by default. Set `DASHBOARD_SHOW_UNKNOWN_SESSIONS=1` only if you also want unrelated live tmux sessions to appear in the bar. If you want first-class **Start** / **Restart** buttons for AI coding agents, enable presets:
+ShellDeck shows the configured slots, presets, and custom sessions by default. Set `DASHBOARD_SHOW_UNKNOWN_SESSIONS=1` only if you also want unrelated live tmux sessions to appear in the bar. If you want first-class **Create** / **Stop** / **Restart** buttons for AI coding agents, enable presets:
 
 ```sh
 DASHBOARD_AGENT_WORKDIR=/home/you/repos

@@ -342,6 +342,18 @@ mod tests {
 }
 
 pub async fn start_session(config: Arc<Config>, name: &str) -> Result<String, String> {
+    launch_known_session(config, name, "started").await
+}
+
+pub async fn create_session(config: Arc<Config>, name: &str) -> Result<String, String> {
+    launch_known_session(config, name, "created").await
+}
+
+async fn launch_known_session(
+    config: Arc<Config>,
+    name: &str,
+    verb: &str,
+) -> Result<String, String> {
     let spec = config
         .known_sessions
         .iter()
@@ -357,7 +369,7 @@ pub async fn start_session(config: Arc<Config>, name: &str) -> Result<String, St
         return Ok(format!("{name} is already running"));
     }
     tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
-    Ok(format!("{name} started"))
+    Ok(format!("{name} {verb}"))
 }
 
 pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, String> {

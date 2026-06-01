@@ -538,6 +538,10 @@ body.shells-locked .container-actions{display:none}
 /* Remote host monitor widget */
 .remote-list{display:flex;flex-direction:column;gap:8px}
 .remote-empty{font-size:12px}
+.remote-panel.loading .panel-header p::after{content:" · checking";color:var(--cyan)}
+.remote-loading{border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:8px;display:flex;flex-direction:column;gap:7px;background:rgba(7,16,23,.42)}
+.remote-loading b{display:block;font-size:12px;color:var(--text)}
+.remote-loading span{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
 .remote-host-card{border:1px solid rgba(255,255,255,.08);background:rgba(7,16,23,.55);border-radius:7px;padding:8px;display:grid;gap:7px;min-width:0}
 .remote-host-card.online{border-color:rgba(114,247,200,.22)}
 .remote-host-card.offline{border-color:rgba(255,106,122,.28)}
@@ -555,6 +559,7 @@ body.shells-locked .container-actions{display:none}
 .expand-lists .remote-containers{max-height:none;overflow:visible}
 .remote-container{padding:7px;background:#071017}
 .remote-error{color:#ffc2cd;font-size:11px;line-height:1.35;overflow-wrap:anywhere}
+.remote-load-error,.remote-stale-error{border:1px solid rgba(255,106,122,.28);border-radius:6px;padding:7px 8px;background:rgba(255,106,122,.06)}
 .remote-metrics{display:grid;gap:5px}
 .remote-metrics .rm-line{display:flex;align-items:center;gap:6px}
 .remote-metrics .rm-line>span{flex:0 0 28px;font-size:11px;color:var(--muted)}

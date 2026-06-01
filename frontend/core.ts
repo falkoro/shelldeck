@@ -161,6 +161,7 @@ const ICONS: Record<string, string> = {
   summary: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
   play: '<polygon points="5 3 19 12 5 21 5 3"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   restart: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   paste: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
@@ -494,6 +495,11 @@ function targetReady(name: string): boolean {
   return Boolean(shellUnlocked && name && (shell?.running || session?.running));
 }
 
+function createReady(name: string): boolean {
+  const session = sessionByName(name);
+  return Boolean(shellUnlocked && session && !session.running && session.family !== 'custom');
+}
+
 function setAccessState(unlocked: boolean): void {
   const el = q('#accessState');
   el.className = unlocked ? 'pill access-pill on' : 'pill access-pill';
@@ -536,6 +542,9 @@ function updateUnlockState(): void {
   });
   document.querySelectorAll<HTMLButtonElement>('[data-stop]').forEach((button) => {
     button.disabled = !targetReady(button.dataset.stop || '');
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-create]').forEach((button) => {
+    button.disabled = !createReady(button.dataset.create || '');
   });
   document.querySelectorAll<HTMLTextAreaElement>('[data-command]').forEach((input) => {
     input.disabled = !targetReady(input.dataset.command || '');

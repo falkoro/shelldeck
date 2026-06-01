@@ -4,6 +4,7 @@ document.addEventListener('click', async (event) => {
     if (!target)
         return;
     const copyButton = target.closest('[data-copy]');
+    const createButton = target.closest('[data-create]');
     const startButton = target.closest('[data-start]');
     const stopButton = target.closest('[data-stop]');
     const restartButton = target.closest('[data-restart]');
@@ -99,6 +100,10 @@ document.addEventListener('click', async (event) => {
             pendingImageTarget = imageButton.dataset.addImage || selectedSession;
             imageFile.click();
             return;
+        }
+        if (createButton && !createButton.disabled) {
+            await sessionAction('/api/create', createButton.dataset.create || '');
+            return selectSession(createButton.dataset.create);
         }
         if (startButton && !startButton.disabled) {
             await sessionAction('/api/start', startButton.dataset.start || '');
