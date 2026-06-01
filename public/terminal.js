@@ -245,11 +245,20 @@ function handleTerminalDrop(tw, event) {
         toast(error.message);
     });
 }
-function copyTerminalSelection(tw) {
+async function copyTerminalSelection(tw) {
     const selection = tw.term?.getSelection?.() || '';
-    if (!selection)
+    if (!selection) {
+        tw.statusEl.textContent = 'select text to copy';
         return;
-    navigator.clipboard?.writeText(selection).catch(() => { });
+    }
+    try {
+        await copyText(selection);
+    }
+    catch (error) {
+        tw.statusEl.textContent = 'copy blocked';
+        toast(error instanceof Error ? error.message : String(error));
+        return;
+    }
     tw.statusEl.textContent = `copied ${selection.length.toLocaleString()} chars`;
 }
 // Read the rich clipboard (so images paste too); fall back to text-only when the browser blocks
@@ -299,7 +308,7 @@ function setupTerminalClipboard(tw) {
         const key = event.key.toLowerCase();
         if (key === 'c' && (event.shiftKey || tw.term.hasSelection())) {
             event.preventDefault();
-            copyTerminalSelection(tw);
+            copyTerminalSelection(tw).catch(() => { });
             return false;
         }
         if (key === 'v') {
@@ -376,6 +385,7 @@ function createTermWindow(name) {
       <span class="term-title">${escapeHtml(name)} · live terminal</span>
       <span class="term-status" data-role="tstatus">connecting…</span>
       <div class="term-controls">
+        <button type="button" class="term-btn" data-act="copy" title="Copy selected terminal text" aria-label="Copy selected terminal text">${icon('copy')}</button>
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
@@ -460,9 +470,14 @@ function createTermWindow(name) {
     // controls
     controls.querySelectorAll('button').forEach((btn) => {
         const act = btn.dataset.act;
+        if (act === 'copy') {
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+        }
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (act === 'min')
+            if (act === 'copy')
+                copyTerminalSelection(tw).catch(() => { });
+            else if (act === 'min')
                 minimizeWindow(tw);
             else if (act === 'max')
                 toggleMaximize(tw);

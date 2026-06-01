@@ -123,19 +123,49 @@ function toast(text) {
     el.classList.add('show');
     setTimeout(() => el.classList.remove('show'), 1800);
 }
-async function copyText(text) {
-    if (navigator.clipboard) {
-        await navigator.clipboard.writeText(text);
+function fallbackCopyText(text) {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const fallback = document.createElement('textarea');
+    fallback.value = text;
+    fallback.setAttribute('readonly', 'true');
+    fallback.style.position = 'fixed';
+    fallback.style.top = '0';
+    fallback.style.left = '-9999px';
+    fallback.style.width = '1px';
+    fallback.style.height = '1px';
+    fallback.style.opacity = '0';
+    document.body.appendChild(fallback);
+    fallback.focus({ preventScroll: true });
+    fallback.select();
+    fallback.setSelectionRange(0, fallback.value.length);
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
     }
-    else {
-        const fallback = document.createElement('textarea');
-        fallback.value = text;
-        document.body.appendChild(fallback);
-        fallback.select();
-        document.execCommand('copy');
+    finally {
         fallback.remove();
+        previousFocus?.focus({ preventScroll: true });
     }
-    toast('Copied');
+    return copied;
+}
+async function copyText(text) {
+    let clipboardError = '';
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast('Copied');
+            return;
+        }
+        catch (error) {
+            clipboardError = error instanceof Error ? error.message : String(error);
+        }
+    }
+    if (fallbackCopyText(text)) {
+        toast('Copied');
+        return;
+    }
+    const reason = clipboardError ? ` (${clipboardError})` : '';
+    throw new Error(`Clipboard copy blocked by the browser${reason}`);
 }
 function sessions() {
     return currentModel.sessions || [];
