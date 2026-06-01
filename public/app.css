@@ -176,13 +176,15 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.selected .shell-composer{position:sticky;top:0;z-index:3}
 .shell-composer{border-bottom:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px}
 .shell-composer textarea{width:100%;min-height:78px;max-height:180px;resize:vertical;background:#03070b;border:1px solid #263846;color:#eef9ff;border-radius:6px;padding:10px 11px;line-height:1.4;font:13px/1.4 "Cascadia Mono","JetBrains Mono",Consolas,monospace}
-.shell-actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.shell-actions button{min-height:28px;padding:4px 8px;font-size:12px}
-.shell-actions .iconly{padding:5px 8px}
+.shell-actions{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.shell-actions button{min-height:28px;padding:4px 7px;font-size:12px}
+.shell-actions .iconly,.shell-actions .mic-btn,.shell-actions .compact-action{width:29px;min-width:29px;padding:4px 0}
+.shell-actions .mic-label,.shell-actions .compact-action span{display:none}
 .shell-actions .mic-btn{border-color:rgba(139,246,255,.55);color:#cdefff}
 .shell-actions .mic-btn:hover{border-color:var(--cyan);background:#102d33}
 .shell-actions .mic-btn.active{background:#e0566a;border-color:#ff97a4;color:#fff;animation:mic-pulse 1.15s ease-in-out infinite}
 @keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,86,106,.55)}50%{box-shadow:0 0 0 6px rgba(224,86,106,0)}}
+@media (max-width:760px){.shell-actions{gap:6px}.shell-actions .iconly,.shell-actions .mic-btn,.shell-actions .compact-action{width:auto;min-width:0;min-height:38px;padding:7px 8px}}
 .segmented{display:inline-flex;border:1px solid rgba(139,246,255,.24);border-radius:6px;overflow:hidden;background:#071017}
 .segmented button{border:0;border-radius:0;min-width:44px}
 .segmented button+button{border-left:1px solid rgba(139,246,255,.18)}

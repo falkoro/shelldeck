@@ -598,6 +598,10 @@ function setDictationState(name, listening) {
         const active = listening && button.dataset.dictateShell === name;
         button.classList.toggle('active', active);
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        button.setAttribute('aria-label', active ? 'Stop recording and transcribe' : 'Mic dictation');
+        button.title = active
+            ? 'Stop recording and transcribe into this input'
+            : 'Record your voice; click again to stop and transcribe into this input';
         const label = button.querySelector('.mic-label');
         if (label)
             label.textContent = active ? 'Stop' : 'Mic';

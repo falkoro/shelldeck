@@ -20,11 +20,11 @@ function createShellCard(shell) {
     <textarea spellcheck="false" data-command placeholder="Type for this shell. Enter sends on mobile; Ctrl+Enter on desktop."></textarea>
     <div class="shell-actions">
       <button class="primary" type="button" data-send-shell title="Type the text and press Enter in the shell">${icon('send')}<span>Send</span></button>
-      <button class="mic-btn" type="button" data-dictate-shell title="Record your voice; click again to stop and transcribe into this input">${icon('mic')}<span class="mic-label">Mic</span></button>
+      <button class="mic-btn" type="button" data-dictate-shell title="Record your voice; click again to stop and transcribe into this input" aria-label="Mic dictation">${icon('mic')}<span class="mic-label">Mic</span></button>
       <button class="iconly" type="button" data-paste-shell title="Paste — insert the text without pressing Enter" aria-label="Paste (no Enter)">${icon('paste')}</button>
       <button class="iconly" type="button" data-add-image title="Attach an image; inserts its saved path" aria-label="Attach image">${icon('image')}</button>
       <button class="iconly" type="button" data-key="enter" title="Press Enter in the shell" aria-label="Press Enter">${icon('enter')}</button>
-      <button class="warn" type="button" data-key="interrupt" title="Interrupt the running command (Ctrl-C)">${icon('stop')}<span>Ctrl-C</span></button>
+      <button class="warn compact-action" type="button" data-key="interrupt" title="Interrupt the running command (Ctrl-C)" aria-label="Interrupt command (Ctrl-C)">${icon('stop')}<span>Ctrl-C</span></button>
       <button class="warn iconly" type="button" data-stop title="Stop this tmux session" aria-label="Stop tmux session">${icon('stop')}</button>
       <button class="iconly" type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)" aria-label="Input history">${icon('clock')}</button>
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
@@ -245,7 +245,15 @@ function renderSelectedSessionActions() {
         return;
     }
     const state = sessionRuntime(selected);
+    const createReason = !shellUnlocked
+        ? 'Unlock shells before creating tmux sessions'
+        : selected.running
+            ? 'This tmux session is already running'
+            : selected.family === 'custom'
+                ? 'ShellDeck can only create configured tmux sessions'
+                : 'Create this tmux session';
     const createDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
+    const createLabel = selected.running ? 'Running' : 'Create';
     const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
     const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
     const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
@@ -254,7 +262,7 @@ function renderSelectedSessionActions() {
         ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
         : '';
     el.hidden = false;
-    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="Create this tmux session">${icon('plus')}<span>Create</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 let shellTabsSignature = '';
 function shellbarSummaryMoving(text) {
