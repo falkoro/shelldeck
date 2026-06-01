@@ -51,13 +51,16 @@ const TERMINAL_KEY_SEQUENCES: Record<string, string> = {
   right: '\x1b[C',
 };
 
-// When the sticky Ctrl key is armed, an arrow tap sends the Ctrl-modified form
-// (xterm modifier 5 = Ctrl) — i.e. word-jump in readline-based shells.
-const TERMINAL_CTRL_ARROW_SEQUENCES: Record<string, string> = {
+// When the sticky Ctrl key is armed, tapping a navigation key sends its Ctrl-modified
+// form (xterm modifier 5 = Ctrl): Ctrl+arrows = word-jump in readline shells, and
+// Ctrl+Home / Ctrl+End = jump to top/bottom (e.g. Claude Code's "Jump to bottom (ctrl+End)").
+const TERMINAL_CTRL_SEQUENCES: Record<string, string> = {
   up: '\x1b[1;5A',
   down: '\x1b[1;5B',
   left: '\x1b[1;5D',
   right: '\x1b[1;5C',
+  home: '\x1b[1;5H',
+  end: '\x1b[1;5F',
 };
 
 // NB: use data-termkey, NOT data-key — the dashboard force-disables every [data-key]
@@ -66,7 +69,7 @@ const TERMINAL_KEYBAR_HTML = `
     <div class="term-keybar" data-keybar>
       <button type="button" class="term-key" data-termkey="esc">Esc</button>
       <button type="button" class="term-key" data-termkey="tab">Tab</button>
-      <button type="button" class="term-key" data-termkey="ctrl" title="Ctrl — tap, then a letter (e.g. d → Ctrl-D) or an arrow (word jump)">Ctrl</button>
+      <button type="button" class="term-key" data-termkey="ctrl" title="Ctrl — tap, then a letter (e.g. d → Ctrl-D), an arrow (word jump), or Home/End (jump to top/bottom)">Ctrl</button>
       <button type="button" class="term-key" data-termkey="ctrl-c" title="Ctrl-C (interrupt)">^C</button>
       <button type="button" class="term-key" data-termkey="home" title="Home (start of line)">Home</button>
       <button type="button" class="term-key" data-termkey="end" title="End (end of line)">End</button>
@@ -502,7 +505,7 @@ function createTermWindow(name: string): TermWindow {
       event.preventDefault();
       const key = btn.dataset.termkey || '';
       if (key === 'ctrl') { setCtrlArmed(!tw.ctrlArmed); tw.term?.focus?.(); return; }
-      const seq = (tw.ctrlArmed && TERMINAL_CTRL_ARROW_SEQUENCES[key]) || TERMINAL_KEY_SEQUENCES[key];
+      const seq = (tw.ctrlArmed && TERMINAL_CTRL_SEQUENCES[key]) || TERMINAL_KEY_SEQUENCES[key];
       if (seq) sendTerminalText(tw, seq);
       if (tw.ctrlArmed) setCtrlArmed(false);
       tw.term?.focus?.();
