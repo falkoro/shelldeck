@@ -275,10 +275,19 @@ function handleTerminalDrop(tw: TermWindow, event: DragEvent): void {
   });
 }
 
-function copyTerminalSelection(tw: TermWindow): void {
+async function copyTerminalSelection(tw: TermWindow): Promise<void> {
   const selection = tw.term?.getSelection?.() || '';
-  if (!selection) return;
-  navigator.clipboard?.writeText(selection).catch(() => {});
+  if (!selection) {
+    tw.statusEl.textContent = 'select text to copy';
+    return;
+  }
+  try {
+    await copyText(selection);
+  } catch (error) {
+    tw.statusEl.textContent = 'copy blocked';
+    toast(error instanceof Error ? error.message : String(error));
+    return;
+  }
   tw.statusEl.textContent = `copied ${selection.length.toLocaleString()} chars`;
 }
 
@@ -323,7 +332,7 @@ function setupTerminalClipboard(tw: TermWindow): void {
     const key = event.key.toLowerCase();
     if (key === 'c' && (event.shiftKey || tw.term.hasSelection())) {
       event.preventDefault();
-      copyTerminalSelection(tw);
+      copyTerminalSelection(tw).catch(() => {});
       return false;
     }
     if (key === 'v') {
@@ -403,6 +412,7 @@ function createTermWindow(name: string): TermWindow {
       <span class="term-title">${escapeHtml(name)} · live terminal</span>
       <span class="term-status" data-role="tstatus">connecting…</span>
       <div class="term-controls">
+        <button type="button" class="term-btn" data-act="copy" title="Copy selected terminal text" aria-label="Copy selected terminal text">${icon('copy')}</button>
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
@@ -489,9 +499,13 @@ function createTermWindow(name: string): TermWindow {
   // controls
   controls.querySelectorAll<HTMLButtonElement>('button').forEach((btn) => {
     const act = btn.dataset.act!;
+    if (act === 'copy') {
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+    }
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (act === 'min') minimizeWindow(tw);
+      if (act === 'copy') copyTerminalSelection(tw).catch(() => {});
+      else if (act === 'min') minimizeWindow(tw);
       else if (act === 'max') toggleMaximize(tw);
       else if (act === 'reset') resetWindow(tw);
       else if (act === 'close') closeWindow(tw);
