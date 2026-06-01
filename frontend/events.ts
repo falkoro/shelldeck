@@ -3,6 +3,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
   if (!target) return;
   const copyButton = target.closest<HTMLElement>('[data-copy]');
   const startButton = target.closest<HTMLButtonElement>('[data-start]');
+  const stopButton = target.closest<HTMLButtonElement>('[data-stop]');
   const restartButton = target.closest<HTMLButtonElement>('[data-restart]');
   const keyButton = target.closest<HTMLButtonElement>('[data-key]');
   const sendButton = target.closest<HTMLButtonElement>('[data-send-shell]');
@@ -90,6 +91,12 @@ document.addEventListener('click', async (event: MouseEvent) => {
     if (startButton && !startButton.disabled) {
       await sessionAction('/api/start', startButton.dataset.start || '');
       return selectSession(startButton.dataset.start);
+    }
+    if (stopButton && !stopButton.disabled) {
+      const stopped = stopButton.dataset.stop || '';
+      await sessionAction('/api/stop', stopped);
+      if (sessionByName(stopped)) selectSession(stopped);
+      return;
     }
     if (restartButton && !restartButton.disabled) {
       await sessionAction('/api/restart', restartButton.dataset.restart || '');

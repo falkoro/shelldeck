@@ -25,6 +25,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button class="iconly" type="button" data-add-image title="Attach an image; inserts its saved path" aria-label="Attach image">${icon('image')}</button>
       <button class="iconly" type="button" data-key="enter" title="Press Enter in the shell" aria-label="Press Enter">${icon('enter')}</button>
       <button class="warn" type="button" data-key="interrupt" title="Interrupt the running command (Ctrl-C)">${icon('stop')}<span>Ctrl-C</span></button>
+      <button class="warn iconly" type="button" data-stop title="Stop this tmux session" aria-label="Stop tmux session">${icon('stop')}</button>
       <button class="iconly" type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)" aria-label="Input history">${icon('clock')}</button>
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
@@ -51,6 +52,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.querySelector<HTMLButtonElement>('[data-reset-preview]')!.dataset.resetPreview = shell.name;
   article.querySelector<HTMLButtonElement>('[data-shellin]')!.dataset.shellin = shell.name;
   article.querySelector<HTMLButtonElement>('[data-resume]')!.dataset.resume = shell.name;
+  article.querySelector<HTMLButtonElement>('[data-stop]')!.dataset.stop = shell.name;
   article.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((button) => {
     button.dataset.shell = shell.name;
   });
@@ -238,13 +240,14 @@ function renderSelectedSessionActions(): void {
   const state = sessionRuntime(selected);
   const startDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
   const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
+  const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
   const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
   const displayLabel = shellDisplayLabel(selected.name, selected.label);
   const sshButton = selected.sshCommand
     ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
     : '';
   el.hidden = false;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${startDisabled} data-start="${escapeHtml(selected.name)}">${icon('play')}<span>Start</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${startDisabled} data-start="${escapeHtml(selected.name)}">${icon('play')}<span>Start</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 
 let shellTabsSignature = '';

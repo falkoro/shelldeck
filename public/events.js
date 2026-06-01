@@ -5,6 +5,7 @@ document.addEventListener('click', async (event) => {
         return;
     const copyButton = target.closest('[data-copy]');
     const startButton = target.closest('[data-start]');
+    const stopButton = target.closest('[data-stop]');
     const restartButton = target.closest('[data-restart]');
     const keyButton = target.closest('[data-key]');
     const sendButton = target.closest('[data-send-shell]');
@@ -102,6 +103,13 @@ document.addEventListener('click', async (event) => {
         if (startButton && !startButton.disabled) {
             await sessionAction('/api/start', startButton.dataset.start || '');
             return selectSession(startButton.dataset.start);
+        }
+        if (stopButton && !stopButton.disabled) {
+            const stopped = stopButton.dataset.stop || '';
+            await sessionAction('/api/stop', stopped);
+            if (sessionByName(stopped))
+                selectSession(stopped);
+            return;
         }
         if (restartButton && !restartButton.disabled) {
             await sessionAction('/api/restart', restartButton.dataset.restart || '');

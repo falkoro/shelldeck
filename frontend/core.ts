@@ -534,6 +534,9 @@ function updateUnlockState(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((button) => {
     button.disabled = !targetReady(button.dataset.shell || '');
   });
+  document.querySelectorAll<HTMLButtonElement>('[data-stop]').forEach((button) => {
+    button.disabled = !targetReady(button.dataset.stop || '');
+  });
   document.querySelectorAll<HTMLTextAreaElement>('[data-command]').forEach((input) => {
     input.disabled = !targetReady(input.dataset.command || '');
   });

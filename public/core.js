@@ -436,6 +436,9 @@ function updateUnlockState() {
     document.querySelectorAll('[data-key]').forEach((button) => {
         button.disabled = !targetReady(button.dataset.shell || '');
     });
+    document.querySelectorAll('[data-stop]').forEach((button) => {
+        button.disabled = !targetReady(button.dataset.stop || '');
+    });
     document.querySelectorAll('[data-command]').forEach((input) => {
         input.disabled = !targetReady(input.dataset.command || '');
     });
