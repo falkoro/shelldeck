@@ -499,11 +499,12 @@ body.shells-locked .container-actions{display:none}
 /* Compact (remote) rows: float the action buttons at the right, revealed on hover/focus, so they
    never crowd the line or wrap at narrow sidebar widths. */
 .container-item.compact{position:relative}
-.container-item.compact .container-actions{position:absolute;top:50%;right:6px;transform:translateY(-50%);margin:0;opacity:0;pointer-events:none;transition:opacity .12s ease;background:rgba(5,11,17,.92);border:1px solid rgba(139,246,255,.18);border-radius:7px;padding:2px;gap:4px}
+.container-item.compact .container-actions{position:absolute;top:6px;right:6px;transform:none;margin:0;opacity:0;pointer-events:none;transition:opacity .12s ease;background:rgba(5,11,17,.92);border:1px solid rgba(139,246,255,.18);border-radius:7px;padding:2px;gap:4px}
 .container-item.compact:hover .container-actions,.container-item.compact:focus-within .container-actions{opacity:1;pointer-events:auto}
+.container-item.compact:hover .ci-cpu,.container-item.compact:focus-within .ci-cpu,.container-item.compact:hover .container-age,.container-item.compact:focus-within .container-age{opacity:0}
 .container-item.compact .container-action{padding:2px 7px}
-/* No hover on touch — keep the buttons in flow on their own line there. */
-@media (hover:none){.container-item.compact .container-actions{position:static;transform:none;opacity:1;pointer-events:auto;background:none;border:0;justify-content:flex-end;margin-top:3px}}
+/* No hover on touch — keep the buttons visible in the same reserved top-right space. */
+@media (hover:none){.container-item.compact .container-actions{top:6px;right:6px;transform:none;opacity:1;pointer-events:auto}.container-item.compact .ci-cpu,.container-item.compact .container-age{opacity:0}}
 .container-item .ci-row1{align-items:flex-start}
 /* Condensed 2-line container row for remote host cards. */
 .container-item.compact{padding:6px 9px;gap:2px}

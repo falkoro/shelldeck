@@ -374,6 +374,18 @@ pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, 
     Ok(format!("{name} restarted in ~"))
 }
 
+pub async fn stop_session(name: &str) -> Result<String, String> {
+    if name.trim().is_empty() {
+        return Err("Session name is required".to_string());
+    }
+    let sessions = list_tmux_sessions().await;
+    if !sessions.iter().any(|s| s.name == name) {
+        return Err(format!("{name} is not running"));
+    }
+    tmux_output(&["kill-session", "-t", name]).await?;
+    Ok(format!("{name} stopped"))
+}
+
 pub async fn paste_text(
     config: Arc<Config>,
     name: &str,

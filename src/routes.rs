@@ -116,6 +116,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
+        .route("/api/stop", post(api_stop))
         .route("/api/container-action", post(api_container_action))
         .with_state(state)
 }
@@ -594,6 +595,21 @@ async fn api_restart(
         return response;
     }
     session_result(tmux::restart_session(state.config.clone(), &body.name).await)
+}
+
+async fn api_stop(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<NameBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    session_result(tmux::stop_session(&body.name).await)
 }
 
 // Restart / pull-latest a Docker/Podman container, locally or on a configured remote host.
