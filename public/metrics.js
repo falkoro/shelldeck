@@ -231,19 +231,21 @@ function compactContainerRowHtml(c, host) {
     const rightHtml = chips ? `<span class="ci-cpu">${chips}</span>` : '';
     const badge = age || c.status.split(/[\s(]/)[0];
     const badgeHtml = badge ? `<span class="container-age" title="${escapeHtml(c.status)}">${escapeHtml(badge)}</span>` : '';
-    // Line 2 shows the description when there is one (image to the tooltip), else the image. Click
-    // to edit/add a description either way.
+    // Line 2 shows the description when there is one (image to the tooltip), else the image.
+    // Compact remote rows are passive except for their explicit action buttons.
     const desc = containerDescription(c);
     const subText = desc || c.image;
-    const subTitle = desc ? `${desc}\n${c.image} — click to edit` : `${c.image} — click to add a description`;
-    const subClass = desc ? 'ci-image ci-editdesc has-desc' : 'ci-image ci-editdesc';
+    const subTitle = desc ? `${desc}\n${c.image}` : c.image;
+    const subClass = desc ? 'ci-image has-desc' : 'ci-image';
     return `<div class="container-item remote-container compact state-${state}">`
         + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
-        + `<div class="ci-bot"><span class="${subClass}" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
+        + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
         + `</div>`;
 }
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics = null;
+let remoteHostsLoaded = false;
+let remoteHostsLoading = false;
 function meterLevel(pct) {
     return pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : 'ok';
 }
@@ -443,6 +445,15 @@ function renderRemoteHosts(hosts) {
         return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'}${escapeHtml(ipText)} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${metricsHtml}${containerHtml}${error}</div>`;
     }).join('');
 }
+function remoteHostsLoadingHtml() {
+    return `<div class="remote-loading"><div><b>Checking remote hosts</b><span>Checking...</span></div><div class="skeleton skel-line skel-w70"></div><div class="skeleton skel-bar"></div><div class="skeleton skel-crow"></div><div class="skeleton skel-crow"></div></div>`;
+}
+function renderRemoteHostsError(message) {
+    const list = document.getElementById('remoteHostList');
+    if (!list)
+        return;
+    list.innerHTML = `<div class="remote-error remote-load-error">${escapeHtml(message)}</div>`;
+}
 async function loadMetrics() {
     if (!document.getElementById('metricsPanel') || !dashboardSettings.panels.machine)
         return;
@@ -461,13 +472,39 @@ async function loadContainers() {
     renderContainers(payload.containers || []);
 }
 async function loadRemoteHosts() {
-    if (!document.getElementById('remotePanel') || !dashboardSettings.panels.remoteHosts)
+    const panel = document.getElementById('remotePanel');
+    const list = document.getElementById('remoteHostList');
+    if (!panel || !list || !dashboardSettings.panels.remoteHosts)
         return;
-    const response = await fetch('/api/remote-hosts', { cache: 'no-store', credentials: 'same-origin' });
-    if (!response.ok)
+    if (remoteHostsLoading)
         return;
-    const payload = await response.json();
-    renderRemoteHosts(payload.hosts || []);
+    remoteHostsLoading = true;
+    panel.classList.add('loading');
+    list.setAttribute('aria-busy', 'true');
+    if (!remoteHostsLoaded)
+        list.innerHTML = remoteHostsLoadingHtml();
+    try {
+        const response = await fetch('/api/remote-hosts', { cache: 'no-store', credentials: 'same-origin' });
+        if (!response.ok)
+            throw new Error(`Remote hosts returned ${response.status}`);
+        const payload = await response.json();
+        remoteHostsLoaded = true;
+        renderRemoteHosts(payload.hosts || []);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : 'Could not load remote hosts';
+        if (!remoteHostsLoaded) {
+            renderRemoteHostsError(message);
+        }
+        else if (!list.querySelector('.remote-stale-error')) {
+            list.insertAdjacentHTML('afterbegin', `<div class="remote-error remote-stale-error">Remote refresh failed: ${escapeHtml(message)}</div>`);
+        }
+    }
+    finally {
+        remoteHostsLoading = false;
+        panel.classList.remove('loading');
+        list.removeAttribute('aria-busy');
+    }
 }
 // Restart / pull-latest a container. Confirms first; server re-checks login + unlock + action header.
 async function containerAction(host, engine, name, action) {

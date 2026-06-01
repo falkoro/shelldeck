@@ -114,6 +114,7 @@ pub fn router(state: AppState) -> Router {
             "/api/transcribe",
             post(api_transcribe).layer(DefaultBodyLimit::max(audio_limit)),
         )
+        .route("/api/create", post(api_create))
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
         .route("/api/stop", post(api_stop))
@@ -580,6 +581,21 @@ async fn api_start(
         return response;
     }
     session_result(tmux::start_session(state.config.clone(), &body.name).await)
+}
+
+async fn api_create(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<NameBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    session_result(tmux::create_session(state.config.clone(), &body.name).await)
 }
 
 async fn api_restart(

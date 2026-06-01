@@ -102,7 +102,7 @@ function updateShellCard(card: HTMLElement, shell: ShellPreview): void {
   const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 48;
   setText(card, '[data-role="output"]', output);
   const input = card.querySelector<HTMLTextAreaElement>('[data-command]')!;
-  input.placeholder = shell.running ? `Input for ${displayLabel}` : 'Start this session before sending input';
+  input.placeholder = shell.running ? `Input for ${displayLabel}` : 'Create this session before sending input';
   if (followOutput && atBottom) pre.scrollTop = pre.scrollHeight;
   renderShellImages(shell.name);
 }
@@ -238,7 +238,7 @@ function renderSelectedSessionActions(): void {
     return;
   }
   const state = sessionRuntime(selected);
-  const startDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
+  const createDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
   const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
   const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
   const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
@@ -247,7 +247,7 @@ function renderSelectedSessionActions(): void {
     ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
     : '';
   el.hidden = false;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${startDisabled} data-start="${escapeHtml(selected.name)}">${icon('play')}<span>Start</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="Create this tmux session">${icon('plus')}<span>Create</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 
 let shellTabsSignature = '';

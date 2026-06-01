@@ -2,6 +2,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return;
   const copyButton = target.closest<HTMLElement>('[data-copy]');
+  const createButton = target.closest<HTMLButtonElement>('[data-create]');
   const startButton = target.closest<HTMLButtonElement>('[data-start]');
   const stopButton = target.closest<HTMLButtonElement>('[data-stop]');
   const restartButton = target.closest<HTMLButtonElement>('[data-restart]');
@@ -87,6 +88,10 @@ document.addEventListener('click', async (event: MouseEvent) => {
       pendingImageTarget = imageButton.dataset.addImage || selectedSession;
       imageFile.click();
       return;
+    }
+    if (createButton && !createButton.disabled) {
+      await sessionAction('/api/create', createButton.dataset.create || '');
+      return selectSession(createButton.dataset.create);
     }
     if (startButton && !startButton.disabled) {
       await sessionAction('/api/start', startButton.dataset.start || '');
