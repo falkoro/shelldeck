@@ -93,12 +93,22 @@ function compactTerminalViewport(): boolean {
   return width <= MOBILE_BREAKPOINT || (width <= 1024 && window.matchMedia('(pointer: coarse)').matches);
 }
 
+// Pin a full-screen mobile terminal to the *visual* viewport. CSS reads these vars so the
+// on-screen keyboard shrinks the window (keybar rides just above the keyboard) instead of
+// covering the prompt. Falls back to 100dvh when the vars are unset (e.g. before first run).
+function applyMobileViewportVars(el: HTMLElement): void {
+  const vv = window.visualViewport;
+  el.style.setProperty('--svh', `${Math.round(vv ? vv.height : window.innerHeight)}px`);
+  el.style.setProperty('--svh-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
+}
+
 function refreshTerminalViewportMode(): void {
   const compact = compactTerminalViewport();
   termWindows.forEach((tw) => {
     tw.el.classList.toggle('mobile', compact);
-    if (compact && !tw.minimized) {
-      tw.el.style.display = '';
+    if (compact) {
+      applyMobileViewportVars(tw.el);
+      if (!tw.minimized) tw.el.style.display = '';
     }
     doFit(tw);
   });
@@ -379,6 +389,7 @@ function createTermWindow(name: string): TermWindow {
   const el = document.createElement('div');
   el.className = 'term-window';
   el.classList.toggle('mobile', compact);
+  if (compact) applyMobileViewportVars(el);
   el.style.left = baseX + 'px';
   el.style.top = baseY + 'px';
   el.style.width = baseW + 'px';
@@ -728,6 +739,22 @@ document.addEventListener('keydown', (event: KeyboardEvent) => {
   event.preventDefault();
   resetShellPreview(card.dataset.shellCard || '');
 });
+
+// One-shot on a phone: drop straight into the most relevant shell so ShellDeck opens
+// "in the shellbox" instead of on a long scroll of preview cards. Detaching the terminal
+// returns to the compact launcher list, and a reload re-enters the shell.
+let mobileAutoOpened = false;
+function maybeAutoOpenMobileShell(): void {
+  if (mobileAutoOpened) return;
+  if (!compactTerminalViewport()) return;
+  if (!shellUnlocked) return; // a locked terminal couldn't connect — leave them on the list
+  if (termWindows.size) return; // user already has a terminal open
+  const target = chooseSession(true) || sessions()[0] || null;
+  if (!target) return;
+  mobileAutoOpened = true;
+  openTerminal(target.name);
+}
+(window as any).maybeAutoOpenMobileShell = maybeAutoOpenMobileShell;
 
 window.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('resize', refreshTerminalViewportMode);
