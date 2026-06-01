@@ -113,8 +113,15 @@ document.addEventListener('click', async (event) => {
         // IS the select target itself (the sidebar session items are <button data-select-session>),
         // but still ignore clicks on inner controls (textarea/pre inside a card).
         if (selectItem && (!interactive || interactive === selectItem)) {
-            selectSession(selectItem.dataset.selectSession);
-            focusComposer(selectItem.dataset.selectSession || '');
+            const sessionName = selectItem.dataset.selectSession || '';
+            selectSession(sessionName);
+            // On a phone the cards are collapsed to a compact launcher, so a tap opens the
+            // full-screen live terminal ("just go") instead of focusing the hidden composer.
+            if (sessionName && compactTerminalViewport()) {
+                openTerminal(sessionName);
+                return;
+            }
+            focusComposer(sessionName);
         }
     }
     catch (error) {
@@ -481,7 +488,10 @@ document.addEventListener('mousedown', (event) => {
 });
 render(initialModel);
 queueMicrotask(() => loadSummary().catch(() => { }));
-queueMicrotask(() => loadShells().then(startShellStream).catch((error) => toast(error.message)));
+queueMicrotask(() => loadShells().then(() => {
+    startShellStream();
+    window.maybeAutoOpenMobileShell?.();
+}).catch((error) => toast(error.message)));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => { }), 30000);
 setInterval(() => loadSummary().catch(() => { }), 60000);
 // Live-tick relative last activity labels (the main "add last activity" UX fix for code.falkinator.org)

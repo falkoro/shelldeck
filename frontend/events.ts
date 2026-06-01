@@ -100,8 +100,15 @@ document.addEventListener('click', async (event: MouseEvent) => {
     // IS the select target itself (the sidebar session items are <button data-select-session>),
     // but still ignore clicks on inner controls (textarea/pre inside a card).
     if (selectItem && (!interactive || interactive === selectItem)) {
-      selectSession(selectItem.dataset.selectSession);
-      focusComposer(selectItem.dataset.selectSession || '');
+      const sessionName = selectItem.dataset.selectSession || '';
+      selectSession(sessionName);
+      // On a phone the cards are collapsed to a compact launcher, so a tap opens the
+      // full-screen live terminal ("just go") instead of focusing the hidden composer.
+      if (sessionName && compactTerminalViewport()) {
+        openTerminal(sessionName);
+        return;
+      }
+      focusComposer(sessionName);
     }
   } catch (error) {
     toast(error instanceof Error ? error.message : String(error));
@@ -436,7 +443,10 @@ document.addEventListener('mousedown', (event: MouseEvent) => {
 
 render(initialModel);
 queueMicrotask(() => loadSummary().catch(() => {}));
-queueMicrotask(() => loadShells().then(startShellStream).catch((error: Error) => toast(error.message)));
+queueMicrotask(() => loadShells().then(() => {
+  startShellStream();
+  (window as any).maybeAutoOpenMobileShell?.();
+}).catch((error: Error) => toast(error.message)));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => {}), 30000);
 setInterval(() => loadSummary().catch(() => {}), 60000);
 

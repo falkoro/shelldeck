@@ -568,3 +568,49 @@ body.shells-locked .container-actions{display:none}
 /* Machine card renders each chip as a button (click to rename the sensor). */
 button.rm-temp{border:0;cursor:pointer;font-family:inherit;line-height:1.5}
 button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.18);color:#cfeaff}
+
+/* ============================================================
+   Mobile UX pass (2026-06-01): land in the shellbox, just go.
+   Collapse the heavy preview cards into a one-tap launcher and
+   make the live terminal keyboard-aware. Desktop is untouched.
+   ============================================================ */
+@media (max-width:760px){
+  /* Each preview card becomes a compact, tappable row -- tapping opens the full-screen
+     live terminal (the real mobile interaction), so the inline composer / output /
+     window controls are hidden and the card shrinks from ~300px to a single line. */
+  .terminal-card{min-height:0!important;cursor:pointer;padding:10px 12px!important}
+  .terminal-card>header{display:flex;align-items:center;gap:9px;margin:0!important;padding:0!important}
+  .terminal-card .card-title{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;gap:1px}
+  .terminal-card .card-title-row{min-width:0}
+  .terminal-card .card-title [data-role="command"]{display:none!important}
+  .terminal-card .terminal-meta{flex:0 0 auto;gap:6px;margin:0!important}
+  .terminal-card .terminal-meta [data-role="cwd"]{display:none!important}
+  .terminal-card .card-window-controls,
+  .terminal-card .card-label-edit,
+  .terminal-card .card-label-reset,
+  .terminal-card .shell-composer,
+  .terminal-card .work-title,
+  .terminal-card pre[data-role="output"]{display:none!important}
+  /* Chevron makes "tap to open the live terminal" obvious. */
+  .terminal-card>header::after{content:"\203A";flex:0 0 auto;margin-left:2px;color:var(--cyan,#8bf6ff);font-size:22px;line-height:1;opacity:.7}
+  .terminal-card.selected{border-color:rgba(139,246,255,.5)}
+
+  /* Keybar to the BOTTOM (under the terminal, above the soft keyboard) as an even grid so
+     no key wraps raggedly or scrolls out of reach. */
+  .term-window.mobile .term-host{order:2}
+  .term-window.mobile .term-keybar{
+    order:3;display:grid!important;grid-auto-rows:1fr;grid-template-columns:repeat(10,minmax(0,1fr));
+    gap:5px;overflow:visible;border-bottom:none;border-top:1px solid rgba(139,246,255,.14);
+    padding:6px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
+  .term-window.mobile .term-key{min-width:0;min-height:42px;padding:6px 4px;font-size:13px}
+
+  /* Pin the full-screen terminal to the visual viewport (JS sets --svh / --svh-top on the
+     element) so the on-screen keyboard shrinks the window instead of hiding the prompt. */
+  .term-window.mobile{
+    top:var(--svh-top,0px)!important;bottom:auto!important;left:0!important;right:auto!important;
+    width:100vw!important;height:var(--svh,100dvh)!important;max-height:none!important}
+}
+@media (max-width:470px){
+  /* Two tidy rows of five on a narrow phone instead of ten cramped columns. */
+  .term-window.mobile .term-keybar{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
