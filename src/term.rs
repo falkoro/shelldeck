@@ -45,6 +45,13 @@ pub async fn term_ws(
             &serde_json::json!({ "error": "Shell unlock required" }),
         );
     }
+    let private = crate::private_sessions::load(state.config.clone()).await;
+    if private.contains(&q.name) {
+        return webutil::json_response(
+            StatusCode::FORBIDDEN,
+            &serde_json::json!({ "error": "Session is private — toggle privacy off to open a terminal" }),
+        );
+    }
     // Cross-site WebSocket hijacking guard: the WS handshake can't carry the X-Codex-Action
     // CSRF header, so a malicious cross-origin page could otherwise drive this PTY using the
     // victim's cookies. Reject when a browser Origin is present and doesn't match the host.

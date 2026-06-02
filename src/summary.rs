@@ -1,4 +1,4 @@
-use crate::{config::Config, tmux};
+use crate::{config::Config, private_sessions, tmux};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
@@ -107,16 +107,17 @@ pub async fn get(config: Arc<Config>, client: reqwest::Client) -> WorkSummary {
 async fn collect_context(config: Arc<Config>) -> serde_json::Value {
     let model = tmux::session_model(config.clone(), false).await;
     let panes = tmux::list_panes().await;
-    let known: Vec<String> = config
-        .known_sessions
-        .iter()
-        .map(|s| s.name.to_string())
+    let managed = tmux::managed_session_names(config.clone()).await;
+    let private = private_sessions::load(config.clone()).await;
+    let visible: Vec<String> = managed
+        .into_iter()
+        .filter(|name| !private.contains(name))
         .collect();
     let mut captures = Vec::new();
     let now_epoch = chrono::Utc::now().timestamp();
     for pane in panes
         .into_iter()
-        .filter(|p| known.contains(&p.session))
+        .filter(|p| visible.contains(&p.session))
         .take(8)
     {
         let tail = sanitize(&focus_recent(&tmux::capture_pane(&pane, 40).await));
@@ -129,7 +130,7 @@ async fn collect_context(config: Arc<Config>) -> serde_json::Value {
         "sessions": model.sessions.iter().map(|s| {
             let activity_age_secs = s.activity.map(|activity| (now_epoch - activity as i64).max(0));
             serde_json::json!({ "name": s.name, "running": s.running, "attached": s.attached, "activity": s.activity, "activityAgeSecs": activity_age_secs })
-        }).collect::<Vec<_>>(),
+        }).filter(|s| s["name"].as_str().map(|name| visible.contains(&name.to_string())).unwrap_or(false)).collect::<Vec<_>>(),
         "panes": captures
     })
 }

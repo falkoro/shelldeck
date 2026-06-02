@@ -122,6 +122,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .session-tab-time{flex:0 0 auto;color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums}
 .session-tab-status{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .session-tab.waiting{border-color:rgba(255,200,87,.35);background:rgba(255,200,87,.06)}
+.session-tab.private{border-color:rgba(255,106,122,.38);background:rgba(255,106,122,.08)}
 .session-tab.offline{opacity:.72}
 .session-tab-attached{display:inline-flex;align-self:center;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:0 5px;color:#c9fff3;font-size:10px}
 .session-actions{border:1px solid rgba(139,246,255,.16);background:#071017;border-radius:8px;margin:0 0 10px;padding:8px;display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -140,6 +141,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .terminal-card.running{border-color:rgba(114,247,200,.28)}
 .terminal-card.selected{border-color:rgba(139,246,255,.7)}
 .terminal-card.offline{opacity:.72}
+.terminal-card.private{border-color:rgba(255,106,122,.42);background:#080b10}
+.terminal-card.private pre{color:#ffccd2;background:#05070b;display:flex;align-items:center;justify-content:center;text-align:center;font-style:italic}
+.terminal-card.private .privacy-btn{border-color:rgba(255,106,122,.58);color:#ffc0c8;background:rgba(255,106,122,.13)}
 .terminal-card.dragging{border-color:#72f7c8;box-shadow:0 0 0 2px rgba(114,247,200,.16)}
 .terminal-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#071017}
 .card-title{min-width:0;flex:1 1 auto}
@@ -191,6 +195,7 @@ body.preview-fullscreen-open{overflow:hidden}
 .shell-actions .mic-btn{border-color:rgba(139,246,255,.55);color:#cdefff}
 .shell-actions .mic-btn:hover{border-color:var(--cyan);background:#102d33}
 .shell-actions .mic-btn.active{background:#e0566a;border-color:#ff97a4;color:#fff;animation:mic-pulse 1.15s ease-in-out infinite}
+.shell-actions .privacy-btn.active{border-color:rgba(255,106,122,.58);color:#ffc0c8;background:rgba(255,106,122,.13)}
 @keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,86,106,.55)}50%{box-shadow:0 0 0 6px rgba(224,86,106,0)}}
 @media (max-width:760px){.shell-actions{gap:6px}.shell-actions .iconly,.shell-actions .mic-btn,.shell-actions .compact-action{width:auto;min-width:0;min-height:38px;padding:7px 8px}}
 .segmented{display:inline-flex;border:1px solid rgba(139,246,255,.24);border-radius:6px;overflow:hidden;background:#071017}
@@ -229,7 +234,8 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none}
 .agent-badge.active{border-color:rgba(114,247,200,.42);color:#bfffe6}
 .agent-badge.waiting{border-color:rgba(255,200,87,.45);color:#ffe2a0;background:rgba(255,200,87,.08)}
-.agent-badge.active,.agent-badge.waiting{display:inline-flex}
+.agent-badge.private{border-color:rgba(255,106,122,.5);color:#ffc0c8;background:rgba(255,106,122,.1)}
+.agent-badge.active,.agent-badge.waiting,.agent-badge.private{display:inline-flex}
 .terminal-card.agent-waiting{border-color:rgba(255,200,87,.5)}
 @media (min-width:1700px){
   .workspace{grid-template-columns:360px minmax(0,1fr)}
@@ -258,6 +264,11 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .links-editor-head p{font-size:12px;margin-top:3px}
 .links-editor-box textarea{width:100%;min-height:260px;resize:vertical;background:#03070b;border:1px solid #263846;color:#eef9ff;border-radius:6px;padding:11px;font:13px/1.45 "Cascadia Mono","JetBrains Mono",Consolas,monospace}
 .links-editor-actions{display:flex;justify-content:flex-end;margin-top:10px}
+.new-session-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.new-session-grid label{margin:0;color:var(--muted);font-size:12.5px}
+.new-session-grid input{margin-top:6px}
+.new-session-wide{grid-column:1 / -1}
+@media (max-width:760px){.new-session-grid{grid-template-columns:1fr}}
 .settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:8px 0 10px}
 .settings-grid label{display:flex;align-items:center;gap:8px;margin:0;color:var(--text);font-size:13px}
 .settings-grid .settings-subsetting{color:var(--muted);padding-left:18px}

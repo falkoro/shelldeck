@@ -55,6 +55,8 @@ pub struct Config {
     pub tickers: Vec<String>,
     pub remote_hosts: Vec<RemoteHostConfig>,
     pub remote_hosts_file: PathBuf,
+    pub private_sessions_file: PathBuf,
+    pub dynamic_sessions_file: PathBuf,
     pub remote_container_cap: usize,
     // Gather CPU/RAM/load/temps for remote hosts over SSH (one extra /proc read per poll).
     // Default on; set DASHBOARD_REMOTE_METRICS=0 to keep remote cards to ping + containers only.
@@ -191,6 +193,14 @@ impl Config {
             remote_hosts_file: configured_path(
                 env::var("DASHBOARD_REMOTE_HOSTS_FILE").ok(),
                 root_dir.join("remote-hosts.json"),
+            ),
+            private_sessions_file: configured_path(
+                env::var("DASHBOARD_PRIVATE_SESSIONS_FILE").ok(),
+                root_dir.join("private-sessions.json"),
+            ),
+            dynamic_sessions_file: configured_path(
+                env::var("DASHBOARD_DYNAMIC_SESSIONS_FILE").ok(),
+                root_dir.join("dynamic-sessions.json"),
             ),
             remote_container_cap: env::var("DASHBOARD_REMOTE_CONTAINER_CAP")
                 .ok()

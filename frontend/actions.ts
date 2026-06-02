@@ -542,6 +542,102 @@ async function saveRemoteHosts(hosts: RemoteHostEntry[]): Promise<void> {
 
 (window as any).openRemoteHostsEditor = openRemoteHostsEditor;
 
+async function loadPrivateSessions(): Promise<void> {
+  if (!shellUnlocked) return;
+  const response = await fetch('/api/private', { cache: 'no-store', credentials: 'same-origin' });
+  if (!response.ok) return;
+  const payload = await response.json() as ApiPayload;
+  applyPrivateSessions(payload.private || []);
+  if (latestShells.length) renderShells({ shells: latestShells });
+  else renderShellTabs();
+}
+
+async function togglePrivateSession(name: string): Promise<void> {
+  if (!shellUnlocked) throw new Error('Unlock shells first');
+  if (!name) throw new Error('Choose a shell first');
+  const next = !isPrivateSession(name);
+  if (next) {
+    removeShellPreviewCache(name);
+    delete shellActivity[name];
+    (window as any).closeTerminalForSession?.(name);
+  }
+  setPrivateSessionState(name, next);
+  renderShells({ shells: latestShells });
+  try {
+    const payload = await postJson('/api/private', { name, private: next });
+    applyPrivateSessions(payload.private || []);
+    renderShells({ shells: latestShells });
+    if (!next) await loadShells(false);
+    toast(next ? `${name} is private` : `${name} is visible`);
+  } catch (error) {
+    setPrivateSessionState(name, !next);
+    renderShells({ shells: latestShells });
+    throw error;
+  }
+}
+
+function removeSessionSummaryLine(name: string): void {
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  latestSummaryText = latestSummaryText
+    .split('\n')
+    .filter((line) => !new RegExp(`^[\\s\\-*•]*\\**${safe}\\**\\b`, 'i').test(line.trim()))
+    .join('\n');
+}
+
+async function wipeShell(name: string): Promise<void> {
+  if (!targetReady(name)) throw new Error('Choose a running unlocked shell');
+  const payload = await postJson('/api/wipe', { name });
+  clearShellPreview(name);
+  clearShellAutoTitleCache(name);
+  removeSessionSummaryLine(name);
+  applyWorkTitles();
+  toast(payload.message || `Wiped ${name}`);
+}
+
+interface NewSessionInput {
+  name: string;
+  command: string;
+  cwd?: string;
+  label?: string;
+}
+
+function openNewSessionEditor(): void {
+  if (document.getElementById('newSessionEditor')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'links-editor-modal new-session-modal';
+  overlay.id = 'newSessionEditor';
+  overlay.innerHTML = `<form class="links-editor-box new-session-box"><div class="links-editor-head"><div><h2>New session</h2><p class="muted">Create a persisted tmux session card.</p></div><button type="button" class="ghost" data-close-new-session>Cancel</button></div><div class="new-session-grid"><label>Name<input id="newSessionName" spellcheck="false" autocomplete="off" placeholder="scratch"></label><label>Label<input id="newSessionLabel" spellcheck="false" autocomplete="off" placeholder="Scratch"></label><label class="new-session-wide">Command<input id="newSessionCommand" spellcheck="false" autocomplete="off" placeholder="htop"></label><label class="new-session-wide">Working directory<input id="newSessionCwd" spellcheck="false" autocomplete="off" placeholder="~"></label></div><div class="links-editor-actions"><button type="submit" class="primary">${icon('plus')}<span>Create session</span></button></div></form>`;
+  document.body.appendChild(overlay);
+  const form = overlay.querySelector<HTMLFormElement>('form')!;
+  const nameInput = overlay.querySelector<HTMLInputElement>('#newSessionName')!;
+  const commandInput = overlay.querySelector<HTMLInputElement>('#newSessionCommand')!;
+  const close = (): void => overlay.remove();
+  overlay.querySelector('[data-close-new-session]')?.addEventListener('click', close);
+  overlay.addEventListener('mousedown', (event: MouseEvent) => { if (event.target === overlay) close(); });
+  form.addEventListener('submit', (event: Event) => {
+    event.preventDefault();
+    const body: NewSessionInput = {
+      name: nameInput.value.trim(),
+      label: overlay.querySelector<HTMLInputElement>('#newSessionLabel')!.value.trim(),
+      command: commandInput.value.trim(),
+      cwd: overlay.querySelector<HTMLInputElement>('#newSessionCwd')!.value.trim(),
+    };
+    createFreeformSession(body).then(close).catch((error: Error) => toast(error.message));
+  });
+  requestAnimationFrame(() => nameInput.focus());
+}
+
+async function createFreeformSession(body: NewSessionInput): Promise<void> {
+  if (!shellUnlocked) throw new Error('Unlock shells first');
+  if (!/^[A-Za-z0-9._-]{1,40}$/.test(body.name)) throw new Error('Name must be 1-40 chars: letters, numbers, dot, dash, underscore');
+  if (!body.command.trim()) throw new Error('Command is required');
+  const payload = await postJson('/api/sessions/create', body);
+  toast(payload.message || `${body.name} created`);
+  await refresh({ preserveUnlock: true });
+  await loadShells(false);
+  selectSession(body.name);
+}
+
 async function sessionAction(endpoint: string, name: string): Promise<void> {
   if (!shellUnlocked) throw new Error('Unlock shells first');
   const payload = await postJson(endpoint, { name });
@@ -1045,7 +1141,7 @@ async function unlockShells(password: string): Promise<void> {
   startShellStream();
   (document.getElementById('currentWork') || q('#shellSection')).scrollIntoView({ block: 'start', behavior: 'smooth' });
   toast(payload.message || 'Unlocked');
-  await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);
+  await Promise.allSettled([refresh({ preserveUnlock: true }), loadPrivateSessions(), loadSummary()]);
 }
 
 async function loadShells(showLoading = true): Promise<void> {
@@ -1131,6 +1227,8 @@ function clearShellPreview(name: string): void {
   const shell = shellPreviewByName(name);
   if (!shell) return;
   clearedOutputs[name] = shell.output;
+  shell.output = '';
+  removeShellPreviewCache(name);
   const pre = document.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(name)}"] [data-role="output"]`);
   if (pre) pre.textContent = '';
 }

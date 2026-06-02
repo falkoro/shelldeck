@@ -1,6 +1,7 @@
 use crate::{
-    auth, config, container_actions, containers, links, metrics, pages, ratelimit, remote,
-    remote_hosts, settings, share, stream, stt, summary, term, tmux, uploads, webutil, AppState,
+    auth, config, container_actions, containers, links, metrics, pages, private_sessions,
+    ratelimit, remote, remote_hosts, settings, share, stream, stt, summary, term, tmux, uploads,
+    webutil, AppState,
 };
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
@@ -37,6 +38,20 @@ struct KeyBody {
 #[derive(Deserialize)]
 struct NameBody {
     name: String,
+}
+
+#[derive(Deserialize)]
+struct PrivateBody {
+    name: String,
+    private: bool,
+}
+
+#[derive(Deserialize)]
+struct CreateSessionBody {
+    name: String,
+    command: String,
+    cwd: Option<String>,
+    label: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -89,6 +104,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/unlock", post(api_unlock))
         .route("/api/summary", get(api_summary))
         .route("/api/shells", get(api_shells))
+        .route("/api/private", get(api_private).post(api_private_save))
+        .route("/api/wipe", post(api_wipe))
         .route("/api/metrics", get(api_metrics))
         .route("/api/containers", get(api_containers))
         .route("/api/remote-hosts", get(api_remote_hosts))
@@ -122,6 +139,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
         .route("/api/stop", post(api_stop))
+        .route("/api/sessions/create", post(api_sessions_create))
+        .route("/api/sessions/remove", post(api_sessions_remove))
         .route("/api/container-action", post(api_container_action))
         .with_state(state)
 }
@@ -507,6 +526,84 @@ async fn api_shells(
     )
 }
 
+async fn api_private(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers) {
+        return response;
+    }
+    let private = private_sessions::load(state.config.clone()).await;
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "private": private }))
+}
+
+async fn api_private_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<PrivateBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    if !tmux::managed_or_running_session(state.config.clone(), &body.name).await {
+        return webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": "Unknown session" }),
+        );
+    }
+    match private_sessions::set(state.config.clone(), &body.name, body.private).await {
+        Ok(private) => {
+            if body.private {
+                if let Ok(mut cache) = state.summary_cache.lock() {
+                    *cache = None;
+                }
+            }
+            webutil::json_response(StatusCode::OK, &serde_json::json!({ "ok": true, "private": private }))
+        }
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_wipe(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<NameBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    match tmux::wipe_session(&body.name).await {
+        Ok(message) => {
+            if let Ok(mut cache) = state.summary_cache.lock() {
+                *cache = None;
+            }
+            webutil::json_response(
+                StatusCode::OK,
+                &serde_json::json!({ "ok": true, "message": message, "target": body.name }),
+            )
+        }
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
 // Live quotes for DASHBOARD_TICKERS via Yahoo's public chart endpoint (login-gated, not unlock —
 // market data isn't sensitive). Each symbol is fetched concurrently; failures are dropped.
 async fn api_tickers(
@@ -716,6 +813,67 @@ async fn api_stop(
         return response;
     }
     session_result(tmux::stop_session(&body.name).await)
+}
+
+async fn api_sessions_create(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<CreateSessionBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    match tmux::create_dynamic_session(
+        state.config.clone(),
+        &body.name,
+        &body.command,
+        body.cwd,
+        body.label,
+    )
+    .await
+    {
+        Ok(session) => webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({ "ok": true, "message": format!("{} created", session.name), "session": session }),
+        ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_sessions_remove(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<NameBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    match tmux::remove_session(state.config.clone(), &body.name).await {
+        Ok(message) => {
+            if let Ok(mut cache) = state.summary_cache.lock() {
+                *cache = None;
+            }
+            webutil::json_response(
+                StatusCode::OK,
+                &serde_json::json!({ "ok": true, "message": message, "target": body.name }),
+            )
+        }
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
 }
 
 // Restart / pull-latest a Docker/Podman container, locally or on a configured remote host.

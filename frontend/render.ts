@@ -29,8 +29,10 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
       <button class="iconly" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
+      <button class="iconly privacy-btn" type="button" data-private-shell title="Turn private mode on" aria-label="Toggle private mode" aria-pressed="false">${icon('lock')}</button>
       <button class="iconly more-toggle" type="button" data-more-toggle title="More actions" aria-label="More actions" aria-expanded="false">⋯</button>
       <button class="iconly shell-action-more" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
+      <button class="warn iconly shell-action-more" type="button" data-wipe-shell title="Wipe scrollback and clear this shell screen" aria-label="Wipe shell">${icon('eraser')}</button>
       <button class="warn iconly shell-action-more" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
       <button class="warn resume-btn iconly" type="button" data-resume title="Re-run the agent's resume command shown in the pane" aria-label="Resume agent">${icon('restart')}</button>
     </div>
@@ -52,6 +54,8 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.querySelector<HTMLButtonElement>('[data-maximize-preview]')!.dataset.maximizePreview = shell.name;
   article.querySelector<HTMLButtonElement>('[data-reset-preview]')!.dataset.resetPreview = shell.name;
   article.querySelector<HTMLButtonElement>('[data-shellin]')!.dataset.shellin = shell.name;
+  article.querySelector<HTMLButtonElement>('[data-private-shell]')!.dataset.privateShell = shell.name;
+  article.querySelector<HTMLButtonElement>('[data-wipe-shell]')!.dataset.wipeShell = shell.name;
   article.querySelector<HTMLButtonElement>('[data-resume]')!.dataset.resume = shell.name;
   article.querySelector<HTMLButtonElement>('[data-stop]')!.dataset.stop = shell.name;
   article.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((button) => {
@@ -69,23 +73,24 @@ function updateShellCard(card: HTMLElement, shell: ShellPreview): void {
   const keepFullscreen = card.classList.contains('preview-fullscreen');
   const keepEnlarged = card.classList.contains('preview-enlarged');
   const keepResizing = card.classList.contains('resizing');
-  card.className = `terminal-card ${shell.running ? 'running' : 'offline'}${shell.name === selectedSession ? ' selected' : ''}`;
+  const privateMode = Boolean(shell.private) || isPrivateSession(shell.name);
+  card.className = `terminal-card ${shell.running ? 'running' : 'offline'}${privateMode ? ' private' : ''}${shell.name === selectedSession ? ' selected' : ''}`;
   card.classList.toggle('preview-fullscreen', keepFullscreen);
   card.classList.toggle('preview-enlarged', keepEnlarged);
   card.classList.toggle('resizing', keepResizing);
   card.classList.toggle('shell-refreshing', shellsLoading);
   const displayLabel = updateShellCardTitle(card, shell);
-  setText(card, '[data-role="command"]', shell.command || 'offline');
-  setText(card, '[data-role="cwd"]', shell.cwd || '');
+  setText(card, '[data-role="command"]', privateMode ? 'private mode' : (shell.command || 'offline'));
+  setText(card, '[data-role="cwd"]', privateMode ? '' : (shell.cwd || ''));
   card.querySelector('[data-role="dot"]')!.className = `dot ${shell.running ? 'on' : ''}`;
-  noteShellActivity(shell.name, shell.output);
+  if (!privateMode) noteShellActivity(shell.name, shell.output);
   setShellAgentBadge(card, shell.name);
   setWorkTitle(card, shell.name);
   // Surface a one-click recovery when an agent has exited and printed a resume command
   // (e.g. Codex: "To continue this session, run codex resume <id>").
   const resumeBtn = card.querySelector<HTMLButtonElement>('[data-resume]');
   if (resumeBtn) {
-    const m = shell.output.match(/\bcodex resume [A-Za-z0-9-]{8,}/i);
+    const m = privateMode ? null : shell.output.match(/\bcodex resume [A-Za-z0-9-]{8,}/i);
     if (m) {
       resumeBtn.dataset.resumeCmd = m[0];
       resumeBtn.classList.add('show');
@@ -94,7 +99,7 @@ function updateShellCard(card: HTMLElement, shell: ShellPreview): void {
       resumeBtn.classList.remove('show');
     }
   }
-  let output = shell.output || (shell.running ? 'No output captured yet.' : 'Session is offline.');
+  let output = privateMode ? 'Private mode: output hidden while private.' : (shell.output || (shell.running ? 'No output captured yet.' : 'Session is offline.'));
   if (clearedOutputs[shell.name] && clearedOutputs[shell.name] === shell.output) output = '';
   if (clearedOutputs[shell.name] && clearedOutputs[shell.name] !== shell.output) delete clearedOutputs[shell.name];
   const pre = card.querySelector<HTMLElement>('[data-role="output"]')!;
@@ -104,6 +109,13 @@ function updateShellCard(card: HTMLElement, shell: ShellPreview): void {
   setText(card, '[data-role="output"]', output);
   const input = card.querySelector<HTMLTextAreaElement>('[data-command]')!;
   input.placeholder = shell.running ? `Input for ${displayLabel}` : 'Create this session before sending input';
+  const stopBtn = card.querySelector<HTMLButtonElement>('[data-stop]');
+  if (stopBtn) {
+    stopBtn.title = sessionByName(shell.name)?.dynamic
+      ? 'Close this dynamic session and remove it from the dashboard'
+      : 'Kill this tmux session';
+  }
+  updatePrivateUi();
   if (followOutput && atBottom) pre.scrollTop = pre.scrollHeight;
   renderShellImages(shell.name);
 }
@@ -155,6 +167,12 @@ function setText(parent: HTMLElement, selector: string, text: string): void {
 function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean }): void {
   const grid = q('#shells');
   latestShells = payload.shells || [];
+  if (!payload.fromCache) {
+    latestShells.forEach((shell) => {
+      if (shell.private) privateSessions.add(shell.name);
+      else privateSessions.delete(shell.name);
+    });
+  }
   if (latestShells.length && !payload.fromCache) saveShellPreviewCache(latestShells);
   if (!latestShells.length) {
     grid.innerHTML = '<div class="locked-note">No tmux panes were returned yet. Try starting a shell slot.</div>';
@@ -214,6 +232,9 @@ function markSelectedShell(): void {
 }
 
 function sessionRuntime(session: SessionItem): { label: string; dotClass: string; className: string } {
+  if (isPrivateSession(session.name)) {
+    return { label: session.running ? 'private' : 'private offline', dotClass: session.running ? 'on' : '', className: 'private' };
+  }
   if (!session.running) return { label: 'offline', dotClass: '', className: 'offline' };
   const shell = shellPreviewByName(session.name);
   if (shell && shell.running) {
@@ -249,14 +270,17 @@ function renderSelectedSessionActions(): void {
   const createDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
   const createLabel = selected.running ? 'Running' : 'Create';
   const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-  const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
+  const dynamic = Boolean(selected.dynamic);
+  const stopDisabled = (!selected.running && !dynamic) || !shellUnlocked ? 'disabled' : '';
+  const stopLabel = dynamic ? 'Close' : 'Stop';
+  const stopTitle = dynamic ? 'Close this dynamic session and remove it from the dashboard' : 'Kill this tmux session';
   const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
   const displayLabel = shellDisplayLabel(selected.name, selected.label);
   const sshButton = selected.sshCommand
     ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
     : '';
   el.hidden = false;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="${escapeHtml(stopTitle)}">${icon('stop')}<span>${stopLabel}</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 
 let shellTabsSignature = '';
@@ -313,6 +337,15 @@ function renderShellTabs(): void {
 }
 
 function setShellAgentBadge(card: HTMLElement, name: string): void {
+  if (isPrivateSession(name)) {
+    const badge = card.querySelector<HTMLElement>('[data-role="agent"]');
+    if (badge) {
+      badge.className = 'agent-badge private';
+      badge.textContent = 'private';
+    }
+    card.classList.remove('agent-waiting');
+    return;
+  }
   const shell = latestShells.find((s) => s.name === name);
   const status = shell && shell.running ? (shellWorking(name) ? 'active' : 'waiting') : '';
   const badge = card.querySelector<HTMLElement>('[data-role="agent"]');
@@ -328,6 +361,12 @@ function setShellAgentBadge(card: HTMLElement, name: string): void {
 function setWorkTitle(card: HTMLElement, name: string): void {
   const el = card.querySelector<HTMLElement>('[data-role="worktitle"]');
   if (!el) return;
+  if (isPrivateSession(name)) {
+    el.className = 'work-title';
+    el.textContent = '';
+    delete el.dataset.renderedTitle;
+    return;
+  }
   const title = shellboxSummary(name);
   if (title) {
     renderWorkTitle(el, title);

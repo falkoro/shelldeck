@@ -12,3 +12,7 @@
 
 # Whisper STT models (downloaded at setup, not committed)
 share/models/
+
+# runtime session state (per-instance)
+dynamic-sessions.json
+private-sessions.json

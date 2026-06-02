@@ -589,6 +589,10 @@ function createTermWindow(name: string): TermWindow {
 
 function openTerminal(name: string): void {
   if (!name) return;
+  if (isPrivateSession(name)) {
+    toast('Toggle privacy off to open a terminal');
+    return;
+  }
   if (typeof Terminal === 'undefined') {
     toast('Terminal failed to load');
     return;
@@ -632,6 +636,12 @@ function closeWindow(tw: TermWindow): void {
   termWindows.delete(tw.name);
   renderDock();
 }
+
+function closeTerminalForSession(name: string): void {
+  const tw = termWindows.get(name);
+  if (tw) closeWindow(tw);
+}
+(window as any).closeTerminalForSession = closeTerminalForSession;
 
 function toggleMaximize(tw: TermWindow): void {
   const el = tw.el;

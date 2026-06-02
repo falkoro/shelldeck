@@ -16,6 +16,8 @@ document.addEventListener('click', async (event) => {
     const historyButton = target.closest('[data-history]');
     const copyOutputButton = target.closest('[data-copy-output]');
     const clearPreviewButton = target.closest('[data-clear-preview]');
+    const privateShellButton = target.closest('[data-private-shell]');
+    const wipeShellButton = target.closest('[data-wipe-shell]');
     const renameShellButton = target.closest('[data-rename-shell]');
     const resetShellLabelButton = target.closest('[data-reset-shell-label]');
     const renameSensorButton = target.closest('[data-rename-sensor]');
@@ -45,6 +47,10 @@ document.addEventListener('click', async (event) => {
             return copyShellOutput(copyOutputButton.dataset.copyOutput || '');
         if (clearPreviewButton)
             return clearShellPreview(clearPreviewButton.dataset.clearPreview || '');
+        if (privateShellButton && !privateShellButton.disabled)
+            return togglePrivateSession(privateShellButton.dataset.privateShell || '');
+        if (wipeShellButton && !wipeShellButton.disabled)
+            return wipeShell(wipeShellButton.dataset.wipeShell || '');
         if (renameShellButton) {
             const name = renameShellButton.dataset.renameShell || '';
             if (name && renameShellLabel(name)) {
@@ -76,7 +82,12 @@ document.addEventListener('click', async (event) => {
             return;
         }
         if (shellinButton) {
-            openTerminal(shellinButton.dataset.shellin || '');
+            const name = shellinButton.dataset.shellin || '';
+            if (isPrivateSession(name)) {
+                toast('Toggle privacy off to open a terminal');
+                return;
+            }
+            openTerminal(name);
             return;
         }
         const minimizeShellButton = target.closest('[data-minimize-shell]');
@@ -118,10 +129,12 @@ document.addEventListener('click', async (event) => {
         }
         if (stopButton && !stopButton.disabled) {
             const stopped = stopButton.dataset.stop || '';
-            if (!confirm(`Kill tmux session "${stopped}"? Everything running in it stops. This cannot be undone.`))
+            const dynamic = Boolean(sessionByName(stopped)?.dynamic);
+            const verb = dynamic ? 'Close' : 'Kill tmux session';
+            if (!confirm(`${verb} "${stopped}"? Everything running in it stops. This cannot be undone.`))
                 return;
-            await sessionAction('/api/stop', stopped);
-            if (sessionByName(stopped))
+            await sessionAction(dynamic ? '/api/sessions/remove' : '/api/stop', stopped);
+            if (!dynamic && sessionByName(stopped))
                 selectSession(stopped);
             return;
         }
@@ -238,6 +251,15 @@ q('#densityToggle').addEventListener('click', toggleDensity);
 q('#followToggle').addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
 // Restore all minimized shell previews button (injected)
 const shellTools = document.querySelector('.shell-tools');
+if (shellTools && !document.querySelector('#newSessionBtn')) {
+    const newSessionBtn = document.createElement('button');
+    newSessionBtn.id = 'newSessionBtn';
+    newSessionBtn.type = 'button';
+    newSessionBtn.title = 'Create a new persisted tmux session';
+    newSessionBtn.innerHTML = `${icon('plus')}<span>New</span>`;
+    newSessionBtn.addEventListener('click', () => openNewSessionEditor());
+    shellTools.appendChild(newSessionBtn);
+}
 if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
     const restoreAllBtn = document.createElement('button');
     restoreAllBtn.id = 'restoreAllPreviewsBtn';
@@ -537,7 +559,7 @@ function markBooted() {
 render(initialModel);
 queueMicrotask(markBooted);
 queueMicrotask(() => loadSummary().catch(() => { }));
-queueMicrotask(() => loadShells().then(() => {
+queueMicrotask(() => loadShells().then(() => loadPrivateSessions()).then(() => {
     startShellStream();
     window.maybeAutoOpenMobileShell?.();
 }).catch((error) => toast(error.message)));

@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::Config, dynamic_sessions, private_sessions};
 use serde::Serialize;
 use std::{collections::HashMap, path::PathBuf, process::Stdio, sync::Arc};
 use tokio::{io::AsyncWriteExt, process::Command};
@@ -20,6 +20,7 @@ pub struct SessionView {
     pub attached: u32,
     pub created: Option<u64>,
     pub activity: Option<u64>,
+    pub dynamic: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -30,6 +31,7 @@ pub struct ShellPreview {
     pub cwd: String,
     pub command: String,
     pub output: String,
+    pub private: bool,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
 }
@@ -50,6 +52,18 @@ struct LiveSession {
     attached: u32,
     created: u64,
     activity: u64,
+}
+
+#[derive(Clone)]
+struct ManagedSession {
+    name: String,
+    label: String,
+    family: String,
+    alias: String,
+    badge: String,
+    start: String,
+    cwd: String,
+    dynamic: bool,
 }
 
 #[derive(Clone)]
@@ -107,7 +121,8 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
     let live_by_name: HashMap<String, LiveSession> =
         live.iter().cloned().map(|s| (s.name.clone(), s)).collect();
     let mut sessions = Vec::new();
-    for spec in &config.known_sessions {
+    let managed = managed_sessions(config.clone()).await;
+    for spec in &managed {
         let found = live_by_name.get(&spec.name);
         sessions.push(SessionView {
             name: spec.name.clone(),
@@ -122,15 +137,12 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
             attached: found.map(|s| s.attached).unwrap_or(0),
             created: found.map(|s| s.created),
             activity: found.map(|s| s.activity),
+            dynamic: spec.dynamic,
         });
     }
     if config.show_unknown_sessions {
         for item in live {
-            if config
-                .known_sessions
-                .iter()
-                .any(|s| s.name == item.name.as_str())
-            {
+            if managed.iter().any(|s| s.name == item.name) {
                 continue;
             }
             let label = custom_label(&item.name);
@@ -147,6 +159,7 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
                 attached: item.attached,
                 created: Some(item.created),
                 activity: Some(item.activity),
+                dynamic: false,
             });
         }
     }
@@ -157,6 +170,60 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
         sessions,
         unlocked,
     }
+}
+
+async fn managed_sessions(config: Arc<Config>) -> Vec<ManagedSession> {
+    let mut sessions: Vec<ManagedSession> = config
+        .known_sessions
+        .iter()
+        .map(|spec| ManagedSession {
+            name: spec.name.clone(),
+            label: spec.label.clone(),
+            family: spec.family.clone(),
+            alias: spec.alias.clone(),
+            badge: spec.badge.clone(),
+            start: spec.start.clone(),
+            cwd: String::new(),
+            dynamic: false,
+        })
+        .collect();
+    let known: std::collections::HashSet<String> =
+        sessions.iter().map(|s| s.name.clone()).collect();
+    for spec in dynamic_sessions::load(config).await {
+        if known.contains(&spec.name) || sessions.iter().any(|s| s.name == spec.name) {
+            continue;
+        }
+        sessions.push(ManagedSession {
+            name: spec.name.clone(),
+            label: spec.label.clone(),
+            family: "dynamic".to_string(),
+            alias: spec.name.clone(),
+            badge: custom_badge(&spec.name),
+            start: spec.start.clone(),
+            cwd: spec.cwd.clone(),
+            dynamic: true,
+        });
+    }
+    sessions
+}
+
+pub async fn managed_session_names(config: Arc<Config>) -> Vec<String> {
+    managed_sessions(config)
+        .await
+        .into_iter()
+        .map(|s| s.name)
+        .collect()
+}
+
+pub async fn managed_or_running_session(config: Arc<Config>, name: &str) -> bool {
+    if managed_session_names(config)
+        .await
+        .iter()
+        .any(|session| session == name)
+    {
+        return true;
+    }
+    session_names().await.iter().any(|session| session == name)
 }
 
 fn custom_label(name: &str) -> String {
@@ -227,12 +294,11 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
     let by_session: HashMap<String, Pane> =
         panes.into_iter().map(|p| (p.session.clone(), p)).collect();
     let mut shells = Vec::new();
-    let known_names: Vec<&str> = config
-        .known_sessions
-        .iter()
-        .map(|spec| spec.name.as_str())
-        .collect();
-    for spec in &config.known_sessions {
+    let managed = managed_sessions(config.clone()).await;
+    let private = private_sessions::load(config.clone()).await;
+    let known_names: Vec<&str> = managed.iter().map(|spec| spec.name.as_str()).collect();
+    for spec in &managed {
+        let is_private = private.contains(&spec.name);
         if let Some(pane) = by_session.get(&spec.name) {
             let cwd = pane
                 .cwd
@@ -241,9 +307,14 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
                 name: spec.name.clone(),
                 label: spec.label.clone(),
                 running: true,
-                cwd,
-                command: pane.command.clone(),
-                output: tidy_output(&capture_pane(pane, clean_lines(lines)).await),
+                cwd: if is_private { String::new() } else { cwd },
+                command: if is_private { String::new() } else { pane.command.clone() },
+                output: if is_private {
+                    String::new()
+                } else {
+                    tidy_output(&capture_pane(pane, clean_lines(lines)).await)
+                },
+                private: is_private,
                 updated_at: iso_now(),
             });
         } else {
@@ -254,6 +325,7 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
                 cwd: String::new(),
                 command: String::new(),
                 output: String::new(),
+                private: is_private,
                 updated_at: iso_now(),
             });
         }
@@ -265,6 +337,7 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
             .collect();
         unknown.sort_by(|a, b| a.session.cmp(&b.session));
         for pane in unknown {
+            let is_private = private.contains(&pane.session);
             let cwd = pane
                 .cwd
                 .replace(&home_dir().to_string_lossy().to_string(), "~");
@@ -272,9 +345,14 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
                 name: pane.session.clone(),
                 label: custom_label(&pane.session),
                 running: true,
-                cwd,
-                command: pane.command.clone(),
-                output: tidy_output(&capture_pane(pane, clean_lines(lines)).await),
+                cwd: if is_private { String::new() } else { cwd },
+                command: if is_private { String::new() } else { pane.command.clone() },
+                output: if is_private {
+                    String::new()
+                } else {
+                    tidy_output(&capture_pane(pane, clean_lines(lines)).await)
+                },
+                private: is_private,
                 updated_at: iso_now(),
             });
         }
@@ -342,21 +420,21 @@ mod tests {
 }
 
 pub async fn start_session(config: Arc<Config>, name: &str) -> Result<String, String> {
-    launch_known_session(config, name, "started").await
+    launch_managed_session(config, name, "started").await
 }
 
 pub async fn create_session(config: Arc<Config>, name: &str) -> Result<String, String> {
-    launch_known_session(config, name, "created").await
+    launch_managed_session(config, name, "created").await
 }
 
-async fn launch_known_session(
+async fn launch_managed_session(
     config: Arc<Config>,
     name: &str,
     verb: &str,
 ) -> Result<String, String> {
-    let spec = config
-        .known_sessions
-        .iter()
+    let spec = managed_sessions(config.clone())
+        .await
+        .into_iter()
         .find(|s| s.name == name)
         .ok_or("Unknown session")?;
     if Command::new("/usr/bin/tmux")
@@ -368,22 +446,104 @@ async fn launch_known_session(
     {
         return Ok(format!("{name} is already running"));
     }
-    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
+    launch_spec(config, &spec).await?;
     Ok(format!("{name} {verb}"))
 }
 
 pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, String> {
-    let spec = config
-        .known_sessions
-        .iter()
+    let spec = managed_sessions(config.clone())
+        .await
+        .into_iter()
         .find(|s| s.name == name)
         .ok_or("Unknown session")?;
     let _ = Command::new("/usr/bin/tmux")
         .args(["kill-session", "-t", name])
         .status()
         .await;
-    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
-    Ok(format!("{name} restarted in ~"))
+    launch_spec(config, &spec).await?;
+    Ok(format!("{name} restarted"))
+}
+
+async fn launch_spec(config: Arc<Config>, spec: &ManagedSession) -> Result<(), String> {
+    if spec.dynamic {
+        tmux_output(&["new-session", "-d", "-s", &spec.name, "-c", &spec.cwd, "zsh -l"]).await?;
+        if let Err(error) = paste_text(config, &spec.name, &spec.start, true).await {
+            let _ = Command::new("/usr/bin/tmux")
+                .args(["kill-session", "-t", &spec.name])
+                .status()
+                .await;
+            return Err(error);
+        }
+        Ok(())
+    } else {
+        tmux_output(&["new-session", "-d", "-s", &spec.name, &spec.start])
+            .await
+            .map(|_| ())
+    }
+}
+
+pub async fn create_dynamic_session(
+    config: Arc<Config>,
+    name: &str,
+    command: &str,
+    cwd: Option<String>,
+    label: Option<String>,
+) -> Result<dynamic_sessions::DynamicSession, String> {
+    let entry = dynamic_sessions::new_entry(name, command, cwd, label)?;
+    if config.known_sessions.iter().any(|spec| spec.name == entry.name) {
+        return Err("That name is already a configured session".to_string());
+    }
+    let mut dynamic = dynamic_sessions::load(config.clone()).await;
+    if dynamic.iter().any(|spec| spec.name == entry.name) {
+        return Err("That dynamic session already exists".to_string());
+    }
+    if session_names().await.iter().any(|session| session == &entry.name) {
+        return Err("A tmux session with that name is already running".to_string());
+    }
+    let spec = ManagedSession {
+        name: entry.name.clone(),
+        label: entry.label.clone(),
+        family: "dynamic".to_string(),
+        alias: entry.name.clone(),
+        badge: custom_badge(&entry.name),
+        start: entry.start.clone(),
+        cwd: entry.cwd.clone(),
+        dynamic: true,
+    };
+    launch_spec(config.clone(), &spec).await?;
+    dynamic.push(entry.clone());
+    if let Err(error) = dynamic_sessions::save(config, dynamic).await {
+        let _ = Command::new("/usr/bin/tmux")
+            .args(["kill-session", "-t", &entry.name])
+            .status()
+            .await;
+        return Err(error);
+    }
+    Ok(entry)
+}
+
+pub async fn remove_session(config: Arc<Config>, name: &str) -> Result<String, String> {
+    if name.trim().is_empty() {
+        return Err("Session name is required".to_string());
+    }
+    let mut dynamic = dynamic_sessions::load(config.clone()).await;
+    if let Some(index) = dynamic.iter().position(|spec| spec.name == name) {
+        if session_names().await.iter().any(|session| session == name) {
+            tmux_output(&["kill-session", "-t", name]).await?;
+        }
+        dynamic.remove(index);
+        dynamic_sessions::save(config.clone(), dynamic).await?;
+        let _ = private_sessions::set(config.clone(), name, false).await;
+        return Ok(format!("{name} closed and removed"));
+    }
+    if config.known_sessions.iter().any(|spec| spec.name == name) {
+        if session_names().await.iter().any(|session| session == name) {
+            tmux_output(&["kill-session", "-t", name]).await?;
+            return Ok(format!("{name} stopped; configured slot remains"));
+        }
+        return Ok(format!("{name} is offline; configured slot remains"));
+    }
+    Err("Unknown session".to_string())
 }
 
 pub async fn stop_session(name: &str) -> Result<String, String> {
@@ -396,6 +556,22 @@ pub async fn stop_session(name: &str) -> Result<String, String> {
     }
     tmux_output(&["kill-session", "-t", name]).await?;
     Ok(format!("{name} stopped"))
+}
+
+pub async fn wipe_session(name: &str) -> Result<String, String> {
+    if name.trim().is_empty() {
+        return Err("Session name is required".to_string());
+    }
+    let sessions = list_tmux_sessions().await;
+    if !sessions.iter().any(|s| s.name == name) {
+        return Err(format!("{name} is not running"));
+    }
+    // ShellDeck sessions are single-pane, so the session target clears the active pane.
+    tmux_output(&["clear-history", "-t", name]).await?;
+    let _ = tmux_output(&["send-keys", "-t", name, "-R"]).await;
+    let _ = tmux_output(&["send-keys", "-t", name, "C-l"]).await;
+    tmux_output(&["clear-history", "-t", name]).await?;
+    Ok(format!("{name} wiped"))
 }
 
 pub async fn paste_text(

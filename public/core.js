@@ -5,6 +5,7 @@ let latestShells = [];
 let latestSummaryText = '';
 let summaryLoading = false;
 let shellsLoading = false;
+let privateSessions = new Set();
 let dashboardSettings = {
     tickers: [],
     panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, links: true, tickers: true, expandLists: false },
@@ -21,6 +22,8 @@ const autoFollowUpSentDrafts = {};
 // Pull the one-liner for a given session out of the Current Work summary (lines like
 // "- main: ...", "main (claude): ...", "**slot1** — ..."), to use as a per-slot title.
 function sessionWorkTitle(session) {
+    if (isPrivateSession(session))
+        return '';
     const cached = shellAutoTitles();
     for (const raw of latestSummaryText.split('\n')) {
         const head = raw.trim().replace(/^[\-*•\s]+/, '').replace(/\*\*/g, '');
@@ -213,9 +216,15 @@ function shellAutoTitles() {
     }
     return titles;
 }
-function clearShellAutoTitleCache() {
+function clearShellAutoTitleCache(name) {
     try {
-        localStorage.removeItem(SHELL_AUTO_TITLES_KEY);
+        if (!name) {
+            localStorage.removeItem(SHELL_AUTO_TITLES_KEY);
+            return;
+        }
+        const store = shellAutoTitleStore();
+        delete store[name];
+        localStorage.setItem(SHELL_AUTO_TITLES_KEY, JSON.stringify(store));
     }
     catch { }
 }
@@ -247,12 +256,16 @@ function compactShellLabel(name, fallback) {
     return fallback;
 }
 function shellboxTitle(name) {
+    if (isPrivateSession(name))
+        return '';
     const title = sessionWorkBrief(name, SHELLBOX_TITLE_WORDS).replace(/\s+/g, ' ').trim();
     if (!title)
         return '';
     return title.replace(/[.,;:!?]+$/, '');
 }
 function shellboxSummary(name) {
+    if (isPrivateSession(name))
+        return '';
     return sessionWorkTitle(name);
 }
 function generatedShellLabel(name) {
@@ -388,11 +401,59 @@ function focusComposer(name) {
 function shellPreviewByName(name) {
     return latestShells.find((shell) => shell.name === name) || null;
 }
+function isPrivateSession(name) {
+    return privateSessions.has(name) || Boolean(shellPreviewByName(name)?.private);
+}
+function setPrivateSessionState(name, isPrivate) {
+    if (!name)
+        return;
+    if (isPrivate)
+        privateSessions.add(name);
+    else
+        privateSessions.delete(name);
+    latestShells = latestShells.map((shell) => shell.name === name ? { ...shell, private: isPrivate, output: isPrivate ? '' : shell.output } : shell);
+    if (isPrivate)
+        clearShellAutoTitleCache(name);
+    shellTabsSignature = '';
+    updatePrivateUi();
+}
+function applyPrivateSessions(names) {
+    privateSessions = new Set((names || []).filter(Boolean));
+    latestShells = latestShells.map((shell) => ({ ...shell, private: privateSessions.has(shell.name) }));
+    shellTabsSignature = '';
+    updatePrivateUi();
+}
+function updatePrivateUi() {
+    document.querySelectorAll('[data-private-shell]').forEach((button) => {
+        const name = button.dataset.privateShell || '';
+        const active = isPrivateSession(name);
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        button.title = active ? 'Turn private mode off' : 'Turn private mode on';
+    });
+    document.querySelectorAll('[data-shellin]').forEach((button) => {
+        const name = button.dataset.shellin || '';
+        const active = isPrivateSession(name);
+        button.disabled = active;
+        button.title = active ? 'Toggle privacy off to open a terminal' : 'Open a live interactive terminal in this session';
+    });
+}
+window.updatePrivateUi = updatePrivateUi;
 function saveShellPreviewCache(shells) {
     if (!shells.length)
         return;
     try {
         localStorage.setItem(SHELL_PREVIEW_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), shells }));
+    }
+    catch { }
+}
+function removeShellPreviewCache(name) {
+    try {
+        const cached = storageJson(SHELL_PREVIEW_CACHE_KEY, {});
+        if (!Array.isArray(cached.shells))
+            return;
+        const shells = cached.shells.map((shell) => shell.name === name ? { ...shell, output: '' } : shell);
+        localStorage.setItem(SHELL_PREVIEW_CACHE_KEY, JSON.stringify({ ...cached, shells }));
     }
     catch { }
 }
@@ -429,6 +490,10 @@ function targetReady(name) {
     const shell = shellPreviewByName(name);
     const session = sessionByName(name);
     return Boolean(shellUnlocked && name && (shell?.running || session?.running));
+}
+function stopReady(name) {
+    const session = sessionByName(name);
+    return Boolean(shellUnlocked && session && (session.running || session.dynamic));
 }
 function createReady(name) {
     const session = sessionByName(name);
@@ -473,8 +538,15 @@ function updateUnlockState() {
         button.disabled = !targetReady(button.dataset.shell || '');
     });
     document.querySelectorAll('[data-stop]').forEach((button) => {
-        button.disabled = !targetReady(button.dataset.stop || '');
+        button.disabled = !stopReady(button.dataset.stop || '');
     });
+    document.querySelectorAll('[data-private-shell],[data-wipe-shell]').forEach((button) => {
+        const name = button.dataset.privateShell || button.dataset.wipeShell || '';
+        button.disabled = button.dataset.wipeShell ? !targetReady(name) : !shellUnlocked;
+    });
+    const newSession = document.getElementById('newSessionBtn');
+    if (newSession)
+        newSession.disabled = !shellUnlocked;
     document.querySelectorAll('[data-create]').forEach((button) => {
         button.disabled = !createReady(button.dataset.create || '');
     });
