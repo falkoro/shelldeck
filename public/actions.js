@@ -1108,7 +1108,7 @@ function startShellStream() {
         const payload = JSON.parse(event.data);
         setShellsLoading(false);
         renderShells({ shells: payload.shells });
-        setStreamState(`live ${new Date().toLocaleTimeString()}`, true);
+        setStreamState(`live ${new Date().toLocaleTimeString([], { hour12: false })}`, true);
     });
     shellStream.onerror = () => setStreamState('stream reconnecting');
 }
@@ -1120,6 +1120,12 @@ function restartShellStream() {
     startShellStream();
 }
 function copyShellOutput(name) {
+    const sel = window.getSelection?.();
+    const selText = sel?.toString() || '';
+    const card = document.querySelector(`[data-shell-card="${selectorEscape(name)}"]`);
+    if (selText.trim() && card && sel?.anchorNode && card.contains(sel.anchorNode)) {
+        return copyText(selText);
+    }
     const text = shellPreviewByName(name)?.output || '';
     if (!text)
         throw new Error('No output to copy');

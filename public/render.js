@@ -25,12 +25,13 @@ function createShellCard(shell) {
       <button class="iconly" type="button" data-add-image title="Attach an image; inserts its saved path" aria-label="Attach image">${icon('image')}</button>
       <button class="iconly" type="button" data-key="enter" title="Press Enter in the shell" aria-label="Press Enter">${icon('enter')}</button>
       <button class="warn compact-action" type="button" data-key="interrupt" title="Interrupt the running command (Ctrl-C)" aria-label="Interrupt command (Ctrl-C)">${icon('stop')}<span>Ctrl-C</span></button>
-      <button class="warn iconly" type="button" data-stop title="Stop this tmux session" aria-label="Stop tmux session">${icon('stop')}</button>
       <button class="iconly" type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)" aria-label="Input history">${icon('clock')}</button>
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
-      <button class="iconly" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
       <button class="iconly" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
+      <button class="iconly more-toggle" type="button" data-more-toggle title="More actions" aria-label="More actions" aria-expanded="false">⋯</button>
+      <button class="iconly shell-action-more" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
+      <button class="warn iconly shell-action-more" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
       <button class="warn resume-btn iconly" type="button" data-resume title="Re-run the agent's resume command shown in the pane" aria-label="Resume agent">${icon('restart')}</button>
     </div>
     <div class="attach-list" data-role="attachments"></div>
@@ -314,6 +315,7 @@ function renderShellTabs() {
     }).join('');
     markSelectedShell();
     renderSelectedSessionActions();
+    buildLegend();
 }
 function setShellAgentBadge(card, name) {
     const shell = latestShells.find((s) => s.name === name);
@@ -383,21 +385,35 @@ function buildLegend() {
         return;
     const items = [
         ['send', 'Send', 'Type the text and press Enter in the shell'],
+        ['mic', 'Mic', 'Record your voice; click again to stop and transcribe'],
         ['paste', 'Paste', 'Insert the text without pressing Enter'],
         ['image', 'Image', 'Attach an image; inserts its saved path'],
-        ['clock', 'History', 'Cycle previous inputs (or ↑ / ↓ in the box)'],
         ['enter', 'Enter', 'Press Enter in the shell'],
-        ['stop', 'Ctrl-C', 'Interrupt the running command'],
+        ['stop', 'Ctrl-C', 'Interrupt the running command (does not kill the session)'],
+        ['power', 'Stop session', 'Kill this tmux session — destructive'],
+        ['clock', 'History', 'Cycle previous inputs (or up / down in the box)'],
         ['eraser', 'Clear', 'Clear the shell screen'],
         ['copy', 'Copy', 'Copy the pane output'],
         ['eyeoff', 'Clear view', 'Clear this preview locally (not the shell)'],
+        ['terminal', 'Shell in', 'Open a live interactive terminal in this session'],
+        ['restart', 'Resume', "Re-run the agent's resume command shown in the pane"],
     ];
-    const rows = items.map(([ic, name, desc]) => `<div class="legend-row">${icon(ic)}<b>${name}</b><span>${escapeHtml(desc)}</span></div>`).join('');
+    // Toolbar controls in the Shells header (the cryptic ones, e.g. the "80" dropdown).
+    const toolbar = [
+        ['focus', 'Focus / Grid', 'Show one shell, or all panes side-by-side'],
+        ['rows', 'Lines · 80 / 200 / 500', 'How many recent output lines each preview shows'],
+        ['follow', 'Follow', 'Auto-scroll previews to the newest output'],
+        ['summary', 'Summary', 'Refresh the AI work-title for each shell'],
+        ['refresh', 'Refresh', 'Reload all shell previews now'],
+    ];
+    const toRow = ([ic, name, desc]) => `<div class="legend-row">${icon(ic)}<b>${name}</b><span>${escapeHtml(desc)}</span></div>`;
+    const rows = items.map(toRow).join('');
+    const toolbarRows = toolbar.map(toRow).join('');
     const status = `<div class="legend-row"><span class="dot on"></span><b>running</b><span>agent is working</span></div><div class="legend-row"><span class="dot wait"></span><b>waiting</b><span>agent is waiting for your input</span></div>`;
     const details = document.createElement('details');
     details.id = 'legend';
     details.className = 'legend';
-    details.innerHTML = `<summary>Button legend</summary><div class="legend-grid">${rows}${status}</div>`;
+    details.innerHTML = `<summary>Button legend — what each control does</summary><div class="legend-section">Shell buttons</div><div class="legend-grid">${rows}</div><div class="legend-section">Toolbar</div><div class="legend-grid">${toolbarRows}</div><div class="legend-section">Status</div><div class="legend-grid">${status}</div>`;
     tabs.insertAdjacentElement('afterend', details);
 }
 function renderTickers(list) {
@@ -426,7 +442,7 @@ function renderShellImages(name) {
 function render(model, options = {}) {
     currentModel = model;
     shellUnlocked = Boolean(model.unlocked) || Boolean(options.preserveUnlock && shellUnlocked);
-    q('#updated').textContent = `updated ${new Date(model.now).toLocaleTimeString()}`;
+    q('#updated').textContent = `updated ${new Date(model.now).toLocaleTimeString([], { hour12: false })}`;
     chooseSession(false);
     renderShellTabs();
     renderSelectedSessionActions();

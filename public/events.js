@@ -23,6 +23,7 @@ document.addEventListener('click', async (event) => {
     const editDescButton = target.closest('[data-edit-desc]');
     const shellinButton = target.closest('[data-shellin]');
     const resumeButton = target.closest('[data-resume]');
+    const moreToggleButton = target.closest('[data-more-toggle]');
     const removeImageButton = target.closest('[data-remove-image]');
     const tabButton = target.closest('[data-shell-tab]');
     const selectItem = target.closest('[data-select-session]');
@@ -68,6 +69,12 @@ document.addEventListener('click', async (event) => {
         }
         if (editDescButton)
             return editContainerDescription(editDescButton.dataset.editDesc || '');
+        if (moreToggleButton) {
+            const bar = moreToggleButton.closest('.shell-actions');
+            const open = !!bar?.classList.toggle('more-open');
+            moreToggleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+            return;
+        }
         if (shellinButton) {
             openTerminal(shellinButton.dataset.shellin || '');
             return;
@@ -111,6 +118,8 @@ document.addEventListener('click', async (event) => {
         }
         if (stopButton && !stopButton.disabled) {
             const stopped = stopButton.dataset.stop || '';
+            if (!confirm(`Kill tmux session "${stopped}"? Everything running in it stops. This cannot be undone.`))
+                return;
             await sessionAction('/api/stop', stopped);
             if (sessionByName(stopped))
                 selectSession(stopped);
@@ -247,6 +256,27 @@ if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
     });
     shellTools.appendChild(restoreAllBtn);
 }
+// Legend toggle next to the live-time pill — reveals the collapsible "what each button means"
+// panel (built lazily by buildLegend, which sits under the shell tabs). On mobile it stays
+// collapsed until tapped, so it never crowds the small screen.
+if (shellTools && !document.querySelector('#legendToggleBtn')) {
+    const legendBtn = document.createElement('button');
+    legendBtn.id = 'legendToggleBtn';
+    legendBtn.type = 'button';
+    legendBtn.title = 'What each button and control does';
+    legendBtn.innerHTML = `${icon('help')}<span>Legend</span>`;
+    legendBtn.addEventListener('click', () => {
+        buildLegend();
+        const legend = document.getElementById('legend');
+        if (!legend)
+            return;
+        legend.open = !legend.open;
+        legendBtn.classList.toggle('active', legend.open);
+        if (legend.open)
+            legend.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    document.getElementById('streamState')?.insertAdjacentElement('afterend', legendBtn);
+}
 // Rotating keyboard-shortcut tip in the spare space of the shell toolbar.
 const SHELL_TIPS = [
     'Tip: r refresh · g grid/focus · c density',
@@ -260,8 +290,10 @@ if (shellTools && !document.querySelector('#shellTip')) {
     tip.id = 'shellTip';
     tip.className = 'shell-tip';
     tip.textContent = SHELL_TIPS[0];
-    // Insert right after the stream-state pill so it uses the empty space, not the button cluster.
-    shellTools.insertBefore(tip, shellTools.children[1] || null);
+    // Insert just after the Legend button (which sits right after the stream-state pill) so the
+    // Legend stays next to the live time and the tip fills the empty space before the buttons.
+    const tipAnchor = document.getElementById('legendToggleBtn') || document.getElementById('streamState') || shellTools.children[0];
+    tipAnchor?.insertAdjacentElement('afterend', tip);
     let tipIndex = 0;
     setInterval(() => {
         tipIndex = (tipIndex + 1) % SHELL_TIPS.length;
