@@ -611,6 +611,8 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
     gap:5px;overflow:visible;border-bottom:none;border-top:1px solid rgba(139,246,255,.14);
     padding:6px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
   .term-window.mobile .term-key{min-width:0;min-height:42px;padding:6px 4px;font-size:13px}
+  /* Text copy keys (Copy/All/Paste) need more room than the symbol keys — span two cells. */
+  .term-window.mobile .term-key-wide{grid-column:span 2}
 
   /* Pin the full-screen terminal to the visual viewport (JS sets --svh / --svh-top on the
      element) so the on-screen keyboard shrinks the window instead of hiding the prompt. */

@@ -45,6 +45,9 @@ const TERMINAL_KEYBAR_HTML = `
       <button type="button" class="term-key" data-termkey="down" aria-label="Arrow down">↓</button>
       <button type="button" class="term-key" data-termkey="left" aria-label="Arrow left">←</button>
       <button type="button" class="term-key" data-termkey="right" aria-label="Arrow right">→</button>
+      <button type="button" class="term-key term-key-wide" data-termkey="copy" title="Copy selected text">Copy</button>
+      <button type="button" class="term-key term-key-wide" data-termkey="copyall" title="Copy all scrollback">All</button>
+      <button type="button" class="term-key term-key-wide" data-termkey="paste" title="Paste from clipboard">Paste</button>
     </div>`;
 function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
@@ -261,6 +264,29 @@ async function copyTerminalSelection(tw) {
     }
     tw.statusEl.textContent = `copied ${selection.length.toLocaleString()} chars`;
 }
+// Copy the entire terminal buffer (scrollback included) without the user having to
+// hand-select — the only practical way to copy from the terminal on a touch device.
+async function copyTerminalAll(tw) {
+    const term = tw.term;
+    if (!term?.selectAll)
+        return copyTerminalSelection(tw);
+    term.selectAll();
+    const text = term.getSelection?.() || '';
+    term.clearSelection?.();
+    if (!text.trim()) {
+        tw.statusEl.textContent = 'nothing to copy';
+        return;
+    }
+    try {
+        await copyText(text);
+    }
+    catch (error) {
+        tw.statusEl.textContent = 'copy blocked';
+        toast(error instanceof Error ? error.message : String(error));
+        return;
+    }
+    tw.statusEl.textContent = `copied ${text.length.toLocaleString()} chars (all)`;
+}
 // Read the rich clipboard (so images paste too); fall back to text-only when the browser blocks
 // clipboard.read() (e.g. no permission). Mirrors the native paste handler's behaviour.
 async function pasteTerminalClipboard(tw) {
@@ -386,6 +412,7 @@ function createTermWindow(name) {
       <span class="term-status" data-role="tstatus">connecting…</span>
       <div class="term-controls">
         <button type="button" class="term-btn" data-act="copy" title="Copy selected terminal text" aria-label="Copy selected terminal text">${icon('copy')}</button>
+        <button type="button" class="term-btn" data-act="copyall" title="Copy all scrollback" aria-label="Copy all terminal scrollback">${icon('summary')}</button>
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
@@ -470,13 +497,15 @@ function createTermWindow(name) {
     // controls
     controls.querySelectorAll('button').forEach((btn) => {
         const act = btn.dataset.act;
-        if (act === 'copy') {
+        if (act === 'copy' || act === 'copyall') {
             btn.addEventListener('mousedown', (e) => e.preventDefault());
         }
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (act === 'copy')
                 copyTerminalSelection(tw).catch(() => { });
+            else if (act === 'copyall')
+                copyTerminalAll(tw).catch(() => { });
             else if (act === 'min')
                 minimizeWindow(tw);
             else if (act === 'max')
@@ -495,6 +524,21 @@ function createTermWindow(name) {
             const key = btn.dataset.termkey || '';
             if (key === 'ctrl') {
                 setCtrlArmed(!tw.ctrlArmed);
+                tw.term?.focus?.();
+                return;
+            }
+            if (key === 'copy') {
+                copyTerminalSelection(tw).catch(() => { });
+                tw.term?.focus?.();
+                return;
+            }
+            if (key === 'copyall') {
+                copyTerminalAll(tw).catch(() => { });
+                tw.term?.focus?.();
+                return;
+            }
+            if (key === 'paste') {
+                pasteTerminalClipboard(tw).catch(() => { });
                 tw.term?.focus?.();
                 return;
             }
