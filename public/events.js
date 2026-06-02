@@ -256,6 +256,27 @@ if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
     });
     shellTools.appendChild(restoreAllBtn);
 }
+// Legend toggle next to the live-time pill — reveals the collapsible "what each button means"
+// panel (built lazily by buildLegend, which sits under the shell tabs). On mobile it stays
+// collapsed until tapped, so it never crowds the small screen.
+if (shellTools && !document.querySelector('#legendToggleBtn')) {
+    const legendBtn = document.createElement('button');
+    legendBtn.id = 'legendToggleBtn';
+    legendBtn.type = 'button';
+    legendBtn.title = 'What each button and control does';
+    legendBtn.innerHTML = `${icon('help')}<span>Legend</span>`;
+    legendBtn.addEventListener('click', () => {
+        buildLegend();
+        const legend = document.getElementById('legend');
+        if (!legend)
+            return;
+        legend.open = !legend.open;
+        legendBtn.classList.toggle('active', legend.open);
+        if (legend.open)
+            legend.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    document.getElementById('streamState')?.insertAdjacentElement('afterend', legendBtn);
+}
 // Rotating keyboard-shortcut tip in the spare space of the shell toolbar.
 const SHELL_TIPS = [
     'Tip: r refresh · g grid/focus · c density',
@@ -269,8 +290,10 @@ if (shellTools && !document.querySelector('#shellTip')) {
     tip.id = 'shellTip';
     tip.className = 'shell-tip';
     tip.textContent = SHELL_TIPS[0];
-    // Insert right after the stream-state pill so it uses the empty space, not the button cluster.
-    shellTools.insertBefore(tip, shellTools.children[1] || null);
+    // Insert just after the Legend button (which sits right after the stream-state pill) so the
+    // Legend stays next to the live time and the tip fills the empty space before the buttons.
+    const tipAnchor = document.getElementById('legendToggleBtn') || document.getElementById('streamState') || shellTools.children[0];
+    tipAnchor?.insertAdjacentElement('afterend', tip);
     let tipIndex = 0;
     setInterval(() => {
         tipIndex = (tipIndex + 1) % SHELL_TIPS.length;

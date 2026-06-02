@@ -1102,7 +1102,7 @@ function startShellStream(): void {
     const payload = JSON.parse((event as MessageEvent).data) as ApiPayload;
     setShellsLoading(false);
     renderShells({ shells: payload.shells });
-    setStreamState(`live ${new Date().toLocaleTimeString()}`, true);
+    setStreamState(`live ${new Date().toLocaleTimeString([], { hour12: false })}`, true);
   });
   shellStream.onerror = () => setStreamState('stream reconnecting');
 }

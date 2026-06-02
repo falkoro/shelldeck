@@ -28,9 +28,9 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button class="iconly" type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)" aria-label="Input history">${icon('clock')}</button>
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
+      <button class="iconly" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
       <button class="iconly more-toggle" type="button" data-more-toggle title="More actions" aria-label="More actions" aria-expanded="false">⋯</button>
       <button class="iconly shell-action-more" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
-      <button class="iconly shell-action-more" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
       <button class="warn iconly shell-action-more" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
       <button class="warn resume-btn iconly" type="button" data-resume title="Re-run the agent's resume command shown in the pane" aria-label="Resume agent">${icon('restart')}</button>
     </div>
@@ -389,12 +389,23 @@ function buildLegend(): void {
     ['terminal', 'Shell in', 'Open a live interactive terminal in this session'],
     ['restart', 'Resume', "Re-run the agent's resume command shown in the pane"],
   ];
-  const rows = items.map(([ic, name, desc]) => `<div class="legend-row">${icon(ic)}<b>${name}</b><span>${escapeHtml(desc)}</span></div>`).join('');
+  // Toolbar controls in the Shells header (the cryptic ones, e.g. the "80" dropdown).
+  const toolbar: Array<[string, string, string]> = [
+    ['focus', 'Focus / Grid', 'Show one shell, or all panes side-by-side'],
+    ['rows', 'Lines · 80 / 200 / 500', 'How many recent output lines each preview shows'],
+    ['follow', 'Follow', 'Auto-scroll previews to the newest output'],
+    ['summary', 'Summary', 'Refresh the AI work-title for each shell'],
+    ['refresh', 'Refresh', 'Reload all shell previews now'],
+  ];
+  const toRow = ([ic, name, desc]: [string, string, string]): string =>
+    `<div class="legend-row">${icon(ic)}<b>${name}</b><span>${escapeHtml(desc)}</span></div>`;
+  const rows = items.map(toRow).join('');
+  const toolbarRows = toolbar.map(toRow).join('');
   const status = `<div class="legend-row"><span class="dot on"></span><b>running</b><span>agent is working</span></div><div class="legend-row"><span class="dot wait"></span><b>waiting</b><span>agent is waiting for your input</span></div>`;
   const details = document.createElement('details');
   details.id = 'legend';
   details.className = 'legend';
-  details.innerHTML = `<summary>Button legend</summary><div class="legend-grid">${rows}${status}</div>`;
+  details.innerHTML = `<summary>Button legend — what each control does</summary><div class="legend-section">Shell buttons</div><div class="legend-grid">${rows}</div><div class="legend-section">Toolbar</div><div class="legend-grid">${toolbarRows}</div><div class="legend-section">Status</div><div class="legend-grid">${status}</div>`;
   tabs.insertAdjacentElement('afterend', details);
 }
 
@@ -426,7 +437,7 @@ function renderShellImages(name: string): void {
 function render(model: DashboardModel, options: RenderOptions = {}): void {
   currentModel = model;
   shellUnlocked = Boolean(model.unlocked) || Boolean(options.preserveUnlock && shellUnlocked);
-  q('#updated').textContent = `updated ${new Date(model.now).toLocaleTimeString()}`;
+  q('#updated').textContent = `updated ${new Date(model.now).toLocaleTimeString([], { hour12: false })}`;
   chooseSession(false);
   renderShellTabs();
   renderSelectedSessionActions();

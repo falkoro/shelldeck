@@ -75,7 +75,13 @@ function applyPrefs() {
     followToggle.classList.toggle('active', followOutput);
     followToggle.innerHTML = `${icon('follow')}<span>${followOutput ? 'Follow' : 'Paused'}</span>`;
     followToggle.title = followOutput ? 'Output follow: on' : 'Output follow: paused';
-    q('#lineCount').value = String(terminalLines);
+    const lineSel = q('#lineCount');
+    lineSel.value = String(terminalLines);
+    lineSel.title = 'Recent output lines shown in each shell preview';
+    if (lineSel.dataset.labeled !== '1') {
+        Array.from(lineSel.options).forEach((opt) => { opt.textContent = `${opt.value} lines`; });
+        lineSel.dataset.labeled = '1';
+    }
     q('#authState').textContent = 'dashboard signed in';
     q('#shells').classList.toggle('focus-mode', viewMode === 'focus');
 }

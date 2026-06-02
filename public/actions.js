@@ -1108,7 +1108,7 @@ function startShellStream() {
         const payload = JSON.parse(event.data);
         setShellsLoading(false);
         renderShells({ shells: payload.shells });
-        setStreamState(`live ${new Date().toLocaleTimeString()}`, true);
+        setStreamState(`live ${new Date().toLocaleTimeString([], { hour12: false })}`, true);
     });
     shellStream.onerror = () => setStreamState('stream reconnecting');
 }
