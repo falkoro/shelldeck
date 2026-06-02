@@ -111,6 +111,8 @@ document.addEventListener('click', async (event) => {
         }
         if (stopButton && !stopButton.disabled) {
             const stopped = stopButton.dataset.stop || '';
+            if (!confirm(`Kill tmux session "${stopped}"? Everything running in it stops. This cannot be undone.`))
+                return;
             await sessionAction('/api/stop', stopped);
             if (sessionByName(stopped))
                 selectSession(stopped);

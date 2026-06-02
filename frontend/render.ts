@@ -25,7 +25,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button class="iconly" type="button" data-add-image title="Attach an image; inserts its saved path" aria-label="Attach image">${icon('image')}</button>
       <button class="iconly" type="button" data-key="enter" title="Press Enter in the shell" aria-label="Press Enter">${icon('enter')}</button>
       <button class="warn compact-action" type="button" data-key="interrupt" title="Interrupt the running command (Ctrl-C)" aria-label="Interrupt command (Ctrl-C)">${icon('stop')}<span>Ctrl-C</span></button>
-      <button class="warn iconly" type="button" data-stop title="Stop this tmux session" aria-label="Stop tmux session">${icon('stop')}</button>
+      <button class="warn iconly" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
       <button class="iconly" type="button" data-history title="Cycle previous inputs (or ↑ / ↓ in the box)" aria-label="Input history">${icon('clock')}</button>
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
@@ -308,6 +308,7 @@ function renderShellTabs(): void {
   }).join('');
   markSelectedShell();
   renderSelectedSessionActions();
+  buildLegend();
 }
 
 function setShellAgentBadge(card: HTMLElement, name: string): void {
@@ -374,14 +375,18 @@ function buildLegend(): void {
   if (!tabs) return;
   const items: Array<[string, string, string]> = [
     ['send', 'Send', 'Type the text and press Enter in the shell'],
+    ['mic', 'Mic', 'Record your voice; click again to stop and transcribe'],
     ['paste', 'Paste', 'Insert the text without pressing Enter'],
     ['image', 'Image', 'Attach an image; inserts its saved path'],
-    ['clock', 'History', 'Cycle previous inputs (or ↑ / ↓ in the box)'],
     ['enter', 'Enter', 'Press Enter in the shell'],
-    ['stop', 'Ctrl-C', 'Interrupt the running command'],
+    ['stop', 'Ctrl-C', 'Interrupt the running command (does not kill the session)'],
+    ['power', 'Stop session', 'Kill this tmux session — destructive'],
+    ['clock', 'History', 'Cycle previous inputs (or up / down in the box)'],
     ['eraser', 'Clear', 'Clear the shell screen'],
     ['copy', 'Copy', 'Copy the pane output'],
     ['eyeoff', 'Clear view', 'Clear this preview locally (not the shell)'],
+    ['terminal', 'Shell in', 'Open a live interactive terminal in this session'],
+    ['restart', 'Resume', "Re-run the agent's resume command shown in the pane"],
   ];
   const rows = items.map(([ic, name, desc]) => `<div class="legend-row">${icon(ic)}<b>${name}</b><span>${escapeHtml(desc)}</span></div>`).join('');
   const status = `<div class="legend-row"><span class="dot on"></span><b>running</b><span>agent is working</span></div><div class="legend-row"><span class="dot wait"></span><b>waiting</b><span>agent is waiting for your input</span></div>`;
