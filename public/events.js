@@ -531,7 +531,11 @@ document.addEventListener('mousedown', (event) => {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp, { once: true });
 });
+function markBooted() {
+    document.body.classList.add('booted');
+}
 render(initialModel);
+queueMicrotask(markBooted);
 queueMicrotask(() => loadSummary().catch(() => { }));
 queueMicrotask(() => loadShells().then(() => {
     startShellStream();

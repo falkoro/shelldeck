@@ -249,20 +249,27 @@ function handleTerminalDrop(tw, event) {
     });
 }
 async function copyTerminalSelection(tw) {
-    const selection = tw.term?.getSelection?.() || '';
+    const selection = terminalSelection(tw);
     if (!selection) {
         tw.statusEl.textContent = 'select text to copy';
         return;
     }
+    await copyTerminalText(tw, selection);
+}
+function terminalSelection(tw) {
+    return tw.term?.getSelection?.() || '';
+}
+async function copyTerminalText(tw, text, suffix = '') {
+    tw.statusEl.textContent = 'copying...';
     try {
-        await copyText(selection);
+        await copyText(text);
     }
     catch (error) {
-        tw.statusEl.textContent = 'copy blocked';
+        tw.statusEl.textContent = 'copy failed';
         toast(error instanceof Error ? error.message : String(error));
         return;
     }
-    tw.statusEl.textContent = `copied ${selection.length.toLocaleString()} chars`;
+    tw.statusEl.textContent = `copied ${text.length.toLocaleString()} chars${suffix}`;
 }
 // Copy the entire terminal buffer (scrollback included) without the user having to
 // hand-select — the only practical way to copy from the terminal on a touch device.
@@ -277,15 +284,7 @@ async function copyTerminalAll(tw) {
         tw.statusEl.textContent = 'nothing to copy';
         return;
     }
-    try {
-        await copyText(text);
-    }
-    catch (error) {
-        tw.statusEl.textContent = 'copy blocked';
-        toast(error instanceof Error ? error.message : String(error));
-        return;
-    }
-    tw.statusEl.textContent = `copied ${text.length.toLocaleString()} chars (all)`;
+    await copyTerminalText(tw, text, ' (all)');
 }
 // Read the rich clipboard (so images paste too); fall back to text-only when the browser blocks
 // clipboard.read() (e.g. no permission). Mirrors the native paste handler's behaviour.
@@ -332,9 +331,12 @@ function setupTerminalClipboard(tw) {
         if (event.type !== 'keydown' || !(event.ctrlKey || event.metaKey))
             return true;
         const key = event.key.toLowerCase();
-        if (key === 'c' && (event.shiftKey || tw.term.hasSelection())) {
+        if (key === 'c' && (event.shiftKey || Boolean(terminalSelection(tw)))) {
             event.preventDefault();
-            copyTerminalSelection(tw).catch(() => { });
+            copyTerminalSelection(tw).catch((error) => {
+                tw.statusEl.textContent = 'copy failed';
+                toast(error.message);
+            });
             return false;
         }
         if (key === 'v') {
@@ -486,6 +488,16 @@ function createTermWindow(name) {
     });
     setupTerminalClipboard(tw);
     el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
+    host.addEventListener('contextmenu', (event) => {
+        if (!terminalSelection(tw))
+            return;
+        event.preventDefault();
+        event.stopPropagation();
+        copyTerminalSelection(tw).catch((error) => {
+            tw.statusEl.textContent = 'copy failed';
+            toast(error.message);
+        });
+    });
     host.addEventListener('dragover', (event) => {
         if (terminalDroppedImages(event).length)
             event.preventDefault();

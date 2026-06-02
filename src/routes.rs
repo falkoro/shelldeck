@@ -10,7 +10,11 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 #[derive(Deserialize)]
 struct UnlockBody {
@@ -269,7 +273,68 @@ async fn icon() -> Response {
     )
 }
 
-async fn asset(State(state): State<AppState>, Path(file): Path<String>) -> Response {
+fn system_time_seconds(time: SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn asset_etag(modified: SystemTime, len: u64) -> String {
+    let duration = modified.duration_since(UNIX_EPOCH).unwrap_or_default();
+    format!(
+        "\"{:x}-{:x}-{:x}\"",
+        len,
+        duration.as_secs(),
+        duration.subsec_nanos()
+    )
+}
+
+fn if_none_match(headers: &HeaderMap, etag: &str) -> bool {
+    headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .any(|candidate| candidate == "*" || candidate == etag)
+        })
+        .unwrap_or(false)
+}
+
+fn if_modified_since(headers: &HeaderMap, modified: SystemTime) -> bool {
+    headers
+        .get(header::IF_MODIFIED_SINCE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| httpdate::parse_http_date(value).ok())
+        .map(|since| system_time_seconds(modified) <= system_time_seconds(since))
+        .unwrap_or(false)
+}
+
+fn asset_with_cache_headers(
+    status: StatusCode,
+    content_type: &'static str,
+    body: Vec<u8>,
+    etag: &str,
+    last_modified: &str,
+) -> Response {
+    let mut response = webutil::text_response(status, content_type, body);
+    let headers = response.headers_mut();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    if let Ok(value) = HeaderValue::from_str(etag) {
+        headers.insert(header::ETAG, value);
+    }
+    if let Ok(value) = HeaderValue::from_str(last_modified) {
+        headers.insert(header::LAST_MODIFIED, value);
+    }
+    response
+}
+
+async fn asset(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(file): Path<String>,
+) -> Response {
     let content_type = match file.rsplit_once('.').map(|(_, ext)| ext) {
         Some("css") => "text/css; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
@@ -288,8 +353,33 @@ async fn asset(State(state): State<AppState>, Path(file): Path<String>) -> Respo
         .root_dir
         .join("public")
         .join(PathBuf::from(&file).file_name().unwrap_or_default());
+    let metadata = match tokio::fs::metadata(&path).await {
+        Ok(metadata) if metadata.is_file() => metadata,
+        _ => {
+            return webutil::json_response(
+                StatusCode::NOT_FOUND,
+                &serde_json::json!({ "error": "Not found" }),
+            )
+        }
+    };
+    let modified = metadata.modified().unwrap_or(UNIX_EPOCH);
+    let etag = asset_etag(modified, metadata.len());
+    let last_modified = httpdate::fmt_http_date(modified);
+    if if_none_match(&headers, &etag)
+        || (!headers.contains_key(header::IF_NONE_MATCH) && if_modified_since(&headers, modified))
+    {
+        return asset_with_cache_headers(
+            StatusCode::NOT_MODIFIED,
+            content_type,
+            Vec::new(),
+            &etag,
+            &last_modified,
+        );
+    }
     match tokio::fs::read(path).await {
-        Ok(bytes) => webutil::text_response(StatusCode::OK, content_type, bytes),
+        Ok(bytes) => {
+            asset_with_cache_headers(StatusCode::OK, content_type, bytes, &etag, &last_modified)
+        }
         Err(_) => webutil::json_response(
             StatusCode::NOT_FOUND,
             &serde_json::json!({ "error": "Not found" }),
@@ -823,6 +913,9 @@ async fn api_share_shot(
         return response;
     }
     if let Err(response) = require_action(&headers) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers) {
         return response;
     }
     match share::save(state.config.clone(), body).await {

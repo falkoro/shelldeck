@@ -483,7 +483,12 @@ document.addEventListener('mousedown', (event: MouseEvent) => {
   document.addEventListener('mouseup', onUp, { once: true });
 });
 
+function markBooted(): void {
+  document.body.classList.add('booted');
+}
+
 render(initialModel);
+queueMicrotask(markBooted);
 queueMicrotask(() => loadSummary().catch(() => {}));
 queueMicrotask(() => loadShells().then(() => {
   startShellStream();

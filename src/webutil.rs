@@ -77,7 +77,7 @@ pub fn with_security_headers(mut response: Response) -> Response {
     );
     headers.insert(
         header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self';"),
+        HeaderValue::from_static("default-src 'self'; script-src 'self' 'sha256-2OqtKWr9Tp2H/5o92BmZUQuG9y9Ae3ZRK8vM6zsd9Og='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self';"),
     );
     response
 }
