@@ -61,7 +61,7 @@ fn normalize(hosts: Vec<RemoteHostConfig>) -> Vec<RemoteHostConfig> {
             if id.is_empty() || label.is_empty() || target.is_empty() || !seen.insert(id.clone()) {
                 return None;
             }
-            Some(RemoteHostConfig { id, label, target })
+            Some(RemoteHostConfig { id, label, target, protected: host.protected })
         })
         .take(8)
         .collect()
@@ -78,22 +78,26 @@ mod tests {
                 id: "logan".into(),
                 label: "Logan".into(),
                 target: "logan-gl502vs".into(),
+                protected: true,
             },
             // leading-dash target → rejected
             RemoteHostConfig {
                 id: "evil".into(),
                 label: "Evil".into(),
                 target: "-oProxyCommand".into(),
+                protected: false,
             },
             // duplicate id → dropped
             RemoteHostConfig {
                 id: "logan".into(),
                 label: "Dupe".into(),
                 target: "other".into(),
+                protected: false,
             },
         ]);
         assert_eq!(hosts.len(), 1);
         assert_eq!(hosts[0].id, "logan");
         assert_eq!(hosts[0].target, "logan-gl502vs");
+        assert!(hosts[0].protected);
     }
 }

@@ -4,6 +4,7 @@
 // Display order (most attention-worthy first) for the health rollup + legend, plus each
 // state's legend label and status-dot colour class.
 const CONTAINER_STATE_ORDER = ['running', 'unhealthy', 'restarting', 'crashed', 'paused', 'created', 'stopped'];
+const RED_CONTAINER_STATES = new Set(['unhealthy', 'restarting', 'crashed']);
 const CONTAINER_STATE_LABEL = {
     running: 'running', unhealthy: 'unhealthy', restarting: 'restarting',
     crashed: 'crashed', paused: 'paused', created: 'created', stopped: 'stopped',
@@ -201,7 +202,10 @@ window.editContainerDescription = editContainerDescription;
 // click handler confirms and the server re-checks login + unlock + action header.
 function containerActionsHtml(c, host) {
     const attrs = `data-cname="${escapeHtml(c.name)}" data-cengine="${escapeHtml(c.engine)}" data-chost="${escapeHtml(host)}"`;
-    return `<div class="container-actions"><button type="button" class="container-action ca-restart" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}" aria-label="Restart ${escapeHtml(c.name)}">↻</button><button type="button" class="container-action ca-pull" data-container-action="pull" ${attrs} title="Pull latest image + recreate ${escapeHtml(c.name)}" aria-label="Pull latest ${escapeHtml(c.name)}">⬇</button></div>`;
+    const fix = RED_CONTAINER_STATES.has(containerState(c.status))
+        ? `<button type="button" class="container-action ca-fix" data-container-action="fix" ${attrs} title="Auto-fix ${escapeHtml(c.name)} — spawns an agent session" aria-label="Auto-fix ${escapeHtml(c.name)}">🔧</button>`
+        : '';
+    return `<div class="container-actions"><button type="button" class="container-action ca-restart" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}" aria-label="Restart ${escapeHtml(c.name)}">↻</button><button type="button" class="container-action ca-pull" data-container-action="pull" ${attrs} title="Pull latest image + recreate ${escapeHtml(c.name)}" aria-label="Pull latest ${escapeHtml(c.name)}">⬇</button>${fix}</div>`;
 }
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
 // then actions. Stopped/unhealthy get a state class for greying/highlighting.
@@ -431,7 +435,7 @@ function renderRemoteHosts(hosts) {
     const legendStates = ['running', 'unhealthy', 'restarting', 'crashed', 'paused', 'stopped'];
     const legendDots = legendStates
         .map((st) => `<span class="lg"><i class="lg-dot ${st}"></i>${CONTAINER_STATE_LABEL[st]}</span>`).join('');
-    const legend = `<div class="remote-legend">${legendDots}<span class="lg"><b class="lg-ic">↻</b>restart</span><span class="lg"><b class="lg-ic">⬇</b>pull</span></div>`;
+    const legend = `<div class="remote-legend">${legendDots}<span class="lg"><b class="lg-ic">↻</b>restart</span><span class="lg"><b class="lg-ic">⬇</b>pull</span><span class="lg"><b class="lg-ic">🔧</b>fix</span></div>`;
     list.innerHTML = legend + hosts.map((host) => {
         const containers = host.containers || [];
         const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
@@ -514,6 +518,10 @@ async function containerAction(host, engine, name, action) {
     }
     if (!name || !engine)
         return;
+    if (action === 'fix') {
+        await openFixModal(host, engine, name);
+        return;
+    }
     const verb = action === 'pull' ? 'Pull latest image for' : 'Restart';
     const where = host ? ` on ${host}` : '';
     if (!window.confirm(`${verb} "${name}"${where}?`))
@@ -527,6 +535,46 @@ async function containerAction(host, engine, name, action) {
         toast(error.message || 'Action failed');
     }
     await Promise.allSettled([loadContainers(), loadRemoteHosts()]);
+}
+async function openFixModal(host, engine, name) {
+    if (document.getElementById('fixModal'))
+        return;
+    await Promise.all([loadFixAgents(), loadRemoteHostConfig()]);
+    const remote = remoteHostConfig.find((item) => item.id === host || item.label === host);
+    const target = remote?.target || '';
+    const protectedHost = Boolean(remote?.protected);
+    const hostLabel = remote?.label || (host ? host : 'local');
+    const warning = protectedHost
+        ? '<div style="border:1px solid rgba(139,246,255,.34);background:rgba(139,246,255,.08);border-radius:7px;padding:9px;margin:8px 0;color:#c9f7ff">PROPOSE-ONLY — production-safe: the agent will only inspect and print recommended commands.</div>'
+        : '<div style="border:1px solid rgba(255,106,122,.38);background:rgba(255,106,122,.08);border-radius:7px;padding:9px;margin:8px 0;color:#ffcbd3">⚠ Potentially dangerous — this spawns an agent that can run commands against a LIVE container.</div>';
+    const overlay = document.createElement('div');
+    overlay.className = 'links-editor-modal';
+    overlay.id = 'fixModal';
+    overlay.innerHTML = `<form class="links-editor-box"><div class="links-editor-head"><div><h2>Auto-fix ${escapeHtml(name)}</h2><p class="muted">${escapeHtml(hostLabel)} · ${escapeHtml(name)}</p></div><button type="button" class="ghost" data-close-fix>Cancel</button></div>${warning}<label>Agent<select id="fixAgentSelect">${fixAgentConfig.map((agent) => `<option value="${escapeHtml(agent.id)}">${escapeHtml(agent.label)}</option>`).join('')}</select></label><label style="display:flex;gap:8px;align-items:center;color:var(--text)"><input id="fixAck" type="checkbox" style="width:auto;min-height:0"> I understand this can disrupt a running service.</label><div class="links-editor-actions"><button type="submit" class="primary" id="fixConfirm" disabled>Confirm</button></div></form>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    const ack = overlay.querySelector('#fixAck');
+    const confirm = overlay.querySelector('#fixConfirm');
+    overlay.querySelector('[data-close-fix]')?.addEventListener('click', close);
+    overlay.addEventListener('mousedown', (event) => { if (event.target === overlay)
+        close(); });
+    ack.addEventListener('change', () => { confirm.disabled = !ack.checked; });
+    overlay.querySelector('form')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const agentId = overlay.querySelector('#fixAgentSelect')?.value || '';
+        postJson('/api/fix', { host, target, engine, name, agent_id: agentId })
+            .then(async (payload) => {
+            toast(payload.message || 'Fix session started');
+            close();
+            await refresh({ preserveUnlock: true });
+            await loadShells(false);
+            if (payload.session) {
+                selectSession(payload.session);
+                openTerminal(payload.session);
+            }
+        })
+            .catch((error) => toast(error.message));
+    });
 }
 window.containerAction = containerAction;
 window.loadMetrics = loadMetrics;

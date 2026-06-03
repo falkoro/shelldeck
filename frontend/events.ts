@@ -214,6 +214,15 @@ document.getElementById('editTickersBtn')?.addEventListener('click', () => openS
 document.getElementById('safeShotBtn')?.addEventListener('click', () => createSafeShot().catch((error: Error) => toast(error.message)));
 document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
 document.getElementById('editRemoteHostsBtn')?.addEventListener('click', () => openRemoteHostsEditor().catch((error: Error) => toast(error.message)));
+const editRemoteHostsBtn = document.getElementById('editRemoteHostsBtn');
+if (editRemoteHostsBtn && !document.getElementById('editFixAgentsBtn')) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.id = 'editFixAgentsBtn';
+  button.innerHTML = '<span>Fix agents</span>';
+  button.addEventListener('click', () => openFixAgentsEditor().catch((error: Error) => toast(error.message)));
+  editRemoteHostsBtn.insertAdjacentElement('afterend', button);
+}
 document.getElementById('refreshSummaryBtn')?.addEventListener('click', () => refreshSummaries().catch((error: Error) => toast(error.message)));
 q<HTMLButtonElement>('#refreshShellsTopBtn').title = 'Refresh shells';
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error: Error) => toast(error.message)));

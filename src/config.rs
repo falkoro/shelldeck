@@ -17,6 +17,8 @@ pub struct RemoteHostConfig {
     pub id: String,
     pub label: String,
     pub target: String,
+    #[serde(default)]
+    pub protected: bool,
 }
 
 #[derive(Clone)]
@@ -55,6 +57,8 @@ pub struct Config {
     pub tickers: Vec<String>,
     pub remote_hosts: Vec<RemoteHostConfig>,
     pub remote_hosts_file: PathBuf,
+    pub fix_agents_file: PathBuf,
+    pub dynamic_sessions_file: PathBuf,
     pub remote_container_cap: usize,
     // Gather CPU/RAM/load/temps for remote hosts over SSH (one extra /proc read per poll).
     // Default on; set DASHBOARD_REMOTE_METRICS=0 to keep remote cards to ping + containers only.
@@ -192,6 +196,14 @@ impl Config {
                 env::var("DASHBOARD_REMOTE_HOSTS_FILE").ok(),
                 root_dir.join("remote-hosts.json"),
             ),
+            fix_agents_file: configured_path(
+                env::var("DASHBOARD_FIX_AGENTS_FILE").ok(),
+                root_dir.join("fix-agents.json"),
+            ),
+            dynamic_sessions_file: configured_path(
+                env::var("DASHBOARD_DYNAMIC_SESSIONS_FILE").ok(),
+                root_dir.join("dynamic-sessions.json"),
+            ),
             remote_container_cap: env::var("DASHBOARD_REMOTE_CONTAINER_CAP")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -267,6 +279,7 @@ fn parse_remote_hosts(raw: &str) -> Vec<RemoteHostConfig> {
                 id,
                 label: label.chars().take(48).collect(),
                 target,
+                protected: false,
             })
         })
         .take(8)

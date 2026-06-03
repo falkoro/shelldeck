@@ -488,17 +488,25 @@ async function loadRemoteHostConfig() {
     const payload = await response.json();
     remoteHostConfig = payload.hosts || [];
 }
-function remoteHostEditorText() {
-    return remoteHostConfig.map((host) => `${host.id}|${host.label}|${host.target}`).join('\n');
+function idFromLabel(label) {
+    return label.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 }
-function parseRemoteHostEditorText(text) {
-    return text
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-        const [id, label, ...rest] = line.split('|');
-        return { id: (id || '').trim(), label: (label || '').trim(), target: rest.join('|').trim() };
+function remoteHostRow(host = {}) {
+    const protectedChecked = host.protected ? 'checked' : '';
+    return `<div data-remote-host-row style="display:grid;grid-template-columns:120px minmax(150px,1fr) minmax(180px,1.2fr) auto;gap:8px;align-items:end;margin-bottom:8px"><label style="margin:0">ID<input data-host-field="id" value="${escapeHtml(host.id || '')}" placeholder="logan"></label><label style="margin:0">Label<input data-host-field="label" value="${escapeHtml(host.label || '')}" placeholder="Logan"></label><label style="margin:0">SSH target<input data-host-field="target" value="${escapeHtml(host.target || '')}" placeholder="logan-gl502vs"></label><button type="button" class="warn" data-remove-host>Remove</button><label style="grid-column:1 / -1;margin:0;display:flex;gap:8px;align-items:center;color:var(--text)"><input type="checkbox" data-host-field="protected" ${protectedChecked} style="width:auto;min-height:0"> Protected (production - propose-only fixes)</label></div>`;
+}
+function readRemoteHostRows(root) {
+    return Array.from(root.querySelectorAll('[data-remote-host-row]'))
+        .map((row) => {
+        const value = (field) => row.querySelector(`[data-host-field="${field}"]`)?.value.trim() || '';
+        const label = value('label');
+        const id = value('id') || idFromLabel(label);
+        return {
+            id,
+            label,
+            target: value('target'),
+            protected: Boolean(row.querySelector('[data-host-field="protected"]')?.checked),
+        };
     })
         .filter((host) => host.id && host.label && host.target);
 }
@@ -509,18 +517,29 @@ async function openRemoteHostsEditor() {
     const overlay = document.createElement('div');
     overlay.className = 'links-editor-modal';
     overlay.id = 'remoteHostsEditor';
-    overlay.innerHTML = `<form class="links-editor-box"><div class="links-editor-head"><div><h2>Remote hosts</h2><p class="muted">One per line: id|Label|user@host — checked over SSH (ping + docker/podman ps)</p></div><button type="button" class="ghost" data-close-remote>Cancel</button></div><textarea id="remoteHostsEditorText" spellcheck="false" placeholder="logan|Logan GL502VS|logan-gl502vs"></textarea><div class="links-editor-actions"><button type="submit" class="primary">Save hosts</button></div></form>`;
+    overlay.innerHTML = `<form class="links-editor-box"><div class="links-editor-head"><div><h2>Remote hosts</h2><p class="muted">Checked over SSH for ping and docker/podman containers.</p></div><button type="button" class="ghost" data-close-remote>Cancel</button></div><div id="remoteHostRows">${(remoteHostConfig.length ? remoteHostConfig : [{}]).map(remoteHostRow).join('')}</div><button type="button" data-add-remote-host>Add host</button><div class="links-editor-actions"><button type="submit" class="primary">Save hosts</button></div></form>`;
     document.body.appendChild(overlay);
-    const textarea = overlay.querySelector('#remoteHostsEditorText');
-    textarea.value = remoteHostEditorText();
-    textarea.focus();
+    const rows = overlay.querySelector('#remoteHostRows');
+    rows.querySelector('input')?.focus();
     const close = () => overlay.remove();
     overlay.querySelector('[data-close-remote]')?.addEventListener('click', close);
+    overlay.querySelector('[data-add-remote-host]')?.addEventListener('click', () => {
+        rows.insertAdjacentHTML('beforeend', remoteHostRow());
+        rows.querySelector('[data-remote-host-row]:last-child input')?.focus();
+    });
+    rows.addEventListener('click', (event) => {
+        const button = event.target instanceof Element ? event.target.closest('[data-remove-host]') : null;
+        if (!button)
+            return;
+        button.closest('[data-remote-host-row]')?.remove();
+        if (!rows.querySelector('[data-remote-host-row]'))
+            rows.insertAdjacentHTML('beforeend', remoteHostRow());
+    });
     overlay.addEventListener('mousedown', (event) => { if (event.target === overlay)
         close(); });
     overlay.querySelector('form')?.addEventListener('submit', (event) => {
         event.preventDefault();
-        saveRemoteHosts(parseRemoteHostEditorText(textarea.value)).then(close).catch((error) => toast(error.message));
+        saveRemoteHosts(readRemoteHostRows(rows)).then(close).catch((error) => toast(error.message));
     });
 }
 async function saveRemoteHosts(hosts) {
@@ -530,6 +549,64 @@ async function saveRemoteHosts(hosts) {
     toast('Remote hosts saved');
 }
 window.openRemoteHostsEditor = openRemoteHostsEditor;
+let fixAgentConfig = [];
+async function loadFixAgents() {
+    const response = await fetch('/api/fix-agents', { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok)
+        throw new Error('Could not load fix agents');
+    const payload = await response.json();
+    fixAgentConfig = payload.agents || [];
+}
+function fixAgentRow(agent = {}) {
+    return `<div data-fix-agent-row style="display:grid;grid-template-columns:110px minmax(130px,1fr) minmax(180px,1.4fr) auto;gap:8px;align-items:end;margin-bottom:8px"><label style="margin:0">ID<input data-agent-field="id" value="${escapeHtml(agent.id || '')}" placeholder="codex"></label><label style="margin:0">Label<input data-agent-field="label" value="${escapeHtml(agent.label || '')}" placeholder="Codex"></label><label style="margin:0">Command<input data-agent-field="command" value="${escapeHtml(agent.command || '')}" placeholder="codex"></label><button type="button" class="warn" data-remove-agent>Remove</button></div>`;
+}
+function readFixAgentRows(root) {
+    return Array.from(root.querySelectorAll('[data-fix-agent-row]'))
+        .map((row) => {
+        const value = (field) => row.querySelector(`[data-agent-field="${field}"]`)?.value.trim() || '';
+        const label = value('label');
+        return { id: value('id') || idFromLabel(label), label, command: value('command') };
+    })
+        .filter((agent) => agent.id && agent.label && agent.command);
+}
+async function openFixAgentsEditor() {
+    if (document.getElementById('fixAgentsEditor'))
+        return;
+    await loadFixAgents();
+    const overlay = document.createElement('div');
+    overlay.className = 'links-editor-modal';
+    overlay.id = 'fixAgentsEditor';
+    overlay.innerHTML = `<form class="links-editor-box"><div class="links-editor-head"><div><h2>Fix agents</h2><p class="muted">{prompt} / {promptfile} placeholders are substituted; otherwise the prompt is appended.</p></div><button type="button" class="ghost" data-close-fix-agents>Cancel</button></div><div id="fixAgentRows">${(fixAgentConfig.length ? fixAgentConfig : [{}]).map(fixAgentRow).join('')}</div><button type="button" data-add-fix-agent>Add agent</button><div class="links-editor-actions"><button type="submit" class="primary">Save agents</button></div></form>`;
+    document.body.appendChild(overlay);
+    const rows = overlay.querySelector('#fixAgentRows');
+    rows.querySelector('input')?.focus();
+    const close = () => overlay.remove();
+    overlay.querySelector('[data-close-fix-agents]')?.addEventListener('click', close);
+    overlay.querySelector('[data-add-fix-agent]')?.addEventListener('click', () => {
+        rows.insertAdjacentHTML('beforeend', fixAgentRow());
+        rows.querySelector('[data-fix-agent-row]:last-child input')?.focus();
+    });
+    rows.addEventListener('click', (event) => {
+        const button = event.target instanceof Element ? event.target.closest('[data-remove-agent]') : null;
+        if (!button)
+            return;
+        button.closest('[data-fix-agent-row]')?.remove();
+        if (!rows.querySelector('[data-fix-agent-row]'))
+            rows.insertAdjacentHTML('beforeend', fixAgentRow());
+    });
+    overlay.addEventListener('mousedown', (event) => { if (event.target === overlay)
+        close(); });
+    overlay.querySelector('form')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        saveFixAgents(readFixAgentRows(rows)).then(close).catch((error) => toast(error.message));
+    });
+}
+async function saveFixAgents(agents) {
+    const payload = await postJson('/api/fix-agents', { agents });
+    fixAgentConfig = payload.agents || [];
+    toast('Fix agents saved');
+}
+window.openFixAgentsEditor = openFixAgentsEditor;
 async function sessionAction(endpoint, name) {
     if (!shellUnlocked)
         throw new Error('Unlock shells first');

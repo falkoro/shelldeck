@@ -1,6 +1,7 @@
 use crate::{
-    auth, config, container_actions, containers, links, metrics, pages, ratelimit, remote,
-    remote_hosts, settings, share, stream, stt, summary, term, tmux, uploads, webutil, AppState,
+    auth, config, container_actions, containers, dynamic_sessions, fix, fix_agents, links, metrics,
+    pages, ratelimit, remote, remote_hosts, settings, share, stream, stt, summary, term, tmux,
+    uploads, webutil, AppState,
 };
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
@@ -69,6 +70,11 @@ struct RemoteHostsBody {
     hosts: Vec<config::RemoteHostConfig>,
 }
 
+#[derive(Deserialize)]
+struct FixAgentsBody {
+    agents: Vec<fix_agents::FixAgent>,
+}
+
 pub fn router(state: AppState) -> Router {
     // Honor the configured image cap: base64 inflates ~4/3, so size the body limit to the
     // configured raw cap plus the base64 overhead (axum's 2 MiB default would otherwise
@@ -96,6 +102,7 @@ pub fn router(state: AppState) -> Router {
             "/api/remote-hosts/config",
             get(api_remote_hosts_config).post(api_remote_hosts_save),
         )
+        .route("/api/fix-agents", get(api_fix_agents).post(api_fix_agents_save))
         .route("/api/links", get(api_links).post(api_links_save))
         .route(
             "/api/ui-config",
@@ -122,7 +129,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/start", post(api_start))
         .route("/api/restart", post(api_restart))
         .route("/api/stop", post(api_stop))
+        .route("/api/sessions/remove", post(api_session_remove))
         .route("/api/container-action", post(api_container_action))
+        .route("/api/fix", post(api_fix))
         .with_state(state)
 }
 
@@ -715,7 +724,22 @@ async fn api_stop(
     if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
         return response;
     }
-    session_result(tmux::stop_session(&body.name).await)
+    stop_session_result(state.config.clone(), &body.name).await
+}
+
+async fn api_session_remove(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<NameBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    stop_session_result(state.config.clone(), &body.name).await
 }
 
 // Restart / pull-latest a Docker/Podman container, locally or on a configured remote host.
@@ -747,6 +771,30 @@ async fn api_container_action(
         }
     };
     session_result(result)
+}
+
+async fn api_fix(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<fix::FixBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    match fix::start(state.config.clone(), body).await {
+        Ok(started) => webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({ "ok": true, "session": started.session, "mode": started.mode, "message": started.message }),
+        ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
 }
 
 // Live machine stats (CPU / RAM / temps) for the host ShellDeck runs on. Login-gated
@@ -827,6 +875,42 @@ async fn api_remote_hosts_save(
     }
     match remote_hosts::save(state.config.clone(), body.hosts).await {
         Ok(hosts) => webutil::json_response(StatusCode::OK, &serde_json::json!({ "hosts": hosts })),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn api_fix_agents(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers) {
+        return response;
+    }
+    let agents = fix_agents::load(state.config.clone()).await;
+    webutil::json_response(StatusCode::OK, &serde_json::json!({ "agents": agents }))
+}
+
+async fn api_fix_agents_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+    axum::Json(body): axum::Json<FixAgentsBody>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
+        return response;
+    }
+    match fix_agents::save(state.config.clone(), body.agents).await {
+        Ok(agents) => webutil::json_response(StatusCode::OK, &serde_json::json!({ "agents": agents })),
         Err(error) => webutil::json_response(
             StatusCode::BAD_REQUEST,
             &serde_json::json!({ "error": error }),
@@ -936,6 +1020,22 @@ fn session_result(result: Result<String, String>) -> Response {
             StatusCode::OK,
             &serde_json::json!({ "ok": true, "message": message }),
         ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
+}
+
+async fn stop_session_result(config: std::sync::Arc<config::Config>, name: &str) -> Response {
+    match tmux::stop_session(name).await {
+        Ok(message) => {
+            let _ = dynamic_sessions::remove(config, name).await;
+            webutil::json_response(
+                StatusCode::OK,
+                &serde_json::json!({ "ok": true, "message": message }),
+            )
+        }
         Err(error) => webutil::json_response(
             StatusCode::BAD_REQUEST,
             &serde_json::json!({ "error": error }),

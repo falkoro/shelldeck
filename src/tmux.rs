@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::{Config, KnownSession}, dynamic_sessions};
 use serde::Serialize;
 use std::{collections::HashMap, path::PathBuf, process::Stdio, sync::Arc};
 use tokio::{io::AsyncWriteExt, process::Command};
@@ -108,6 +108,23 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
         live.iter().cloned().map(|s| (s.name.clone(), s)).collect();
     let mut sessions = Vec::new();
     for spec in &config.known_sessions {
+        let found = live_by_name.get(&spec.name);
+        sessions.push(SessionView {
+            name: spec.name.clone(),
+            label: spec.label.clone(),
+            family: spec.family.clone(),
+            alias: spec.alias.clone(),
+            badge: spec.badge.clone(),
+            command: config.attach_template.replace("{name}", &spec.name),
+            ssh_command: ssh_attach_command(&config, &spec.name),
+            running: found.is_some(),
+            windows: found.map(|s| s.windows).unwrap_or(0),
+            attached: found.map(|s| s.attached).unwrap_or(0),
+            created: found.map(|s| s.created),
+            activity: found.map(|s| s.activity),
+        });
+    }
+    for spec in dynamic_sessions::load(config.clone()).await {
         let found = live_by_name.get(&spec.name);
         sessions.push(SessionView {
             name: spec.name.clone(),
@@ -359,17 +376,32 @@ async fn launch_known_session(
         .iter()
         .find(|s| s.name == name)
         .ok_or("Unknown session")?;
+    launch_spec(spec, verb).await
+}
+
+async fn launch_spec(spec: &KnownSession, verb: &str) -> Result<String, String> {
     if Command::new("/usr/bin/tmux")
-        .args(["has-session", "-t", name])
+        .args(["has-session", "-t", &spec.name])
         .status()
         .await
         .map(|s| s.success())
         .unwrap_or(false)
     {
-        return Ok(format!("{name} is already running"));
+        return Ok(format!("{} is already running", spec.name));
     }
-    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
-    Ok(format!("{name} {verb}"))
+    tmux_output(&["new-session", "-d", "-s", &spec.name, &spec.start]).await?;
+    Ok(format!("{} {verb}", spec.name))
+}
+
+pub async fn create_dynamic_session(config: Arc<Config>, spec: KnownSession) -> Result<String, String> {
+    dynamic_sessions::save_entry(config.clone(), &spec).await?;
+    match launch_spec(&spec, "created").await {
+        Ok(message) => Ok(message),
+        Err(error) => {
+            let _ = dynamic_sessions::remove(config, &spec.name).await;
+            Err(error)
+        }
+    }
 }
 
 pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, String> {

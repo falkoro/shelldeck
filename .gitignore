@@ -9,6 +9,12 @@
 /links.json
 /dashboard-config.json
 /remote-hosts.json
+/fix-agents.json
+/dynamic-sessions.json
+/fix-prompts/
+
+# Browser-automation + screenshot scratch (local verification only)
+/.playwright-mcp/
 
 # Whisper STT models (downloaded at setup, not committed)
 share/models/
