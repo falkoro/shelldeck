@@ -1,5 +1,5 @@
 use crate::{
-    config::{clean_remote_target, Config},
+    config::{clean_remote_target, Config, RemoteHostConfig},
     container_actions::{clean_name, engine_ok},
     dynamic_sessions, fix_agents, remote_hosts, tmux,
 };
@@ -33,38 +33,7 @@ pub async fn start(config: Arc<Config>, body: FixBody) -> Result<FixStarted, Str
         .find(|agent| agent.id == body.agent_id)
         .ok_or_else(|| "Unknown fix agent".to_string())?;
     let hosts = remote_hosts::load(config.clone()).await;
-    let requested_host = body.host.trim();
-    let raw_target = body.target.trim();
-    let matched = hosts.iter().find(|h| {
-        h.id == requested_host
-            || h.label == requested_host
-            || (!raw_target.is_empty() && h.target == raw_target)
-    });
-    let target = if raw_target.is_empty() {
-        if requested_host.is_empty() {
-            String::new()
-        } else {
-            matched
-                .map(|host| host.target.clone())
-                .ok_or_else(|| "Unknown remote host".to_string())?
-        }
-    } else {
-        let clean = clean_remote_target(raw_target);
-        if clean.is_empty() {
-            return Err("Invalid SSH target".to_string());
-        }
-        clean
-    };
-    let host = hosts.iter().find(|h| {
-        (!target.is_empty() && h.target == target)
-            || h.id == requested_host
-            || h.label == requested_host
-    });
-    let propose = host.is_some_and(|host| host.protected);
-    let host_label = host
-        .map(|host| host.label.clone())
-        .or_else(|| (!requested_host.is_empty()).then(|| requested_host.to_string()))
-        .unwrap_or_else(|| "local".to_string());
+    let (target, propose, host_label) = resolve_host(&hosts, body.host.trim(), body.target.trim())?;
     let diagnostics = diagnostic(&target, &body.engine, &name).await?;
     let session = unique_session_name(config.clone(), &name).await?;
     let prompt = prompt_text(
@@ -85,6 +54,39 @@ pub async fn start(config: Arc<Config>, body: FixBody) -> Result<FixStarted, Str
         mode: mode.to_string(),
         message: format!("{session} started in {mode} mode"),
     })
+}
+
+// Resolve the SSH target, propose-only flag, and display label from ONE authoritative source.
+// The `protected` (propose-only) gate must be decided by the same record that supplies the
+// target, so a client can't dodge a protected host by sending an alternate target string that
+// fails to string-match the configured record. Returns (target, propose_only, host_label).
+fn resolve_host(
+    hosts: &[RemoteHostConfig],
+    requested_host: &str,
+    raw_target: &str,
+) -> Result<(String, bool, String), String> {
+    // A named host (id/label) is authoritative: trust ITS target and flag, ignore client target.
+    if !requested_host.is_empty() {
+        let h = hosts
+            .iter()
+            .find(|h| h.id == requested_host || h.label == requested_host)
+            .ok_or_else(|| "Unknown remote host".to_string())?;
+        return Ok((h.target.clone(), h.protected, h.label.clone()));
+    }
+    // No named host: empty target is local; otherwise a free-form SSH target.
+    if raw_target.is_empty() {
+        return Ok((String::new(), false, "local".to_string()));
+    }
+    let clean = clean_remote_target(raw_target);
+    if clean.is_empty() {
+        return Err("Invalid SSH target".to_string());
+    }
+    // If it matches a configured host, honour that record's flag; an unconfigured target can't be
+    // proven non-production, so fail safe to propose-only.
+    match hosts.iter().find(|h| h.target == clean) {
+        Some(h) => Ok((clean, h.protected, h.label.clone())),
+        None => Ok((clean.clone(), true, clean)),
+    }
 }
 
 fn diagnostic_script(engine: &str, name: &str) -> String {
@@ -288,6 +290,38 @@ mod tests {
         // When the admin opts into {prompt}, the prompt is single-quote escaped, not raw.
         let cmd = start_command("web", "", false, "agent {prompt}", "a'b", "/p/x.md");
         assert!(cmd.contains("'\"'\"'"), "single quote in prompt must be escaped");
+    }
+
+    fn hosts() -> Vec<RemoteHostConfig> {
+        vec![
+            RemoteHostConfig { id: "prod".into(), label: "Prod".into(), target: "falk@1.2.3.4".into(), protected: true },
+            RemoteHostConfig { id: "dev".into(), label: "Dev".into(), target: "dev-box".into(), protected: false },
+        ]
+    }
+
+    #[test]
+    fn named_host_decides_target_and_propose_ignoring_client_target() {
+        // Spoofed alternate target must NOT dodge the protected gate: named host wins.
+        let (target, propose, _) = resolve_host(&hosts(), "prod", "1.2.3.4").unwrap();
+        assert_eq!(target, "falk@1.2.3.4"); // record's target, not the client's
+        assert!(propose); // protected → propose-only
+    }
+
+    #[test]
+    fn unknown_named_host_is_rejected() {
+        assert!(resolve_host(&hosts(), "ghost", "").is_err());
+    }
+
+    #[test]
+    fn freeform_target_fails_safe_and_honours_matches() {
+        // unconfigured free-form target → fail safe to propose-only
+        assert_eq!(resolve_host(&hosts(), "", "10.0.0.9").unwrap().1, true);
+        // matches a protected record by target → propose-only
+        assert_eq!(resolve_host(&hosts(), "", "falk@1.2.3.4").unwrap().1, true);
+        // matches an unprotected record → full fix allowed
+        assert_eq!(resolve_host(&hosts(), "", "dev-box").unwrap().1, false);
+        // empty → local, not propose
+        assert_eq!(resolve_host(&hosts(), "", ""), Ok((String::new(), false, "local".into())));
     }
 
     #[test]
