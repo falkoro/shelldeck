@@ -1,3 +1,4 @@
+use crate::image_versions;
 use serde::Serialize;
 use std::{
     collections::{HashMap, HashSet},
@@ -24,6 +25,9 @@ pub struct ContainerInfo {
     // Image's org.opencontainers.image.description label, when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub desc: Option<String>,
+    // Best-effort registry version state for semver-tagged Docker Hub images.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<image_versions::ContainerVersionInfo>,
 }
 
 // `name\tStartedAt\tdescription` rows from `inspect` → name -> (started, desc). Container names
@@ -96,6 +100,7 @@ pub(crate) fn parse_ps(engine: &str, raw: &str) -> Vec<ContainerInfo> {
                 mem: None,
                 started: None,
                 desc: None,
+                version: None,
             })
         })
         .collect()
@@ -202,6 +207,7 @@ pub async fn running() -> ContainerList {
     let mut seen = HashSet::new();
     docker.retain(|container| seen.insert((container.engine.clone(), container.name.clone())));
     docker.truncate(64);
+    image_versions::annotate(&mut docker).await;
     ContainerList { containers: docker }
 }
 

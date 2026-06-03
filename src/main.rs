@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod container_actions;
 mod containers;
+mod image_versions;
 mod links;
 mod metrics;
 mod pages;

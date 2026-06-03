@@ -1,6 +1,7 @@
 use crate::{
     config::RemoteHostConfig,
     containers::{attach_inspect, attach_stats, parse_inspect, ContainerInfo},
+    image_versions,
     remote_metrics::{self, RemoteMetrics, REMOTE_METRICS_SCRIPT},
 };
 use chrono::Utc;
@@ -199,6 +200,7 @@ async fn ssh_probe(target: &str, cap: usize, with_metrics: bool) -> ProbeResult 
     }
     let total = containers.len();
     containers.truncate(cap.max(1));
+    image_versions::annotate(&mut containers).await;
     let ip = secs
         .get("IP")
         .and_then(|raw| raw.split_whitespace().next())
@@ -240,6 +242,7 @@ fn parse_remote_containers(raw: &str) -> Vec<ContainerInfo> {
                 mem: None,
                 started: None,
                 desc: None,
+                version: None,
             })
         })
         .collect();
