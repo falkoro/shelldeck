@@ -42,6 +42,25 @@ function containerHealth(containers) {
         .map((st) => `${counts[st]} ${CONTAINER_STATE_LABEL[st]}`);
     return parts.join(' · ') || 'no containers';
 }
+function containerVersionSummary(containers) {
+    let staleContainers = 0;
+    let totalBehind = 0;
+    for (const c of containers) {
+        if (c.version?.state === 'behind' && c.version.behind > 0) {
+            staleContainers += 1;
+            totalBehind += c.version.behind;
+        }
+    }
+    if (!staleContainers)
+        return '';
+    const rows = staleContainers === 1 ? '1 update' : `${staleContainers} updates`;
+    const versions = totalBehind === 1 ? '1 version' : `${totalBehind} versions`;
+    return `${rows} · ${versions} behind`;
+}
+function containerOverview(containers) {
+    const version = containerVersionSummary(containers);
+    return version ? `${containerHealth(containers)} · ${version}` : containerHealth(containers);
+}
 // "12.50%" → 12.5; null when there's no parseable number.
 function parsePercent(s) {
     if (!s)
@@ -203,6 +222,18 @@ function containerActionsHtml(c, host) {
     const attrs = `data-cname="${escapeHtml(c.name)}" data-cengine="${escapeHtml(c.engine)}" data-chost="${escapeHtml(host)}"`;
     return `<div class="container-actions"><button type="button" class="container-action ca-restart" data-container-action="restart" ${attrs} title="Restart ${escapeHtml(c.name)}" aria-label="Restart ${escapeHtml(c.name)}">↻</button><button type="button" class="container-action ca-pull" data-container-action="pull" ${attrs} title="Pull latest image + recreate ${escapeHtml(c.name)}" aria-label="Pull latest ${escapeHtml(c.name)}">⬇</button></div>`;
 }
+function containerVersionBadgeHtml(c) {
+    const v = c.version;
+    if (!v)
+        return '';
+    const current = v.current || '';
+    const latest = v.latest || current;
+    const title = `${c.image}\ncurrent: ${current}\nlatest: ${latest}\n${v.detail || ''}`.trim();
+    if (v.state === 'behind' && v.behind > 0) {
+        return `<span class="ci-version behind" title="${escapeHtml(title)}">${escapeHtml(String(v.behind))} behind</span>`;
+    }
+    return `<span class="ci-version current" title="${escapeHtml(title)}">current</span>`;
+}
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
 // then actions. Stopped/unhealthy get a state class for greying/highlighting.
 function containerRowHtml(c, extraClass = '', host = '') {
@@ -216,7 +247,7 @@ function containerRowHtml(c, extraClass = '', host = '') {
         : `<div class="ci-desc ci-desc-empty" data-edit-desc="${escapeHtml(c.name)}" title="Add a description">+ description</div>`;
     return `<div class="container-item ${extraClass} state-${containerState(c.status)}">`
         + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small>${containerActionsHtml(c, host)}</div>`
-        + `<div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>`
+        + `<div class="ci-image-line"><div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>${containerVersionBadgeHtml(c)}</div>`
         + descHtml
         + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
         + statsHtml + `</div>`;
@@ -237,9 +268,11 @@ function compactContainerRowHtml(c, host) {
     const subText = desc || c.image;
     const subTitle = desc ? `${desc}\n${c.image}` : c.image;
     const subClass = desc ? 'ci-image has-desc' : 'ci-image';
+    const versionHtml = containerVersionBadgeHtml(c);
+    const badges = versionHtml || badgeHtml ? `<span class="ci-badges">${versionHtml}${badgeHtml}</span>` : '';
     return `<div class="container-item remote-container compact state-${state}">`
         + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
-        + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badgeHtml}</div>`
+        + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badges}</div>`
         + `</div>`;
 }
 const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
@@ -385,7 +418,7 @@ function renderContainers(containers) {
         list.innerHTML = '<div class="muted container-empty">No containers</div>';
         return;
     }
-    const summary = `<div class="container-health">${escapeHtml(containerHealth(containers))}</div>`;
+    const summary = `<div class="container-health">${escapeHtml(containerOverview(containers))}</div>`;
     list.innerHTML = summary + containers.map((c) => containerRowHtml(c)).join('');
 }
 function remoteProbeText(host) {
@@ -437,7 +470,7 @@ function renderRemoteHosts(hosts) {
         const total = typeof host.container_total === 'number' ? host.container_total : containers.length;
         const shownNote = total > containers.length ? ` · showing ${containers.length} of ${total}` : '';
         const containerHtml = containers.length
-            ? `<div class="remote-count">${escapeHtml(containerHealth(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => compactContainerRowHtml(c, host.id)).join('')}</div>`
+            ? `<div class="remote-count">${escapeHtml(containerOverview(containers))}${escapeHtml(shownNote)}</div><div class="remote-containers">${containers.map((c) => compactContainerRowHtml(c, host.id)).join('')}</div>`
             : `<div class="muted remote-empty">${host.online ? 'No containers' : escapeHtml(host.error || 'Remote host is offline')}</div>`;
         const error = host.error && host.online ? `<div class="remote-error">${escapeHtml(host.error)}</div>` : '';
         const metricsHtml = host.metrics ? remoteMetricsHtml(host.metrics) : '';
