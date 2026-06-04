@@ -17,7 +17,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Browser memory** — remembers the selected shell, command history, view/density/line preferences, shell order/sizes, onboarding dismissal, and floating terminal window positions in local browser storage.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
 - **Agent presets** — optional Create/Stop/Restart entries for iFlow/Flow, Gemini CLI, Qwen Code, goose, Aider, OpenCode, Codex, Grok, Claude Code, and custom commands.
-- **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`, then editable in `links.json`) to related services, plus an optional stock/crypto ticker bar (`DASHBOARD_TICKERS`, then editable in `dashboard-config.json`).
+- **Quick links & tickers** — configurable sidebar links (`DASHBOARD_LINKS`, then editable in `links.json`) to related services, plus an optional stock ticker bar (`DASHBOARD_TICKERS` + a `FINNHUB_API_KEY`, then editable in `dashboard-config.json`).
 - **Configurable widgets** — Machine, remote hosts, local containers, Links, and the ticker bar can be shown/hidden from **Configure**, with JSON persistence for agent-driven setup. Remote-host widgets and quick links are fully self-service: add/edit/remove them from the sidebar (Homarr-style) without touching env or restarting.
 - **Machine metrics and containers** — sidebar widgets show live CPU, CPU MHz, RAM, load average, hardware temperatures, local Docker/Podman containers, plus optional SSH-based remote host ping/container checks.
 - **Safe shot** — creates a sanitized share image with shell names, commands, paths, hostnames, and output removed; copies it to the clipboard and saves it under `share/`.
@@ -53,11 +53,13 @@ scripts/shelldeck-secret --dir ~/.config/shelldeck DASHBOARD_PASSWORD --prompt
 
 `DASHBOARD_LINKS` seeds the sidebar links. Runtime edits are saved to `links.json` in `DASHBOARD_ROOT_DIR` by default, or to `DASHBOARD_LINKS_FILE` when set.
 
-`DASHBOARD_TICKERS` seeds the ticker bar. Runtime edits and widget visibility are saved to `dashboard-config.json` in `DASHBOARD_ROOT_DIR` by default, or to `DASHBOARD_UI_CONFIG_FILE` when set:
+`DASHBOARD_TICKERS` seeds the ticker bar. Runtime edits and widget visibility are saved to `dashboard-config.json` in `DASHBOARD_ROOT_DIR` by default, or to `DASHBOARD_UI_CONFIG_FILE` when set.
+
+Live quotes come from [Finnhub](https://finnhub.io) — set `FINNHUB_API_KEY` (free tier covers US equities like `INTC`, `TSLA`, `NVDA`). When it's unset the ticker bar shows a link to grab a free key instead of quotes.
 
 ```json
 {
-  "tickers": ["MSFT", "NVDA", "BTC-USD"],
+  "tickers": ["MSFT", "NVDA", "TSLA"],
   "panels": {
     "machine": true,
     "machineSensors": true,

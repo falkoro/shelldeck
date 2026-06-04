@@ -507,8 +507,10 @@ async fn api_shells(
     )
 }
 
-// Live quotes for DASHBOARD_TICKERS via Yahoo's public chart endpoint (login-gated, not unlock —
-// market data isn't sensitive). Each symbol is fetched concurrently; failures are dropped.
+// Live quotes for the configured tickers via Finnhub's /quote endpoint (login-gated, not unlock —
+// market data isn't sensitive). Needs FINNHUB_API_KEY; if unset we return `unconfigured` so the UI
+// can prompt for a free key. Each symbol is fetched concurrently; failures are dropped.
+// Finnhub free covers US equities (e.g. INTC, TSLA, NVDA); indices/crypto need their own symbols.
 async fn api_tickers(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -524,17 +526,22 @@ async fn api_tickers(
     if !settings.panels.tickers {
         return webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": [] }));
     }
+    let key = state.config.finnhub_api_key.trim().to_string();
+    if key.is_empty() {
+        return webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": [], "unconfigured": true }));
+    }
     let fetches = settings.tickers.iter().take(16).cloned().map(|sym| {
         let client = state.client.clone();
+        let key = key.clone();
         async move {
-            let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?range=1d&interval=1d", urlencoding::encode(&sym));
-            let resp = client.get(&url).header("User-Agent", "Mozilla/5.0").send().await.ok()?;
+            let url = format!("https://finnhub.io/api/v1/quote?symbol={}&token={}", urlencoding::encode(&sym), urlencoding::encode(&key));
+            let resp = client.get(&url).send().await.ok()?;
             let body = resp.json::<serde_json::Value>().await.ok()?;
-            let meta = &body["chart"]["result"][0]["meta"];
-            let price = meta["regularMarketPrice"].as_f64()?;
-            let prev = meta["chartPreviousClose"].as_f64().or_else(|| meta["previousClose"].as_f64()).unwrap_or(price);
-            let pct = if prev != 0.0 { (price - prev) / prev * 100.0 } else { 0.0 };
-            Some(serde_json::json!({ "symbol": sym, "price": price, "changePct": pct, "currency": meta["currency"].as_str().unwrap_or("") }))
+            let price = body["c"].as_f64()?;
+            let prev = body["pc"].as_f64().unwrap_or(price);
+            if price == 0.0 && prev == 0.0 { return None; } // 0/0 = no live data for this symbol
+            let pct = body["dp"].as_f64().unwrap_or(if prev != 0.0 { (price - prev) / prev * 100.0 } else { 0.0 });
+            Some(serde_json::json!({ "symbol": sym, "price": price, "changePct": pct, "currency": "USD" }))
         }
     });
     let tickers: Vec<serde_json::Value> = futures_util::future::join_all(fetches)
