@@ -1,7 +1,4 @@
-use std::{
-    sync::Mutex,
-    time::Duration,
-};
+use std::{sync::Mutex, time::Duration};
 
 use serde::Serialize;
 use tauri::{
@@ -103,9 +100,17 @@ pub fn run() {
 
 fn build_tray(app: &App) -> tauri::Result<()> {
     let show_hide = MenuItem::with_id(app, "show_hide", "Show/Hide", true, None::<&str>)?;
-    let open_browser = MenuItem::with_id(app, "open_browser", "Open in browser", true, None::<&str>)?;
-    let check_updates = MenuItem::with_id(app, "check_updates", "Check for updates", true, None::<&str>)?;
-    let switch_server = MenuItem::with_id(app, "switch_server", "Switch server", true, None::<&str>)?;
+    let open_browser =
+        MenuItem::with_id(app, "open_browser", "Open in browser", true, None::<&str>)?;
+    let check_updates = MenuItem::with_id(
+        app,
+        "check_updates",
+        "Check for updates",
+        true,
+        None::<&str>,
+    )?;
+    let switch_server =
+        MenuItem::with_id(app, "switch_server", "Switch server", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
@@ -206,12 +211,20 @@ async fn check_for_updates(app: AppHandle, manual: bool) {
                     app.restart();
                 }
                 Err(error) => {
-                    emit_update_status(&app, format!("Could not install the update: {error}"), true);
+                    emit_update_status(
+                        &app,
+                        format!("Could not install the update: {error}"),
+                        true,
+                    );
                 }
             }
         }
         Ok(None) => emit_update_status(&app, "ShellDeck is up to date.".to_string(), manual),
-        Err(error) => emit_update_status(&app, format!("Could not check for updates: {error}"), manual),
+        Err(error) => emit_update_status(
+            &app,
+            format!("Could not check for updates: {error}"),
+            manual,
+        ),
     }
 }
 
@@ -283,11 +296,11 @@ fn focus_window(window: &WebviewWindow) {
 }
 
 fn parse_server_url(value: &str) -> Result<url::Url, String> {
-    let parsed = url::Url::parse(value.trim()).map_err(|error| format!("Invalid server URL: {error}"))?;
+    let parsed =
+        url::Url::parse(value.trim()).map_err(|error| format!("Invalid server URL: {error}"))?;
 
     match parsed.scheme() {
         "http" | "https" => Ok(parsed),
         _ => Err("Server URL must start with http:// or https://.".to_string()),
     }
 }
-
