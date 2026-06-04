@@ -188,19 +188,21 @@ async fn check_for_updates(app: AppHandle, manual: bool) {
         Ok(Some(update)) => {
             emit_update_status(&app, "Installing a ShellDeck update...".to_string(), true);
             let mut downloaded = 0;
+            let progress_app = app.clone();
+            let finish_app = app.clone();
             let result = update
                 .download_and_install(
-                    |chunk_length, content_length| {
+                    move |chunk_length, content_length| {
                         downloaded += chunk_length;
                         if let Some(content_length) = content_length {
-                            let _ = app.emit(
+                            let _ = progress_app.emit(
                                 "updater-status",
                                 format!("Downloaded {downloaded} of {content_length} bytes."),
                             );
                         }
                     },
-                    || {
-                        let _ = app.emit("updater-status", "Update download finished.");
+                    move || {
+                        let _ = finish_app.emit("updater-status", "Update download finished.");
                     },
                 )
                 .await;
