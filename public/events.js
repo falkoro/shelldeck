@@ -535,12 +535,18 @@ function markBooted() {
     document.body.classList.add('booted');
 }
 render(initialModel);
-queueMicrotask(markBooted);
+// Hold the boot splash up until the first LIVE shell load confirms session state. The injected
+// initial model is a point-in-time server snapshot (running = "tmux session exists"), so revealing
+// it immediately flashes a stale "running" before the live fetch lands. Gating the reveal on
+// loadShells() means we only ever show client-confirmed state. The timeout is a safety net so the
+// splash can never stick if the fetch hangs (the page also keeps its own 4s hard fallback).
+const bootSplashFallback = setTimeout(markBooted, 4000);
+const liftBootSplash = () => { clearTimeout(bootSplashFallback); markBooted(); };
 queueMicrotask(() => loadSummary().catch(() => { }));
 queueMicrotask(() => loadShells().then(() => {
     startShellStream();
     window.maybeAutoOpenMobileShell?.();
-}).catch((error) => toast(error.message)));
+}).catch((error) => toast(error.message)).finally(liftBootSplash));
 setInterval(() => refresh({ preserveUnlock: true }).catch(() => { }), 30000);
 setInterval(() => loadSummary().catch(() => { }), 60000);
 // Live-tick relative last activity labels (the main "add last activity" UX fix for code.falkinator.org)
