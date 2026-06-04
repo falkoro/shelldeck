@@ -16,6 +16,8 @@
 - `npm run build` in `desktop/` completed successfully.
 - `npm run latest-json` generated a valid test updater manifest from a throwaway signature file.
 - `git diff --check` completed with no whitespace errors.
+- `cargo fmt --check` completed successfully.
+- `npm run tauri info` parsed the Tauri app and confirmed WebKitGTK 4.1 is the missing local prerequisite.
 - Playwright loaded the static site at desktop and 390px widths: no console warnings/errors after localhost manifest fetches were disabled, and no horizontal overflow was detected.
 - Playwright loaded the desktop settings screen through Vite at desktop and 390px widths: no console warnings/errors and no horizontal overflow was detected.
 - `cargo check` in `desktop/src-tauri` could not complete on this machine because WebKitGTK 4.1 development packages are not installed locally.
