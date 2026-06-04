@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ShellDeck Desktop</title>
+    <meta name="description" content="ShellDeck Desktop is a native thin client for your ShellDeck server." />
+    <link rel="icon" href="favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">ShellDeck</a>
+      <nav aria-label="Primary">
+        <a href="#downloads">Downloads</a>
+        <a href="#screenshots">Screenshots</a>
+        <a data-browser-link href="https://code.falkinator.org">Use in browser</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Desktop client</p>
+          <h1>ShellDeck Desktop</h1>
+          <p class="lede">A native window for the ShellDeck server you already run. Point it at your server URL, sign in there, and keep using the same dashboard.</p>
+          <div class="download-row" id="downloads">
+            <a class="button" data-download="windows" aria-disabled="true">Loading Windows download</a>
+            <a class="button secondary" data-download="linux" aria-disabled="true">Loading Linux download</a>
+          </div>
+          <p class="download-status" data-download-status>Checking the current desktop release.</p>
+          <p class="browser-line">Or <a data-browser-link href="https://code.falkinator.org">use ShellDeck in your browser</a>.</p>
+        </div>
+        <img class="hero-shot" src="screenshot-dashboard.png" alt="ShellDeck dashboard screenshot placeholder" />
+      </section>
+
+      <section class="band">
+        <div class="narrow">
+          <h2>It wraps the web UI, not the server</h2>
+          <p>ShellDeck still runs on the machine that has tmux and SSH. The desktop app stores your server URL, opens it in a persistent webview, and leaves server auth to the existing login page.</p>
+        </div>
+      </section>
+
+      <section class="screenshots" id="screenshots" aria-label="Screenshots">
+        <figure>
+          <img src="screenshot-dashboard.png" alt="ShellDeck dashboard screenshot placeholder" />
+          <figcaption>Dashboard</figcaption>
+        </figure>
+        <figure>
+          <img src="screenshot-terminal.png" alt="ShellDeck terminal screenshot placeholder" />
+          <figcaption>Terminal sessions</figcaption>
+        </figure>
+        <figure>
+          <img src="screenshot-tray.png" alt="ShellDeck tray screenshot placeholder" />
+          <figcaption>Tray controls</figcaption>
+        </figure>
+      </section>
+
+      <section class="band">
+        <div class="narrow">
+          <h2>Updates are signed</h2>
+          <p>The app checks for a signed release on startup and once an hour. When an update is available, Tauri verifies the signature before it installs anything.</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

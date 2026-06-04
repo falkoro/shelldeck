@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { SERVER_URL_STORAGE_KEY, SHELLDECK_BRAND } from "./config";
+import { SERVER_URL_STORAGE_KEY } from "./config";
 import "./styles.css";
 
 type ServerCheck = {
@@ -19,11 +19,13 @@ if (!appRoot) {
 const app: HTMLElement = appRoot;
 let lastUpdateMessage = "";
 
-void listen<string>("updater-status", (event) => {
-  lastUpdateMessage = event.payload;
-  const status = document.querySelector<HTMLElement>("[data-update-status]");
-  if (status) status.textContent = lastUpdateMessage;
-});
+if (isTauriRuntime()) {
+  void listen<string>("updater-status", (event) => {
+    lastUpdateMessage = event.payload;
+    const status = document.querySelector<HTMLElement>("[data-update-status]");
+    if (status) status.textContent = lastUpdateMessage;
+  });
+}
 
 start();
 
@@ -135,6 +137,15 @@ function renderConnectionError(serverUrl: string, message: string) {
 }
 
 async function checkServer(serverUrl: string): Promise<ServerCheck> {
+  if (!isTauriRuntime()) {
+    return {
+      ok: false,
+      status: null,
+      finalUrl: null,
+      message: "Run this screen inside ShellDeck Desktop to validate and save a server URL."
+    };
+  }
+
   try {
     return await invoke<ServerCheck>("check_server_url", { url: serverUrl });
   } catch (error) {
@@ -148,6 +159,7 @@ async function checkServer(serverUrl: string): Promise<ServerCheck> {
 }
 
 async function setNativeServerUrl(serverUrl: string | null) {
+  if (!isTauriRuntime()) return;
   await invoke("set_server_url", { url: serverUrl });
 }
 
@@ -184,4 +196,6 @@ function escapeHtml(value: string) {
   });
 }
 
-console.info(`ShellDeck desktop landing domain: ${SHELLDECK_BRAND.marketingDomain}`);
+function isTauriRuntime() {
+  return "__TAURI_INTERNALS__" in window;
+}
