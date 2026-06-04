@@ -411,9 +411,14 @@ function buildLegend(): void {
 
 interface Ticker { symbol: string; price: number; changePct: number; currency: string }
 
-function renderTickers(list: Ticker[]): void {
+function renderTickers(list: Ticker[], unconfigured = false): void {
   const bar = document.getElementById('tickerBar');
   if (!bar) return;
+  if (unconfigured) {
+    bar.hidden = false;
+    bar.innerHTML = '<span class="ticker-empty">Live quotes need a Finnhub key — <a class="ticker-link" href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">get a free one</a>, then set <code>FINNHUB_API_KEY</code></span>';
+    return;
+  }
   if (!list.length) {
     bar.hidden = false;
     bar.innerHTML = '<span class="ticker-empty">No tickers configured</span>';

@@ -416,10 +416,15 @@ function buildLegend() {
     details.innerHTML = `<summary>Button legend — what each control does</summary><div class="legend-section">Shell buttons</div><div class="legend-grid">${rows}</div><div class="legend-section">Toolbar</div><div class="legend-grid">${toolbarRows}</div><div class="legend-section">Status</div><div class="legend-grid">${status}</div>`;
     tabs.insertAdjacentElement('afterend', details);
 }
-function renderTickers(list) {
+function renderTickers(list, unconfigured = false) {
     const bar = document.getElementById('tickerBar');
     if (!bar)
         return;
+    if (unconfigured) {
+        bar.hidden = false;
+        bar.innerHTML = '<span class="ticker-empty">Live quotes need a Finnhub key — <a class="ticker-link" href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">get a free one</a>, then set <code>FINNHUB_API_KEY</code></span>';
+        return;
+    }
     if (!list.length) {
         bar.hidden = false;
         bar.innerHTML = '<span class="ticker-empty">No tickers configured</span>';
