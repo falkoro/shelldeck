@@ -1,0 +1,167 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+env:
+  DOWNLOAD_HOST: dl.shelldeck.app
+  DOWNLOAD_BASE_URL: https://dl.shelldeck.app/desktop
+  DESKTOP_ARCH: x86_64
+
+jobs:
+  linux:
+    name: Linux desktop bundles
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            wget
+
+      - name: Install desktop dependencies
+        run: npm ci
+
+      - name: Build AppImage and deb
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --bundles appimage,deb
+
+      - name: Prepare Linux updater manifest
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          APPIMAGE="$(find src-tauri/target/release/bundle/appimage -type f -name '*.AppImage' | head -n 1)"
+          DEB="$(find src-tauri/target/release/bundle/deb -type f -name '*.deb' | head -n 1)"
+          SIG="${APPIMAGE}.sig"
+
+          test -f "$APPIMAGE"
+          test -f "$DEB"
+          test -f "$SIG"
+
+          mkdir -p release/upload release/linux
+          cp "$APPIMAGE" "$SIG" "$DEB" release/upload/
+
+          npm run latest-json -- \
+            --version "$VERSION" \
+            --target linux \
+            --arch "$DESKTOP_ARCH" \
+            --artifact "$APPIMAGE" \
+            --signature "$SIG" \
+            --url "$DOWNLOAD_BASE_URL/linux/$DESKTOP_ARCH/$(basename "$APPIMAGE")" \
+            --out release/linux/latest.json
+
+      - name: Upload Linux bundles to R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_BUCKET: ${{ secrets.SHELLDECK_R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          for file in release/upload/*; do
+            npx wrangler@latest r2 object put "$R2_BUCKET/desktop/linux/$DESKTOP_ARCH/$(basename "$file")" --file "$file"
+          done
+          npx wrangler@latest r2 object put "$R2_BUCKET/desktop/linux/$DESKTOP_ARCH/latest.json" --file release/linux/latest.json
+
+      - name: Attach Linux artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            desktop/release/upload/*
+            desktop/release/linux/latest.json
+
+  windows:
+    name: Windows desktop bundle
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install desktop dependencies
+        run: npm ci
+
+      - name: Build NSIS installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --bundles nsis
+
+      - name: Prepare Windows updater manifest
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          INSTALLER="$(find src-tauri/target/release/bundle/nsis -type f -name '*.exe' | head -n 1)"
+          SIG="${INSTALLER}.sig"
+
+          test -f "$INSTALLER"
+          test -f "$SIG"
+
+          mkdir -p release/upload release/windows
+          cp "$INSTALLER" "$SIG" release/upload/
+
+          npm run latest-json -- \
+            --version "$VERSION" \
+            --target windows \
+            --arch "$DESKTOP_ARCH" \
+            --artifact "$INSTALLER" \
+            --signature "$SIG" \
+            --url "$DOWNLOAD_BASE_URL/windows/$DESKTOP_ARCH/$(basename "$INSTALLER")" \
+            --out release/windows/latest.json
+
+      - name: Upload Windows bundle to R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_BUCKET: ${{ secrets.SHELLDECK_R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          for file in release/upload/*; do
+            npx wrangler@latest r2 object put "$R2_BUCKET/desktop/windows/$DESKTOP_ARCH/$(basename "$file")" --file "$file"
+          done
+          npx wrangler@latest r2 object put "$R2_BUCKET/desktop/windows/$DESKTOP_ARCH/latest.json" --file release/windows/latest.json
+
+      - name: Attach Windows artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            desktop/release/upload/*
+            desktop/release/windows/latest.json
