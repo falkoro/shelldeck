@@ -8,6 +8,7 @@ name: Desktop Pre-release
 on:
   push:
     branches:
+      - master
       - feat/shelldeck-desktop
     paths:
       - "desktop/**"
