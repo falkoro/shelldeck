@@ -109,7 +109,7 @@ fn build_tray(app: &App) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
-    let switch_server =
+    let switch_server_item =
         MenuItem::with_id(app, "switch_server", "Switch server", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -119,7 +119,7 @@ fn build_tray(app: &App) -> tauri::Result<()> {
             &show_hide,
             &open_browser,
             &check_updates,
-            &switch_server,
+            &switch_server_item,
             &separator,
             &quit,
         ],
