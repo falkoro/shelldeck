@@ -55,7 +55,7 @@ scripts/shelldeck-secret --dir ~/.config/shelldeck DASHBOARD_PASSWORD --prompt
 
 `DASHBOARD_TICKERS` seeds the ticker bar. Runtime edits and widget visibility are saved to `dashboard-config.json` in `DASHBOARD_ROOT_DIR` by default, or to `DASHBOARD_UI_CONFIG_FILE` when set.
 
-Live quotes come from [Finnhub](https://finnhub.io) — set `FINNHUB_API_KEY` (free tier covers US equities like `INTC`, `TSLA`, `NVDA`). When it's unset the ticker bar shows a link to grab a free key instead of quotes.
+Live quotes come from [Finnhub](https://finnhub.io) — set `FINNHUB_API_KEY` (also accepts `FINNHUB_TOKEN` / `finnhub_token`). Free tier covers US equities (`INTC`, `TSLA`, `NVDA`) and crypto: a Yahoo-style `BTC-USD` is auto-mapped to Finnhub's `COINBASE:BTC-USD`, or use an explicit `BINANCE:BTCUSDT`. When the key is unset the ticker bar shows a link to grab a free one instead of quotes.
 
 ```json
 {

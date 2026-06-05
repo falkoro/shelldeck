@@ -12,3 +12,4 @@
 
 # Whisper STT models (downloaded at setup, not committed)
 share/models/
+.opencode/

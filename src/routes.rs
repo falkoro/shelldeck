@@ -507,10 +507,24 @@ async fn api_shells(
     )
 }
 
+// Map a Yahoo-style crypto symbol (BTC-USD) to a Finnhub one (COINBASE:BTC-USD). Finnhub /quote
+// returns 0 for a bare BTC-USD but works with an exchange prefix; stocks never end in -USD, so this
+// is safe. Symbols that already carry an exchange prefix (BINANCE:BTCUSDT) pass through untouched.
+fn finnhub_symbol(sym: &str) -> String {
+    let s = sym.trim().to_uppercase();
+    if s.contains(':') {
+        return s;
+    }
+    match s.strip_suffix("-USD") {
+        Some(coin) if !coin.is_empty() => format!("COINBASE:{}-USD", coin),
+        _ => s,
+    }
+}
+
 // Live quotes for the configured tickers via Finnhub's /quote endpoint (login-gated, not unlock —
 // market data isn't sensitive). Needs FINNHUB_API_KEY; if unset we return `unconfigured` so the UI
-// can prompt for a free key. Each symbol is fetched concurrently; failures are dropped.
-// Finnhub free covers US equities (e.g. INTC, TSLA, NVDA); indices/crypto need their own symbols.
+// can prompt for a free key. Each symbol is fetched concurrently; failures are dropped. Finnhub free
+// covers US equities (INTC, TSLA…) and crypto via exchange-prefixed symbols (BTC-USD auto-prefixed).
 async fn api_tickers(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -534,7 +548,8 @@ async fn api_tickers(
         let client = state.client.clone();
         let key = key.clone();
         async move {
-            let url = format!("https://finnhub.io/api/v1/quote?symbol={}&token={}", urlencoding::encode(&sym), urlencoding::encode(&key));
+            let fetch_sym = finnhub_symbol(&sym); // display keeps the user's symbol; fetch uses the mapped one
+            let url = format!("https://finnhub.io/api/v1/quote?symbol={}&token={}", urlencoding::encode(&fetch_sym), urlencoding::encode(&key));
             let resp = client.get(&url).send().await.ok()?;
             let body = resp.json::<serde_json::Value>().await.ok()?;
             let price = body["c"].as_f64()?;
