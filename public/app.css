@@ -434,6 +434,62 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .card-resize-handle{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:se-resize;background:linear-gradient(135deg,transparent 40%,rgba(139,246,255,.28) 41%);z-index:5;border-bottom-right-radius:6px;opacity:0;transition:opacity .14s}
 .terminal-card:hover .card-resize-handle{opacity:1}
 .terminal-card.resizing .card-resize-handle{background:linear-gradient(135deg,transparent 40%,rgba(114,247,200,.45) 41%);opacity:1}
+
+/* ============================================================
+   EXE.DEV COCKPIT REDESIGN (2026-06-05)
+   All-dark, monospace-minimal (exe.dev language) but keeps
+   ShellDeck's dark terminal vibe. The sidebar is removed — the
+   shells grid becomes the full-bleed hero (multi-agent canvas),
+   and the former sidebar panels reflow into a "System" strip
+   below. Self-contained override block: delete it to revert.
+   ============================================================ */
+
+/* — Type: monospace everything (exe.dev signature) — */
+body{font-family:"Cascadia Mono","JetBrains Mono","SFMono-Regular",ui-monospace,Consolas,monospace;-webkit-font-smoothing:antialiased}
+
+/* — Slim top bar, hairline divider, green prompt accent — */
+.topbar{align-items:center;gap:14px;padding-bottom:13px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.brand{align-items:center;gap:10px}
+.brand-logo{width:30px;height:30px;border-radius:6px;box-shadow:none}
+.brand h1{font-size:15px;font-weight:600;letter-spacing:.03em}
+.brand h1::before{content:"\25B8  ";color:var(--green);font-weight:700}
+.status-line{margin-top:7px;gap:6px}
+.pill{border-radius:5px;padding:3px 8px;font-size:11px;background:transparent}
+.top-actions .button,.top-actions button{border-radius:6px;font-size:12px;padding:6px 11px;min-height:30px;font-weight:500}
+.top-actions button.primary{font-weight:600}
+
+/* — Kill the sidebar: shells grid is the hero; the old sidebar
+     panels reflow into a responsive "System" instrument strip — */
+.workspace{display:flex;flex-direction:column;gap:18px}
+.main-stack{order:1;gap:14px}
+.sidebar{order:2;position:static;top:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(252px,1fr));gap:12px;align-items:start}
+.sidebar-head{grid-column:1 / -1;margin:4px 0 -4px;padding-top:14px;border-top:1px solid var(--line);align-items:center}
+.sidebar-head-title{font-size:0}
+.sidebar-head-title::before{content:"System";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* — Flat instrument-panel cards (neutral hairlines, no glow) — */
+.panel{border-color:var(--line);background:#0a1119;box-shadow:none}
+.panel-header h2{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.panel-header p{color:var(--muted);opacity:.82;font-size:11.5px}
+
+/* — Shells = the hero: strip the outer card chrome so the agent
+     grid floats full-bleed on the cockpit background — */
+.terminal-panel{border:0;background:transparent;padding:0}
+.terminal-grid{gap:12px}
+
+/* — Terminal cards as exe.dev terminal windows w/ traffic lights — */
+.terminal-card{border-color:var(--line);background:#070d13}
+.terminal-card header{background:#0a1119;padding:9px 12px}
+.terminal-card header::before{content:"";flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:#ff5f57;box-shadow:16px 0 0 #febc2e,32px 0 0 #28c840;margin-right:34px;align-self:center}
+.terminal-card.running{border-color:rgba(114,247,200,.34)}
+
+/* — Buttons: flat, neutral hairline (mono inherited from body) — */
+button,.button{border-color:var(--line);background:#0a1119;border-radius:6px}
+button:hover,.button:hover{border-color:var(--cyan);background:#10202b}
+
+/* — Slim ticker strip to match — */
+.ticker-bar{border-color:var(--line);background:#0a1119;border-radius:6px}
+.ticker-strip button{border-radius:6px}
 .terminal-card.resizing{border-color:rgba(114,247,200,.4);user-select:none}
 /* Preview-enlarged state (resize button) */
 .terminal-card.preview-enlarged pre{max-height:560px}
