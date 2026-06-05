@@ -16,12 +16,41 @@ pub fn dashboard(model: &SessionModel, config: &Config) -> String {
     let data = serde_json::to_string(model)
         .unwrap_or_else(|_| "{}".to_string())
         .replace('<', "\\u003c");
-    format!(
+    let v = asset_ver(config);
+    let html = format!(
         r##"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#071017"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ShellDeck"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/xterm.css"><link rel="stylesheet" href="/assets/app.css"><title>ShellDeck</title></head><body><script type="application/json" id="initial-model">{}</script><main class="shell"><header class="topbar"><div class="brand"><img class="brand-logo" src="/assets/shelldeck-logo.png" alt="" width="50" height="50"><div><h1>ShellDeck</h1><div class="status-line"><span class="pill">{}</span><span class="pill" id="authState">dashboard signed in</span><span class="pill" id="updated">syncing</span><span class="pill access-pill" id="accessState">shells locked</span></div></div></div><div class="top-actions"><button class="ghost" id="safeShotBtn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4 13 2H7L5.5 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-6.5Z"/><circle cx="12" cy="12" r="3.5"/><path d="M20 8h.01"/></svg><span>Safe shot</span></button><button class="primary" id="refreshBtn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh</span></button><a class="button ghost" href="/logout"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sign out</span></a></div></header><div class="ticker-strip" id="tickerStrip"><div class="ticker-bar" id="tickerBar"><span class="ticker-empty">No tickers configured</span></div><button type="button" id="editTickersBtn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg><span>Edit tickers</span></button></div>{}<div class="toast" id="toast"></div><div id="bootSplash" aria-hidden="true"><div class="boot-card"><img class="brand-logo" src="/assets/shelldeck-logo.png" alt="" width="54" height="54"><div class="boot-spinner"></div><div class="boot-title">ShellDeck</div></div></div><script src="/assets/xterm.js"></script><script src="/assets/addon-fit.js"></script><script src="/assets/core.js"></script><script src="/assets/prefs.js"></script><script src="/assets/render.js"></script><script src="/assets/actions.js"></script><script src="/assets/terminal.js"></script><script src="/assets/metrics.js"></script><script src="/assets/events.js"></script><script>setTimeout(()=>document.body.classList.add('booted'),4000);</script></body></html>"##,
         data,
         html_escape(&model.hostname),
         workspace(&links_panel_html(config))
-    )
+    );
+    bust_assets(&html, &v)
+}
+
+// Cache-bust the app's own CSS/JS so a stale browser/CDN copy can't serve old code: the origin
+// sends no-cache, but Cloudflare overrides that to a 4h max-age and caches the assets. The HTML
+// is no-store (always fresh), so a versioned URL is what forces the browser to refetch the CSS/JS
+// after every deploy or hot-reloaded CSS edit. Version = newest mtime among the app's own files.
+const VERSIONED_ASSETS: [&str; 8] = ["app.css", "core.js", "prefs.js", "render.js", "actions.js", "terminal.js", "metrics.js", "events.js"];
+
+fn asset_ver(config: &Config) -> String {
+    let dir = config.root_dir.join("public");
+    let mut newest: u64 = 0;
+    for name in VERSIONED_ASSETS {
+        if let Ok(t) = std::fs::metadata(dir.join(name)).and_then(|m| m.modified()) {
+            if let Ok(d) = t.duration_since(std::time::UNIX_EPOCH) {
+                newest = newest.max(d.as_secs());
+            }
+        }
+    }
+    newest.to_string()
+}
+
+fn bust_assets(html: &str, v: &str) -> String {
+    let mut out = html.to_string();
+    for name in VERSIONED_ASSETS {
+        out = out.replace(&format!("/assets/{name}\""), &format!("/assets/{name}?v={v}\""));
+    }
+    out
 }
 
 // Configurable quick links (DASHBOARD_LINKS) rendered as a sidebar panel.
