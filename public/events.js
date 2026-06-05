@@ -236,6 +236,20 @@ q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((er
 q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
 q('#densityToggle').addEventListener('click', toggleDensity);
 q('#followToggle').addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
+// Side-panels toggle in the top bar. The side rail (Machine/Remote/Containers/Links/Unlock) is
+// OPTIONAL — this always-visible button is the hint that it can be shown/hidden, and the choice
+// persists per browser (sdSidebar). Injected so it needs no HTML rebuild.
+const topActions = document.querySelector('.top-actions');
+if (topActions && !document.getElementById('sidebarToggle')) {
+    const sidebarBtn = document.createElement('button');
+    sidebarBtn.id = 'sidebarToggle';
+    sidebarBtn.type = 'button';
+    sidebarBtn.className = 'ghost';
+    sidebarBtn.innerHTML = `${icon('sidebar')}<span>Panels</span>`;
+    sidebarBtn.addEventListener('click', toggleSidebar);
+    topActions.insertAdjacentElement('afterbegin', sidebarBtn);
+    applySidebar();
+}
 // Restore all minimized shell previews button (injected)
 const shellTools = document.querySelector('.shell-tools');
 if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
@@ -284,6 +298,7 @@ const SHELL_TIPS = [
     'Tip: ? lists all shortcuts',
     'Tip: unlock shells to Restart / Pull containers',
     'Tip: ⚙ Configure hides sidebar panels (e.g. Machine)',
+    'Tip: the Panels button (top bar) shows/hides the side rail',
 ];
 if (shellTools && !document.querySelector('#shellTip')) {
     const tip = document.createElement('span');
