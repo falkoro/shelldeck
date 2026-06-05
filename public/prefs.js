@@ -3,6 +3,9 @@ let viewMode = localStorage.getItem('sdViewMode2') || 'grid';
 let density = localStorage.getItem('sdDensity') || 'compact';
 let terminalLines = Number(localStorage.getItem('sdTerminalLines') || '80');
 let followOutput = localStorage.getItem('sdFollowOutput') !== '0';
+// Side panels (Machine/Remote/Containers/Links/Unlock) are an OPTIONAL left rail. Default shown on
+// this instance; productized tenants can default it hidden. Persisted per browser as sdSidebar.
+let sidebarVisible = localStorage.getItem('sdSidebar') !== 'hidden';
 let shellImages = {};
 let clearedOutputs = {};
 let historyCursor = {};
@@ -84,6 +87,22 @@ function applyPrefs() {
     }
     q('#authState').textContent = 'dashboard signed in';
     q('#shells').classList.toggle('focus-mode', viewMode === 'focus');
+    applySidebar();
+}
+// Show/hide the optional side rail. The body class drives the layout (see app.css); the top-bar
+// Panels button reflects state. Null-safe so it can run before the button is injected.
+function applySidebar() {
+    document.body.classList.toggle('sidebar-hidden', !sidebarVisible);
+    const btn = document.getElementById('sidebarToggle');
+    if (btn) {
+        btn.classList.toggle('active', sidebarVisible);
+        btn.title = sidebarVisible ? 'Side panels shown — click to hide' : 'Side panels hidden — click to show';
+    }
+}
+function toggleSidebar() {
+    sidebarVisible = !sidebarVisible;
+    localStorage.setItem('sdSidebar', sidebarVisible ? 'shown' : 'hidden');
+    applySidebar();
 }
 function setViewMode(mode) {
     viewMode = mode;

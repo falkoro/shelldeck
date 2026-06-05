@@ -458,14 +458,16 @@ body{font-family:"Cascadia Mono","JetBrains Mono","SFMono-Regular",ui-monospace,
 .top-actions .button,.top-actions button{border-radius:6px;font-size:12px;padding:6px 11px;min-height:30px;font-weight:500}
 .top-actions button.primary{font-weight:600}
 
-/* — Kill the sidebar: shells grid is the hero; the old sidebar
-     panels reflow into a responsive "System" instrument strip — */
-.workspace{display:flex;flex-direction:column;gap:18px}
-.main-stack{order:1;gap:14px}
-.sidebar{order:2;position:static;top:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(252px,1fr));gap:12px;align-items:start}
-.sidebar-head{grid-column:1 / -1;margin:4px 0 -4px;padding-top:14px;border-top:1px solid var(--line);align-items:center}
+/* — Optional side rail. Default keeps the original left-rail layout
+     (just restyled flat/mono); the top-bar Panels toggle adds
+     body.sidebar-hidden, which drops the rail so the shells grid goes
+     full-bleed. The rail stays a left column on wide screens and the
+     base 980px breakpoint still stacks it below on narrow ones. — */
+.main-stack{gap:14px}
 .sidebar-head-title{font-size:0}
-.sidebar-head-title::before{content:"System";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sidebar-head-title::before{content:"Panels";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+body.sidebar-hidden .sidebar{display:none}
+body.sidebar-hidden .workspace{grid-template-columns:minmax(0,1fr)}
 
 /* — Flat instrument-panel cards (neutral hairlines, no glow) — */
 .panel{border-color:var(--line);background:#0a1119;box-shadow:none}
