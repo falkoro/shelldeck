@@ -477,10 +477,14 @@ body{font-family:"Cascadia Mono","JetBrains Mono","SFMono-Regular",ui-monospace,
 .terminal-panel{border:0;background:transparent;padding:0}
 .terminal-grid{gap:12px}
 
-/* — Terminal cards as exe.dev terminal windows w/ traffic lights — */
+/* — Terminal cards as terminal windows w/ ShellDeck's OWN "lights":
+     three rounded squares (our logo motif, not macOS round dots) in
+     our cooler red/amber/green. Dimmed when idle, full-bright on
+     running/selected cards so they actually signal state. — */
 .terminal-card{border-color:var(--line);background:#070d13}
 .terminal-card header{background:#0a1119;padding:9px 12px}
-.terminal-card header::before{content:"";flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:#ff5f57;box-shadow:16px 0 0 #febc2e,32px 0 0 #28c840;margin-right:34px;align-self:center}
+.terminal-card header::before{content:"";flex:0 0 auto;width:9px;height:9px;border-radius:3px;background:var(--red);box-shadow:14px 0 0 var(--amber),28px 0 0 var(--green);margin-right:30px;align-self:center;opacity:.5;transition:opacity .2s}
+.terminal-card.running header::before,.terminal-card.selected header::before{opacity:1}
 .terminal-card.running{border-color:rgba(114,247,200,.34)}
 
 /* — Buttons: flat, neutral hairline (mono inherited from body) — */
