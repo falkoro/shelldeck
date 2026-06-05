@@ -714,3 +714,7 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
   /* Two tidy rows of five on a narrow phone instead of ten cramped columns. */
   .term-window.mobile .term-keybar{grid-template-columns:repeat(5,minmax(0,1fr))}
 }
+/* The selected-session action bar (badge + Create/Stop/Restart/Attach) duplicates the
+   selected card's header and ate a whole row on smaller screens — hide it there. It stays
+   on desktop, the only home for Restart / Create / Attach (Stop is also on each card's ⋯ menu). */
+@media (max-width:980px){.session-actions{display:none}}
