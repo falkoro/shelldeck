@@ -153,7 +153,10 @@ impl Config {
                 .unwrap_or(200),
             summary_command: env::var("DASHBOARD_SUMMARY_COMMAND").unwrap_or_default(),
             xai_api_key: xai_api_key.clone(),
-            finnhub_api_key: env::var("FINNHUB_API_KEY").unwrap_or_default(),
+            finnhub_api_key: env::var("FINNHUB_API_KEY")
+                .or_else(|_| env::var("FINNHUB_TOKEN"))
+                .or_else(|_| env::var("finnhub_token"))
+                .unwrap_or_default(),
             xai_base_url: xai_base_url.clone(),
             xai_api_style: xai_api_style.clone(),
             xai_model: xai_model.clone(),
