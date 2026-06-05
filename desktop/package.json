@@ -1,0 +1,22 @@
+{
+  "name": "shelldeck-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "tauri": "tauri",
+    "latest-json": "node scripts/write-latest-json.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.2",
+    "typescript": "^6.0.3",
+    "vite": "^7.2.6"
+  }
+}
+
