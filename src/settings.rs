@@ -11,6 +11,8 @@ pub struct PanelSettings {
     pub containers: bool,
     #[serde(default = "default_true", rename = "remoteHosts")]
     pub remote_hosts: bool,
+    #[serde(default, rename = "ciRuns")]
+    pub ci_runs: bool,
     pub links: bool,
     pub tickers: bool,
     // When true, container/host lists drop their max-height + scrollbar and expand fully.
@@ -33,6 +35,7 @@ impl DashboardSettings {
                 machine_sensors: true,
                 containers: true,
                 remote_hosts: true,
+                ci_runs: false,
                 links: true,
                 tickers: true,
                 expand_lists: false,
@@ -105,6 +108,11 @@ fn parse_file(raw: &str, config: &Config) -> Option<DashboardSettings> {
                     .or_else(|| panels.get("remote_hosts"))
                     .and_then(|v| v.as_bool())
                     .unwrap_or(settings.panels.remote_hosts);
+                settings.panels.ci_runs = panels
+                    .get("ciRuns")
+                    .or_else(|| panels.get("ci_runs"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(settings.panels.ci_runs);
                 settings.panels.links = panels
                     .get("links")
                     .and_then(|v| v.as_bool())
@@ -177,8 +185,10 @@ mod tests {
         .unwrap();
         assert!(parsed.panels.machine_sensors);
         assert!(parsed.panels.remote_hosts);
+        assert!(!parsed.panels.ci_runs);
         let value = serde_json::to_value(parsed).unwrap();
         assert_eq!(value["panels"]["machineSensors"], true);
         assert_eq!(value["panels"]["remoteHosts"], true);
+        assert_eq!(value["panels"]["ciRuns"], false);
     }
 }

@@ -12,6 +12,7 @@ function applyDashboardSettings(settings) {
     const metricTemps = document.getElementById('metricTemps');
     const containersPanel = document.getElementById('containersPanel');
     const remotePanel = document.getElementById('remotePanel');
+    const ciRunsPanel = document.getElementById('ciRunsPanel');
     const linksPanel = document.getElementById('linksPanel');
     const tickerStrip = document.getElementById('tickerStrip');
     const tickerBar = document.getElementById('tickerBar');
@@ -23,6 +24,8 @@ function applyDashboardSettings(settings) {
         containersPanel.hidden = !panels.containers;
     if (remotePanel)
         remotePanel.hidden = !panels.remoteHosts;
+    if (ciRunsPanel)
+        ciRunsPanel.hidden = !panels.ciRuns;
     if (linksPanel)
         linksPanel.hidden = !panels.links;
     if (tickerStrip)
@@ -60,7 +63,7 @@ function openSettingsEditor(focus) {
     overlay.className = 'links-editor-modal settings-editor-modal';
     overlay.id = 'settingsEditor';
     const panels = dashboardSettings.panels;
-    overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label><label><input type="checkbox" name="expandLists" ${panels.expandLists ? 'checked' : ''}> Expand lists (no scrollbars)</label></div><label>Tickers</label><div class="ticker-editor"><div class="ticker-chips" id="tickerChips"></div><div class="ticker-add"><input id="tickerInput" type="text" spellcheck="false" autocapitalize="characters" placeholder="Add symbol — e.g. NVDA, TSLA, BTC-USD"><button type="button" id="addTickerBtn"><span class="ticker-add-plus">+</span> Add</button></div><p class="muted ticker-hint">Enter to add · Finnhub symbols · US stocks + crypto (BTC-USD) · max 16</p></div><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
+    overlay.innerHTML = `<form class="links-editor-box settings-editor-box"><div class="links-editor-head"><div><h2>Configure</h2><p class="muted">Sidebar widgets and stock tickers are saved in dashboard-config.json.</p></div><button type="button" class="ghost" data-close-settings>Cancel</button></div><div class="settings-grid"><label><input type="checkbox" name="machine" ${panels.machine ? 'checked' : ''}> Machine</label><label class="settings-subsetting"><input type="checkbox" name="machineSensors" ${panels.machineSensors ? 'checked' : ''}> Thermal sensors</label><label><input type="checkbox" name="remoteHosts" ${panels.remoteHosts ? 'checked' : ''}> Remote hosts</label><label><input type="checkbox" name="containers" ${panels.containers ? 'checked' : ''}> Local containers</label><label><input type="checkbox" name="ciRuns" ${panels.ciRuns ? 'checked' : ''}> CI runs</label><label><input type="checkbox" name="links" ${panels.links ? 'checked' : ''}> Links</label><label><input type="checkbox" name="tickers" ${panels.tickers ? 'checked' : ''}> Ticker bar</label><label><input type="checkbox" name="expandLists" ${panels.expandLists ? 'checked' : ''}> Expand lists (no scrollbars)</label></div><label>Tickers</label><div class="ticker-editor"><div class="ticker-chips" id="tickerChips"></div><div class="ticker-add"><input id="tickerInput" type="text" spellcheck="false" autocapitalize="characters" placeholder="Add symbol — e.g. NVDA, TSLA, BTC-USD"><button type="button" id="addTickerBtn"><span class="ticker-add-plus">+</span> Add</button></div><p class="muted ticker-hint">Enter to add · Finnhub symbols · US stocks + crypto (BTC-USD) · max 16</p></div><div class="links-editor-actions"><button type="submit" class="primary">${icon('settings')}<span>Save config</span></button></div></form>`;
     document.body.appendChild(overlay);
     const form = overlay.querySelector('form');
     const chipsEl = overlay.querySelector('#tickerChips');
@@ -117,6 +120,7 @@ function openSettingsEditor(focus) {
                 machineSensors: data.has('machineSensors'),
                 remoteHosts: data.has('remoteHosts'),
                 containers: data.has('containers'),
+                ciRuns: data.has('ciRuns'),
                 links: data.has('links'),
                 tickers: data.has('tickers'),
                 expandLists: data.has('expandLists'),
@@ -128,7 +132,7 @@ function openSettingsEditor(focus) {
 async function saveDashboardSettings(settings) {
     const saved = await postJson('/api/ui-config', settings);
     applyDashboardSettings(saved);
-    await Promise.allSettled([loadTickers(), loadMetrics(), loadContainers(), loadRemoteHosts(), loadLinks()]);
+    await Promise.allSettled([loadTickers(), loadMetrics(), loadContainers(), loadRemoteHosts(), loadGhRuns(), loadLinks()]);
     toast('Config saved');
 }
 function roundedRect(ctx, x, y, w, h, r) {

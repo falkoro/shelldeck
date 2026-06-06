@@ -72,6 +72,34 @@ interface RemoteHostStatus {
   error?: string | null;
 }
 
+interface GhRun {
+  id: number;
+  name: string;
+  display_title: string;
+  status: string;
+  conclusion?: string | null;
+  head_branch?: string | null;
+  run_number: number;
+  html_url: string;
+  updated_at: string;
+  event: string;
+}
+
+interface GhRepoStatus {
+  repo: string;
+  ok: boolean;
+  error?: string | null;
+  run?: GhRun | null;
+}
+
+interface GhRunsResult {
+  repos: GhRepoStatus[];
+  rate_limit_remaining?: number | null;
+  rate_limit_reset?: number | null;
+  fetched_at: string;
+  cached: boolean;
+}
+
 type ContainerStateKind =
   | 'running' | 'unhealthy' | 'restarting' | 'paused' | 'crashed' | 'created' | 'stopped';
 
@@ -335,6 +363,8 @@ const SENSOR_LABEL_ALIASES_KEY = 'sdSensorLabelAliases';
 let latestMachineMetrics: MachineMetrics | null = null;
 let remoteHostsLoaded = false;
 let remoteHostsLoading = false;
+let ghRunsLoaded = false;
+let ghRunsLoading = false;
 
 function meterLevel(pct: number): string {
   return pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : 'ok';
@@ -539,6 +569,74 @@ function renderRemoteHostsError(message: string): void {
   list.innerHTML = `<div class="remote-error remote-load-error">${escapeHtml(message)}</div>`;
 }
 
+function isoRelativeTime(iso: string | null | undefined): string {
+  const ms = Date.parse(iso || '');
+  if (!Number.isFinite(ms)) return 'updated unknown';
+  return `updated ${fmtTime(Math.floor(ms / 1000)).replace('just now', 'now')}`;
+}
+
+function ghRunState(run?: GhRun | null): { label: string; cls: string } {
+  if (!run) return { label: 'no runs', cls: 'muted' };
+  const status = (run.status || '').toLowerCase();
+  const conclusion = (run.conclusion || '').toLowerCase();
+  if (status === 'queued' || status === 'in_progress') {
+    return { label: status.replace('_', ' '), cls: 'pending' };
+  }
+  if (status === 'completed') {
+    if (conclusion === 'success') return { label: 'success', cls: 'success' };
+    if (conclusion === 'failure') return { label: 'failure', cls: 'failure' };
+    return { label: conclusion || 'completed', cls: 'muted' };
+  }
+  return { label: status || 'unknown', cls: 'muted' };
+}
+
+function ghRateLimitHtml(payload: GhRunsResult): string {
+  if (typeof payload.rate_limit_remaining !== 'number') return '';
+  const reset = typeof payload.rate_limit_reset === 'number'
+    ? ` · resets ${new Date(payload.rate_limit_reset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : '';
+  const cached = payload.cached ? ' · cached' : '';
+  return `<div class="gh-rate-limit">GitHub API ${payload.rate_limit_remaining} left${reset}${cached}</div>`;
+}
+
+function ghRunCardHtml(repo: GhRepoStatus): string {
+  const run = repo.run || null;
+  const state = ghRunState(run);
+  const error = repo.error ? `<div class="remote-error gh-run-error">${escapeHtml(repo.error)}</div>` : '';
+  if (!run) {
+    return `<div class="gh-run-card empty ${repo.ok ? '' : 'stale'}"><div class="gh-run-head"><b>${escapeHtml(repo.repo)}</b><span class="run-status-badge ${state.cls}">${escapeHtml(state.label)}</span></div>${error}</div>`;
+  }
+  const title = run.display_title || run.name || 'Workflow run';
+  const titleHtml = run.html_url
+    ? `<a href="${escapeHtml(run.html_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+    : escapeHtml(title);
+  const branch = run.head_branch ? `<span class="run-branch-tag">${escapeHtml(run.head_branch)}</span>` : '';
+  const runNumber = run.run_number ? `<span class="gh-run-number">#${run.run_number}</span>` : '';
+  const event = run.event ? `<span>${escapeHtml(run.event)}</span>` : '';
+  const workflow = run.name && run.name !== title ? `<div class="gh-run-workflow">${escapeHtml(run.name)}</div>` : '';
+  return `<div class="gh-run-card ${state.cls} ${repo.ok ? '' : 'stale'}"><div class="gh-run-head"><b>${escapeHtml(repo.repo)}</b><span class="run-status-badge ${state.cls}">${escapeHtml(state.label)}</span></div><div class="gh-run-title">${titleHtml}</div>${workflow}<div class="gh-run-meta">${branch}${runNumber}${event}<span>${escapeHtml(isoRelativeTime(run.updated_at))}</span></div>${error}</div>`;
+}
+
+function renderGhRuns(payload: GhRunsResult): void {
+  const list = document.getElementById('ciRunsList');
+  if (!list) return;
+  if (!payload.repos.length) {
+    list.innerHTML = '<div class="muted gh-runs-empty">No GitHub repos configured</div>';
+    return;
+  }
+  list.innerHTML = ghRateLimitHtml(payload) + payload.repos.map(ghRunCardHtml).join('');
+}
+
+function ghRunsLoadingHtml(): string {
+  return `<div class="remote-loading gh-runs-loading"><div><b>Checking CI runs</b><span>Checking...</span></div><div class="skeleton skel-line skel-w70"></div><div class="skeleton skel-bar"></div><div class="skeleton skel-line skel-w50"></div></div>`;
+}
+
+function renderGhRunsError(message: string): void {
+  const list = document.getElementById('ciRunsList');
+  if (!list) return;
+  list.innerHTML = `<div class="remote-error remote-load-error">${escapeHtml(message)}</div>`;
+}
+
 async function loadMetrics(): Promise<void> {
   if (!document.getElementById('metricsPanel') || !dashboardSettings.panels.machine) return;
   const response = await fetch('/api/metrics', { cache: 'no-store', credentials: 'same-origin' });
@@ -583,6 +681,34 @@ async function loadRemoteHosts(): Promise<void> {
   }
 }
 
+async function loadGhRuns(): Promise<void> {
+  const panel = document.getElementById('ciRunsPanel');
+  const list = document.getElementById('ciRunsList');
+  if (!panel || !list || !dashboardSettings.panels.ciRuns) return;
+  if (ghRunsLoading) return;
+  ghRunsLoading = true;
+  panel.classList.add('loading');
+  list.setAttribute('aria-busy', 'true');
+  if (!ghRunsLoaded) list.innerHTML = ghRunsLoadingHtml();
+  try {
+    const response = await fetch('/api/gh-runs', { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`CI runs returned ${response.status}`);
+    ghRunsLoaded = true;
+    renderGhRuns(await response.json() as GhRunsResult);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not load CI runs';
+    if (!ghRunsLoaded) {
+      renderGhRunsError(message);
+    } else if (!list.querySelector('.gh-stale-error')) {
+      list.insertAdjacentHTML('afterbegin', `<div class="remote-error remote-stale-error gh-stale-error">CI refresh failed: ${escapeHtml(message)}</div>`);
+    }
+  } finally {
+    ghRunsLoading = false;
+    panel.classList.remove('loading');
+    list.removeAttribute('aria-busy');
+  }
+}
+
 // Restart / pull-latest a container. Confirms first; server re-checks login + unlock + action header.
 async function containerAction(host: string, engine: string, name: string, action: string): Promise<void> {
   if (!shellUnlocked) { toast('Unlock shells first to manage containers'); return; }
@@ -604,3 +730,4 @@ async function containerAction(host: string, engine: string, name: string, actio
 (window as any).loadMetrics = loadMetrics;
 (window as any).loadContainers = loadContainers;
 (window as any).loadRemoteHosts = loadRemoteHosts;
+(window as any).loadGhRuns = loadGhRuns;

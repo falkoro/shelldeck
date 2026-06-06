@@ -7,7 +7,7 @@ let summaryLoading = false;
 let shellsLoading = false;
 let dashboardSettings = {
     tickers: [],
-    panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, links: true, tickers: true, expandLists: false },
+    panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, ciRuns: false, links: true, tickers: true, expandLists: false },
 };
 const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
 const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';

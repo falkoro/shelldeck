@@ -1,5 +1,5 @@
 use crate::{
-    auth, config, container_actions, containers, links, metrics, pages, ratelimit, remote,
+    auth, config, container_actions, containers, gh_runs, links, metrics, pages, ratelimit, remote,
     remote_hosts, settings, share, stream, stt, summary, term, tmux, uploads, webutil, AppState,
 };
 use axum::{
@@ -91,6 +91,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/shells", get(api_shells))
         .route("/api/metrics", get(api_metrics))
         .route("/api/containers", get(api_containers))
+        .route("/api/gh-runs", get(api_gh_runs))
         .route("/api/remote-hosts", get(api_remote_hosts))
         .route(
             "/api/remote-hosts/config",
@@ -813,6 +814,25 @@ async fn api_remote_hosts(
             hosts,
             state.config.remote_container_cap,
             state.config.remote_metrics,
+        )
+        .await,
+    )
+}
+
+async fn api_gh_runs(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    connect: ConnectInfo<SocketAddr>,
+) -> Response {
+    if let Some(response) = guard(&state, &headers, &connect) {
+        return response;
+    }
+    webutil::json_response(
+        StatusCode::OK,
+        &gh_runs::fetch_all(
+            state.config.clone(),
+            state.client.clone(),
+            state.gh_runs_cache.clone(),
         )
         .await,
     )

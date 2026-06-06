@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod container_actions;
 mod containers;
+mod gh_runs;
 mod image_versions;
 mod links;
 mod metrics;
@@ -35,6 +36,8 @@ pub struct AppState {
     pub client: reqwest::Client,
     // last successful (non-local) work summary, served if the AI backend briefly fails
     pub summary_cache: Arc<Mutex<Option<summary::WorkSummary>>>,
+    // GitHub Actions run summaries, cached so sidebar polling stays within GitHub rate limits
+    pub gh_runs_cache: Arc<Mutex<Option<gh_runs::GhRunsCache>>>,
     // caps concurrent speech-to-text jobs so whisper.cpp can't pile up and saturate CPU
     pub stt_limit: Arc<Semaphore>,
     // throttles shell-unlock password guessing (the last gate before live shell control)
@@ -59,6 +62,7 @@ async fn main() {
         config: config.clone(),
         client,
         summary_cache: Arc::new(Mutex::new(None)),
+        gh_runs_cache: Arc::new(Mutex::new(None)),
         stt_limit: Arc::new(Semaphore::new(2)),
         unlock_limiter: Arc::new(Mutex::new(ratelimit::UnlockLimiter::default())),
     };
