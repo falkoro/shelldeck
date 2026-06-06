@@ -244,6 +244,7 @@ if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
   restoreAllBtn.type = 'button';
   restoreAllBtn.title = 'Restore all minimized shell previews from the dock';
   restoreAllBtn.innerHTML = 'Restore all';
+  restoreAllBtn.style.display = 'none';
   restoreAllBtn.addEventListener('click', () => {
     const fn = (window as any).restoreAllShellPreviews || (() => {
       const set = (window as any).minimizedPreviews;

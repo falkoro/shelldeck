@@ -163,6 +163,8 @@ function renderDock(): void {
     dock.appendChild(item);
   });
   dock.style.display = any ? 'flex' : 'none';
+  const restoreAllBtn = document.getElementById('restoreAllPreviewsBtn');
+  if (restoreAllBtn) restoreAllBtn.style.display = minimizedPreviews.size > 0 ? '' : 'none';
 }
 
 function bringToFront(tw: TermWindow): void {
