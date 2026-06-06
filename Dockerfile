@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=linux/amd64 rust:bookworm AS build
+FROM rust:bookworm AS build
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip \
@@ -22,7 +22,7 @@ RUN bun install --frozen-lockfile
 RUN bun run build:frontend
 RUN cargo build --release --features saas
 
-FROM --platform=linux/amd64 debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIPX_HOME=/opt/pipx

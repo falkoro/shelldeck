@@ -51,9 +51,11 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          push: true
+          # Only publish from master. A workflow_dispatch on any other ref still builds
+          # (validation) but must NOT push the rolling :saas tag or write the shared cache.
+          push: ${{ github.ref == 'refs/heads/master' }}
           tags: |
             ghcr.io/falkoro/shelldeck:saas
             ghcr.io/falkoro/shelldeck:saas-${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: ${{ github.ref == 'refs/heads/master' && 'type=gha,mode=max' || '' }}
