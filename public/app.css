@@ -658,6 +658,34 @@ body.shells-locked .container-actions{display:none}
 .remote-metrics .rm-line .meter{flex:1}
 .remote-metrics .rm-line>b{flex:0 0 auto;font-size:11px;color:var(--text);font-variant-numeric:tabular-nums}
 .remote-metrics .rm-meta{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* CI runs monitor widget */
+.gh-runs-list{display:flex;flex-direction:column;gap:8px}
+.gh-runs-empty{font-size:12px}
+.ci-runs-panel.loading .panel-header p::after{content:" · checking";color:var(--cyan)}
+.gh-rate-limit{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding:0 2px}
+.gh-run-card{border:1px solid var(--line);background:rgba(7,16,23,.55);border-radius:7px;padding:8px;display:grid;gap:6px;min-width:0}
+.gh-run-card.success{border-color:rgba(114,247,200,.24)}
+.gh-run-card.failure{border-color:rgba(255,106,122,.34)}
+.gh-run-card.pending{border-color:rgba(255,200,87,.32)}
+.gh-run-card.stale{border-color:rgba(255,200,87,.28)}
+.gh-run-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
+.gh-run-head b{font-size:12.5px;color:var(--text);font-family:"Cascadia Mono","JetBrains Mono",monospace;overflow-wrap:anywhere}
+.run-status-badge{flex:0 0 auto;border:1px solid rgba(139,246,255,.18);border-radius:999px;padding:2px 7px;font-size:10px;line-height:1.25;text-transform:uppercase;letter-spacing:0;font-family:"Cascadia Mono","JetBrains Mono",monospace;color:var(--muted);background:rgba(139,246,255,.05)}
+.run-status-badge.success{border-color:rgba(114,247,200,.34);color:var(--green);background:rgba(114,247,200,.07)}
+.run-status-badge.failure{border-color:rgba(255,106,122,.4);color:var(--red);background:rgba(255,106,122,.08)}
+.run-status-badge.pending{border-color:rgba(255,200,87,.4);color:var(--amber);background:rgba(255,200,87,.08);animation:gh-status-pulse 1.5s ease-in-out infinite}
+.run-status-badge.muted{color:#9aa6b2}
+@keyframes gh-status-pulse{0%,100%{box-shadow:0 0 0 rgba(255,200,87,0)}50%{box-shadow:0 0 12px rgba(255,200,87,.22)}}
+@media (prefers-reduced-motion:reduce){.run-status-badge.pending{animation:none}}
+.gh-run-title{font-size:12px;line-height:1.35;color:#cfeaff;overflow-wrap:anywhere}
+.gh-run-title a{color:#cfeaff;text-decoration:none}
+.gh-run-title a:hover{text-decoration:underline}
+.gh-run-workflow{font-size:10.5px;color:var(--muted);overflow-wrap:anywhere}
+.gh-run-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums}
+.gh-run-meta span{min-width:0}
+.run-branch-tag{border:1px solid rgba(139,246,255,.18);border-radius:999px;padding:1px 6px;color:#9fe9dd;background:rgba(139,246,255,.05);font-family:"Cascadia Mono","JetBrains Mono",monospace;overflow-wrap:anywhere}
+.gh-run-number{font-family:"Cascadia Mono","JetBrains Mono",monospace;color:var(--cyan)}
+.gh-run-error{font-size:10.5px}
 /* Temp chips — shared by the remote-host cards and the local Machine card (#metricTemps). */
 .rm-temps{display:flex;flex-wrap:wrap;gap:4px}
 .rm-temp{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(139,246,255,.08);color:var(--muted);white-space:nowrap}

@@ -60,6 +60,8 @@ pub struct Config {
     // Gather CPU/RAM/load/temps for remote hosts over SSH (one extra /proc read per poll).
     // Default on; set DASHBOARD_REMOTE_METRICS=0 to keep remote cards to ping + containers only.
     pub remote_metrics: bool,
+    pub gh_repos: Vec<String>,
+    pub gh_token: Option<String>,
     // "Safe shot" generates a shareable, redacted screenshot. Off by default; set
     // DASHBOARD_ENABLE_SAFE_SHOT=1 to show the top-bar button.
     pub enable_safe_shot: bool,
@@ -209,6 +211,11 @@ impl Config {
             remote_metrics: env::var("DASHBOARD_REMOTE_METRICS")
                 .map(|v| parse_flag(&v))
                 .unwrap_or(true),
+            gh_repos: parse_gh_repos(&env::var("DASHBOARD_GH_REPOS").unwrap_or_default()),
+            gh_token: env::var("DASHBOARD_GH_TOKEN")
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty()),
             enable_safe_shot: env_flag("DASHBOARD_ENABLE_SAFE_SHOT"),
             // Extra browser Origins allowed to open the /api/term WebSocket (beyond same-host).
             allowed_origins: split_env("DASHBOARD_ALLOWED_ORIGINS"),
@@ -279,6 +286,36 @@ fn parse_remote_hosts(raw: &str) -> Vec<RemoteHostConfig> {
             })
         })
         .take(8)
+        .collect()
+}
+
+// Parse DASHBOARD_GH_REPOS into monitored GitHub repositories.
+// Format: "owner/repo;owner2/repo2". Dedupe case-insensitively and cap at 8 repos.
+fn parse_gh_repos(raw: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    raw.split(';')
+        .filter_map(|item| {
+            let mut parts = item.trim().split('/');
+            let owner = clean_gh_segment(parts.next()?, 39);
+            let repo = clean_gh_segment(parts.next()?, 100);
+            if parts.next().is_some() || owner.is_empty() || repo.is_empty() {
+                return None;
+            }
+            let full = format!("{owner}/{repo}");
+            if !seen.insert(full.to_ascii_lowercase()) {
+                return None;
+            }
+            Some(full)
+        })
+        .take(8)
+        .collect()
+}
+
+fn clean_gh_segment(raw: &str, max: usize) -> String {
+    raw.trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        .take(max)
         .collect()
 }
 
@@ -566,6 +603,12 @@ mod tests {
         assert_eq!(hosts[0].label, "Logan GL502VS");
         assert_eq!(hosts[0].target, "logan-gl502vs");
         assert_eq!(hosts[1].target, "deploy@10.0.0.8:22");
+    }
+
+    #[test]
+    fn gh_repos_parse_owner_repo_pairs_and_dedupe() {
+        let repos = parse_gh_repos(" falkoro/shelldeck ;bad;FALKORO/shelldeck;spot-techno/spot_suite ");
+        assert_eq!(repos, vec!["falkoro/shelldeck", "spot-techno/spot_suite"]);
     }
 
     #[test]

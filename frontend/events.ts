@@ -532,6 +532,7 @@ queueMicrotask(() => {
       loadMetrics().catch(() => {});
       loadContainers().catch(() => {});
       loadRemoteHosts().catch(() => {});
+      loadGhRuns().catch(() => {});
       loadLinks().catch(() => {});
     });
 });
@@ -539,6 +540,7 @@ setInterval(() => loadTickers().catch(() => {}), 60000);
 setInterval(() => loadMetrics().catch(() => {}), 5000);
 setInterval(() => loadContainers().catch(() => {}), 15000);
 setInterval(() => loadRemoteHosts().catch(() => {}), 20000);
+setInterval(() => loadGhRuns().catch(() => {}), 60000);
 
 window.addEventListener('resize', () => {
   shellTabsSignature = '';
