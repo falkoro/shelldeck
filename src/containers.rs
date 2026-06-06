@@ -28,16 +28,27 @@ pub struct ContainerInfo {
     // Best-effort registry version state for semver-tagged Docker Hub images.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<image_versions::ContainerVersionInfo>,
+    // Short image digest (12 hex, no "sha256:") the container is actually running.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_id: Option<String>,
+    // RFC3339 build time of the running image (image .Created).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub built: Option<String>,
 }
 
-// `name\tStartedAt\tdescription` rows from `inspect` → name -> (started, desc). Container names
-// from inspect have a leading '/'. Empty fields stay None.
+// "sha256:abcdef0123..." (or bare hex) -> first 12 hex chars; short ids pass through unchanged.
+pub(crate) fn short_image_id(raw: &str) -> String {
+    raw.trim().trim_start_matches("sha256:").chars().take(12).collect()
+}
+
+// `name\tStartedAt\timageId\tdescription` rows from `inspect` -> name -> (started, desc, image_id).
+// Container names from inspect have a leading '/'. Empty fields stay None.
 pub(crate) fn parse_inspect(
     raw: &str,
-) -> std::collections::HashMap<String, (Option<String>, Option<String>)> {
+) -> std::collections::HashMap<String, (Option<String>, Option<String>, Option<String>)> {
     raw.lines()
         .filter_map(|line| {
-            let mut parts = line.splitn(3, '\t');
+            let mut parts = line.splitn(4, '\t');
             let name = parts.next()?.trim().trim_start_matches('/').to_string();
             if name.is_empty() {
                 return None;
@@ -47,20 +58,57 @@ pub(crate) fn parse_inspect(
                 .map(str::trim)
                 .filter(|s| !s.is_empty() && *s != "0001-01-01T00:00:00Z")
                 .map(str::to_string);
+            let image_id = parts
+                .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(short_image_id);
             let desc = parts
                 .next()
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
                 .map(str::to_string);
-            Some((name, (started, desc)))
+            Some((name, (started, desc, image_id)))
         })
         .collect()
 }
 
-// inspect `--format` template shared by local and remote: name, StartedAt, description label,
-// tab-separated (real \t). Empty description renders as an empty field.
+// inspect `--format` template shared by local and remote: name, StartedAt, image id, description
+// label, tab-separated (real \t). Empty description renders as an empty field.
 pub(crate) const INSPECT_FORMAT: &str =
-    "{{.Name}}\t{{.State.StartedAt}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}";
+    "{{.Name}}\t{{.State.StartedAt}}\t{{.Image}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}";
+
+// `image inspect` format: full image id + RFC3339 build time.
+const IMAGE_INSPECT_FORMAT: &str = "{{.Id}}\t{{.Created}}";
+
+// short image id -> RFC3339 build time, from `<engine> image inspect` over every local image.
+pub(crate) fn parse_image_built(raw: &str) -> HashMap<String, String> {
+    raw.lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(2, '\t');
+            let id = short_image_id(parts.next()?);
+            let created = parts.next()?.trim();
+            if id.is_empty() || created.is_empty() {
+                return None;
+            }
+            Some((id, created.to_string()))
+        })
+        .collect()
+}
+
+// Attach the image build time onto containers by matching their short image id.
+pub(crate) fn attach_built(list: &mut [ContainerInfo], built: &HashMap<String, String>) {
+    for container in list.iter_mut() {
+        if container.built.is_some() {
+            continue;
+        }
+        if let Some(id) = &container.image_id {
+            if let Some(ts) = built.get(id) {
+                container.built = Some(ts.clone());
+            }
+        }
+    }
+}
 
 #[derive(Serialize)]
 pub struct ContainerList {
@@ -101,23 +149,28 @@ pub(crate) fn parse_ps(engine: &str, raw: &str) -> Vec<ContainerInfo> {
                 started: None,
                 desc: None,
                 version: None,
+                image_id: None,
+                built: None,
             })
         })
         .collect()
 }
 
-// Attach StartedAt + description from an inspect map onto matching containers (by name).
+// Attach StartedAt + description + image_id from an inspect map onto matching containers (by name).
 pub(crate) fn attach_inspect(
     list: &mut [ContainerInfo],
-    inspect: &HashMap<String, (Option<String>, Option<String>)>,
+    inspect: &HashMap<String, (Option<String>, Option<String>, Option<String>)>,
 ) {
     for container in list.iter_mut() {
-        if let Some((started, desc)) = inspect.get(&container.name) {
+        if let Some((started, desc, image_id)) = inspect.get(&container.name) {
             if container.started.is_none() {
                 container.started = started.clone();
             }
             if container.desc.is_none() {
                 container.desc = desc.clone();
+            }
+            if container.image_id.is_none() {
+                container.image_id = image_id.clone();
             }
         }
     }
@@ -180,8 +233,9 @@ async fn engine_containers(engine: &str) -> Vec<ContainerInfo> {
     {
         attach_stats(&mut list, &parse_stats(&raw));
     }
-    // One inspect over all containers for StartedAt + description label. Needs a shell for the
-    // `$(... ps -aq)` substitution; engine is validated to docker/podman so it's injection-safe.
+    // One inspect over all containers for StartedAt + description label + image id. Needs a shell
+    // for the `$(... ps -aq)` substitution; engine is validated to docker/podman so it's
+    // injection-safe.
     if matches!(engine, "docker" | "podman") {
         let script =
             format!("{engine} inspect --format '{INSPECT_FORMAT}' $({engine} ps -aq) 2>/dev/null");
@@ -192,6 +246,22 @@ async fn engine_containers(engine: &str) -> Vec<ContainerInfo> {
                 attach_inspect(
                     &mut list,
                     &parse_inspect(&String::from_utf8_lossy(&output.stdout)),
+                );
+            }
+        }
+    }
+    // One image-inspect over all local images for RFC3339 build time of the running image.
+    if matches!(engine, "docker" | "podman") {
+        let script = format!(
+            "{engine} image inspect --format '{IMAGE_INSPECT_FORMAT}' $({engine} images -q 2>/dev/null | sort -u) 2>/dev/null"
+        );
+        let mut command = Command::new("sh");
+        command.args(["-c", &script]).kill_on_drop(true);
+        if let Ok(Ok(output)) = timeout(Duration::from_millis(2500), command.output()).await {
+            if output.status.success() {
+                attach_built(
+                    &mut list,
+                    &parse_image_built(&String::from_utf8_lossy(&output.stdout)),
                 );
             }
         }
@@ -227,7 +297,18 @@ mod tests {
         attach_stats(&mut list, &stats);
         assert_eq!(list[0].cpu.as_deref(), Some("12.50%"));
         assert_eq!(list[0].mem.as_deref(), Some("128MiB / 4GiB"));
-        // stopped container has no stats row → stays None
+        // stopped container has no stats row -> stays None
         assert!(list[1].cpu.is_none());
+    }
+
+    #[test]
+    fn parses_image_built_and_inspect_with_image_id() {
+        let inspect = parse_inspect("/web\t2026-06-01T10:00:00Z\tsha256:abc123def4567890\tThe web app\n");
+        let row = inspect.get("web").unwrap();
+        assert_eq!(row.0.as_deref(), Some("2026-06-01T10:00:00Z"));
+        assert_eq!(row.1.as_deref(), Some("The web app"));
+        assert_eq!(row.2.as_deref(), Some("abc123def456"));
+        let built = parse_image_built("sha256:abc123def4567890\t2026-05-30T08:00:00Z\n");
+        assert_eq!(built.get("abc123def456").map(String::as_str), Some("2026-05-30T08:00:00Z"));
     }
 }

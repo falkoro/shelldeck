@@ -610,6 +610,7 @@ body.shells-locked .container-actions{display:none}
 .container-item.compact .ci-bot .ci-image{flex:1;min-width:0;font-size:10.5px}
 .container-item.compact .ci-badges{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px}
 .container-item.compact .ci-version{padding:1px 5px;font-size:9.5px}
+.container-item .ci-built{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .container-item.compact.state-stopped{opacity:.5}
 /* Loading skeletons + shimmer */
 @keyframes sd-shimmer{100%{transform:translateX(100%)}}
