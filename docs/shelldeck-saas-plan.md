@@ -1,29 +1,34 @@
 # ShellDeck → self-serve SaaS — build plan (2026-06-06)
 
 Source: ultracode design workflow `wf_fc4c1f4b-f0c` (4 research subagents + synthesis).
-Decisions locked: per-customer host = **Cloudflare Containers**; signup = **ShellDeck as a full spot-suite product** (catalog + buy form + `/v1/signup` + Stripe invoicing).
+Decisions locked: per-customer host = **isolated Docker container on the spot-tech-ci VM** (revised 2026-06-06 from Cloudflare Containers); signup = **ShellDeck as a full spot-suite product** (catalog + buy form + `/v1/signup` + Stripe invoicing). Pricing: Solo €29 / Team €99 /mo, 90-day trial, EUR. Domain: `{tenant}.spot-suite.com` for now → migrate to shelldeck.com once there are customers. Image CLIs: claude + codex + aider + opencode.
 
-## ⚠️ Headline finding (verified vs live Cloudflare docs)
-Cloudflare Containers conflicts with ShellDeck's core job (babysitting long-lived tmux/agent sessions) in two ways:
-1. **All container disk is ephemeral** — sleep/eviction/redeploy wipes uploads, `*.json` config, **and running tmux/agent session state**. `keepAlive` reduces but does not eliminate eviction.
-2. **No inbound raw TCP** — no public SSH *into* the box. The UI works over HTTP through a fronting Worker (WebSocket terminal is fine); outbound SSH-to-remote-hosts from inside the container still works with injected keys.
+## ⚠️ Why the VM, not Cloudflare Containers
+The earlier CF Containers plan had two conflicts with ShellDeck's core job (babysitting long-lived tmux/agent sessions): all container disk is ephemeral (sleep/eviction wipes running session state), and there's no inbound raw TCP. **Running each customer as an isolated Docker container on the spot-tech-ci VM solves both:**
+- **Persistent disk** — a per-tenant Docker volume keeps tmux/agent session state, uploads, and config across restarts. The `saas` feature's best-effort/stateless behavior still applies but is no longer load-bearing.
+- **No per-container cloud cost** — runs on hardware we already pay for (VM has ~6 GiB RAM + 120 GB free; headroom for many small tenants).
+- **Existing fronting pattern** — the VM already runs a `cloudflared` container (remotely-managed tunnel). Each tenant gets a tunnel ingress rule + DNS + CF Access, exactly like dev.falkinator.org / glances.
 
-The plan ships on Containers as decided, designed to *survive* this (stateless-config build + best-effort sessions), and flags session-durability as the one soft spot. The "always-on agents" promise may later want a Fly.io/VM tier.
+**VM constraints (from recon 2026-06-06):** Docker (not podman) 29.1.3; the cloudflared tunnel is **shared** with production routes (autonomy-ev remark42, news-mcp, mail relay, bots) so ingress rules must be **appended, never replaced**; `127.0.0.1:8787` is already in use, so allocate per-tenant ports from a free range; production services on the box must not be disturbed.
 
 ## Phases (safest-first, each independently shippable)
 - **Phase 0 — GitHub CI-runs monitor** (ShellDeck only, S). New `src/gh_runs.rs` + `/api/gh-runs` + a "CI Runs" sidebar panel, mirroring the Remote Hosts panel. Env: `DASHBOARD_GH_REPOS`, `DASHBOARD_GH_TOKEN` (token env-only, never serialized/logged). *Building now via codex.*
 - **Phase 1 — Containerization** (ShellDeck, M). Dockerfile (linux/amd64, tmux+ssh-client, non-root), config-from-env, `saas-stateless` Cargo feature (disables disk "save"), fix host assumptions in tmux.rs/term.rs, per-tenant socket. **Opt-in / feature-gated so code.falkinator.org keeps working unchanged.**
 - **Phase 2 — Spot-suite product** (spot-suite config, M). Add `shelldeck` to `packages/pricing-catalog/src/catalog.json` (+ `ProductSlug`/`PlanCode` unions), `directPurchaseReady=false` until ready, Stripe price IDs via `STRIPE_PRICE_IDS_JSON` secret, product-logo art from the brand hub, landing copy. Go-live = flip `directPurchaseReady=true`.
-- **Phase 3 — CF Containers provisioning** (spot-suite + ShellDeck, L, **codex-heavy**). Add `shelldeck` to provisioner `PRODUCT_REGISTRY_JSON`; fronting Worker (Host→tenant routing, CF Access, WebSocket passthrough, per-tenant envVars); ShellDeck CI publishes a linux/amd64 image bundle row; provisioner deploys+routes+secrets a per-customer container; entitlement unblock. Per-tenant stable `DASHBOARD_SECRET` (generated once, stored in Spot Suite secrets).
+- **Phase 3 — VM provisioning** (ShellDeck ops + spot-suite, L). Revised to the VM/Docker model:
+  - **Image publish** — ShellDeck CI builds the `--features saas` linux/amd64 image and pushes it to GHCR (`ghcr.io/falkoro/shelldeck:saas`) on master, so the VM can `docker pull`.
+  - **Tenant provisioner** (`ops/` script/agent, idempotent + teardown) — per tenant: allocate a free port; `docker run` the image with a per-tenant Docker volume (`sd-{tenant}-data`) and injected env (`DASHBOARD_PASSWORD`, `DASHBOARD_UNLOCK_PASSWORD`, stable `DASHBOARD_SECRET`, `DASHBOARD_TMUX_SOCKET=tenant`, `DASHBOARD_HOSTNAME`); register a cloudflared **ingress append** (`{tenant}.spot-suite.com → http://localhost:{port}`), a DNS CNAME to the tunnel, and a CF Access policy. **Reads current tunnel config and appends — never replaces** (shared production tunnel).
+  - **Spot-suite wiring** — `shelldeck` provisioning topology = `vm_container` (diverges from the Worker+Pages+D1 path); the provisioner calls the VM agent (authenticated) on signup. v1 may start with manual/scripted provisioning before the automated trigger.
+  - Go-live = flip `directPurchaseReady=true` + real Stripe price ids once a tenant provisions cleanly end-to-end.
 
-## Decisions needed from Falk (with my recommendations)
-1. **Session-durability promise** (the caveat): v1 = *stateless config + best-effort sessions* on Containers, clearly messaged. *(rec)* Revisit Fly.io/VM for an always-on tier if customers need guaranteed long-lived agents.
-2. **Pricing/tiers** (EUR, trial 90d like the suite): *(rec placeholder)* Solo €19/mo, Team €79/mo — needs your real numbers.
-3. **Domain:** *(rec)* `{tenant}.shelldeck.com` (own domain, free Universal SSL, matches xevolve pattern). Needs shelldeck.com registered into the spotcloud CF account.
-4. **CF cost ceiling:** always-on standard-1 ≈ €30-45/customer/mo. *(rec)* trial tier scales-to-zero (accepts idle session loss), paid tier keepAlive; set an aggregate cap.
-5. **Default image CLIs:** *(rec)* ship claude + codex (+ maybe aider/opencode); customers add their own API keys via injected secrets.
-6. **Azure Marketplace:** *(rec)* direct-buy + Stripe only for v1; Marketplace later.
-7. **GH panel:** *(rec)* default OFF; a single shared `DASHBOARD_GH_TOKEN` is fine for your own instance.
+## Decisions — locked (2026-06-06)
+1. **Host / durability:** isolated Docker container per customer on the **spot-tech-ci VM** with a persistent volume — sessions survive. (Supersedes CF Containers + the ephemerality caveat.)
+2. **Pricing/tiers:** Solo €29/mo, Team €99/mo (highlight), 90-day trial, EUR. *(Stripe price ids placeholder until go-live.)*
+3. **Domain:** `{tenant}.spot-suite.com` for now (reuse the existing zone + shared tunnel) → migrate to shelldeck.com once there are paying customers.
+4. **Cost ceiling:** n/a — runs on the existing VM; bound by VM RAM/disk, not per-container cloud billing. Watch aggregate VM load.
+5. **Default image CLIs:** claude + codex + aider + opencode (preinstalled; customers bring their own API keys).
+6. **Azure Marketplace:** direct-buy + Stripe only for v1; Marketplace later.
+7. **GH panel:** default OFF; a single shared `DASHBOARD_GH_TOKEN` for your own instance.
 
 ## Phase 1 — what shipped
 
