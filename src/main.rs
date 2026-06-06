@@ -7,6 +7,7 @@ mod image_versions;
 mod links;
 mod metrics;
 mod pages;
+mod persist;
 mod ratelimit;
 mod remote;
 mod remote_hosts;
@@ -74,10 +75,46 @@ async fn main() {
         .await
         .expect("bind dashboard listener");
     println!("ShellDeck listening on http://{}", addr);
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .expect("serve dashboard");
+    #[cfg(feature = "saas")]
+    {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("serve dashboard");
+    }
+    #[cfg(not(feature = "saas"))]
+    {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .expect("serve dashboard");
+    }
+}
+
+#[cfg(feature = "saas")]
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut signal) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            let _ = signal.recv().await;
+        } else {
+            std::future::pending::<()>().await;
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }

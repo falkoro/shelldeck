@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::Config, persist};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::fs;
@@ -30,14 +30,18 @@ pub async fn save(config: Arc<Config>, links: Vec<QuickLink>) -> Result<Vec<Quic
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
     {
-        fs::create_dir_all(parent)
-            .await
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = fs::create_dir_all(parent).await {
+            if !persist::continue_after_disk_error(parent, "create directory", &e) {
+                return Err(e.to_string());
+            }
+        }
     }
     let json = serde_json::to_string_pretty(&links).map_err(|e| e.to_string())?;
-    fs::write(&config.links_file, format!("{json}\n"))
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = fs::write(&config.links_file, format!("{json}\n")).await {
+        if !persist::continue_after_disk_error(&config.links_file, "write file", &e) {
+            return Err(e.to_string());
+        }
+    }
     Ok(links)
 }
 
