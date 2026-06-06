@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::Config, persist};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -38,13 +38,17 @@ pub async fn save(config: Arc<Config>, payload: ShareShotUpload) -> Result<Saved
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
     {
-        fs::create_dir_all(parent)
-            .await
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = fs::create_dir_all(parent).await {
+            if !persist::continue_after_disk_error(parent, "create directory", &e) {
+                return Err(e.to_string());
+            }
+        }
     }
-    fs::write(&config.share_shot_file, &bytes)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = fs::write(&config.share_shot_file, &bytes).await {
+        if !persist::continue_after_disk_error(&config.share_shot_file, "write file", &e) {
+            return Err(e.to_string());
+        }
+    }
     Ok(SavedShareShot {
         path: config.share_shot_file.to_string_lossy().to_string(),
         bytes: bytes.len(),

@@ -1,4 +1,7 @@
-use crate::config::{clean_remote_id, clean_remote_target, Config, RemoteHostConfig};
+use crate::{
+    config::{clean_remote_id, clean_remote_target, Config, RemoteHostConfig},
+    persist,
+};
 use std::sync::Arc;
 use tokio::fs;
 
@@ -21,14 +24,18 @@ pub async fn save(
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
     {
-        fs::create_dir_all(parent)
-            .await
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = fs::create_dir_all(parent).await {
+            if !persist::continue_after_disk_error(parent, "create directory", &e) {
+                return Err(e.to_string());
+            }
+        }
     }
     let json = serde_json::to_string_pretty(&hosts).map_err(|e| e.to_string())?;
-    fs::write(&config.remote_hosts_file, format!("{json}\n"))
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = fs::write(&config.remote_hosts_file, format!("{json}\n")).await {
+        if !persist::continue_after_disk_error(&config.remote_hosts_file, "write file", &e) {
+            return Err(e.to_string());
+        }
+    }
     Ok(hosts)
 }
 

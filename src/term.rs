@@ -8,7 +8,7 @@ use axum::{
     response::Response,
 };
 use futures_util::{SinkExt, StreamExt};
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, PtySize};
 use serde::Deserialize;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
@@ -63,10 +63,7 @@ pub async fn term_ws(
     // A window in tmux has one size shared by all clients. "latest" sizes it to whichever client
     // is actively used, so the browser terminal only affects the session while it's focused and
     // hands the size back to your other client (RDP/SSH) when this terminal closes.
-    let _ = tokio::process::Command::new("/usr/bin/tmux")
-        .args(["set-option", "-g", "window-size", "latest"])
-        .status()
-        .await;
+    tmux::set_window_size_latest().await;
     let name = q.name.clone();
     let cols = q.cols.unwrap_or(120).clamp(20, 400);
     let rows = q.rows.unwrap_or(34).clamp(6, 200);
@@ -118,8 +115,7 @@ async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
     let Ok(pair) = native_pty_system().openpty(size) else {
         return;
     };
-    let mut cmd = CommandBuilder::new("/usr/bin/tmux");
-    cmd.args(["attach-session", "-t", &name]);
+    let mut cmd = tmux::tmux_pty_command(&["attach-session", "-t", &name]);
     cmd.env("TERM", "xterm-256color");
     let Ok(mut child) = pair.slave.spawn_command(cmd) else {
         return;

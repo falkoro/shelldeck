@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::Config, persist};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::fs;
@@ -28,7 +28,7 @@ pub struct DashboardSettings {
 
 impl DashboardSettings {
     pub fn defaults(config: &Config) -> Self {
-        Self {
+        let settings = Self {
             tickers: normalize_tickers(config.tickers.clone()),
             panels: PanelSettings {
                 machine: true,
@@ -40,6 +40,14 @@ impl DashboardSettings {
                 tickers: true,
                 expand_lists: false,
             },
+        };
+        #[cfg(feature = "saas")]
+        {
+            saas_env_defaults(settings, config)
+        }
+        #[cfg(not(feature = "saas"))]
+        {
+            settings
         }
     }
 }
@@ -63,14 +71,18 @@ pub async fn save(
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
     {
-        fs::create_dir_all(parent)
-            .await
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = fs::create_dir_all(parent).await {
+            if !persist::continue_after_disk_error(parent, "create directory", &e) {
+                return Err(e.to_string());
+            }
+        }
     }
     let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(&config.ui_config_file, format!("{json}\n"))
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = fs::write(&config.ui_config_file, format!("{json}\n")).await {
+        if !persist::continue_after_disk_error(&config.ui_config_file, "write file", &e) {
+            return Err(e.to_string());
+        }
+    }
     Ok(settings)
 }
 
@@ -140,6 +152,61 @@ fn normalize_settings(mut settings: DashboardSettings) -> DashboardSettings {
     settings
 }
 
+#[cfg(feature = "saas")]
+fn saas_env_defaults(mut settings: DashboardSettings, config: &Config) -> DashboardSettings {
+    if !config.gh_repos.is_empty() {
+        settings.panels.ci_runs = true;
+    }
+    if let Ok(raw) = std::env::var("DASHBOARD_PANELS") {
+        if let Some(panels) = parse_panels(&raw) {
+            settings.panels = panels;
+        }
+    }
+    settings
+}
+
+#[cfg(any(feature = "saas", test))]
+fn parse_panels(raw: &str) -> Option<PanelSettings> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let mut panels = PanelSettings {
+        machine: false,
+        machine_sensors: false,
+        containers: false,
+        remote_hosts: false,
+        ci_runs: false,
+        links: false,
+        tickers: false,
+        expand_lists: false,
+    };
+    for item in raw.split([',', ';']) {
+        match clean_panel_name(item).as_str() {
+            "" => {}
+            "machine" => panels.machine = true,
+            "machinesensors" | "sensors" => panels.machine_sensors = true,
+            "containers" => panels.containers = true,
+            "remotehosts" | "remote" => panels.remote_hosts = true,
+            "ciruns" | "github" => panels.ci_runs = true,
+            "links" => panels.links = true,
+            "tickers" => panels.tickers = true,
+            "expandlists" | "expanded" => panels.expand_lists = true,
+            other => eprintln!("Ignoring unknown DASHBOARD_PANELS entry: {other}"),
+        }
+    }
+    Some(panels)
+}
+
+#[cfg(any(feature = "saas", test))]
+fn clean_panel_name(raw: &str) -> String {
+    raw.trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
 fn normalize_tickers(tickers: Vec<String>) -> Vec<String> {
     tickers
         .into_iter()
@@ -190,5 +257,17 @@ mod tests {
         assert_eq!(value["panels"]["machineSensors"], true);
         assert_eq!(value["panels"]["remoteHosts"], true);
         assert_eq!(value["panels"]["ciRuns"], false);
+    }
+
+    #[test]
+    fn dashboard_panels_env_parse_camel_kebab_and_aliases() {
+        let panels = parse_panels("machine,machineSensors,remote-hosts,ci-runs,expand-lists")
+            .unwrap();
+        assert!(panels.machine);
+        assert!(panels.machine_sensors);
+        assert!(panels.remote_hosts);
+        assert!(panels.ci_runs);
+        assert!(panels.expand_lists);
+        assert!(!panels.containers);
     }
 }

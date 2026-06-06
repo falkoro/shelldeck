@@ -1,4 +1,4 @@
-use crate::{config::Config, webutil};
+use crate::{config::Config, persist, webutil};
 use axum::http::StatusCode;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::{rngs::OsRng, RngCore};
@@ -29,9 +29,11 @@ pub struct SavedImage {
 }
 
 pub async fn save_image(config: Arc<Config>, payload: ImageUpload) -> Result<SavedImage, String> {
-    fs::create_dir_all(&config.upload_dir)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = fs::create_dir_all(&config.upload_dir).await {
+        if !persist::continue_after_disk_error(&config.upload_dir, "create directory", &e) {
+            return Err(e.to_string());
+        }
+    }
     let (mime_type, encoded) = payload
         .data_url
         .strip_prefix("data:")
@@ -73,9 +75,11 @@ pub async fn save_image(config: Arc<Config>, payload: ImageUpload) -> Result<Sav
         ext
     );
     let full_path = config.upload_dir.join(&file_name);
-    fs::write(&full_path, &bytes)
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = fs::write(&full_path, &bytes).await {
+        if !persist::continue_after_disk_error(&full_path, "write file", &e) {
+            return Err(e.to_string());
+        }
+    }
     Ok(SavedImage {
         name: file_name.clone(),
         path: full_path.to_string_lossy().to_string(),

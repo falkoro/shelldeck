@@ -24,3 +24,24 @@ The plan ships on Containers as decided, designed to *survive* this (stateless-c
 5. **Default image CLIs:** *(rec)* ship claude + codex (+ maybe aider/opencode); customers add their own API keys via injected secrets.
 6. **Azure Marketplace:** *(rec)* direct-buy + Stripe only for v1; Marketplace later.
 7. **GH panel:** *(rec)* default OFF; a single shared `DASHBOARD_GH_TOKEN` is fine for your own instance.
+
+## Phase 1 — what shipped
+
+- `saas` Cargo feature: default builds remain host-style and strict; `--features saas` seeds UI state from env and treats settings/links/remote-hosts/share/uploads disk write failures as best-effort.
+- New env: `DASHBOARD_PANELS` for SaaS panel defaults, `DASHBOARD_TMUX_SOCKET` for per-tenant `tmux -L` isolation, and `DASHBOARD_HOSTNAME` for a friendly displayed host/container name.
+- Container: multi-stage `Dockerfile` builds `cargo build --release --features saas`, rebuilds frontend JS with Bun, runs as non-root `shelldeck`, and expects all secrets/config at runtime via env.
+
+Local build/run:
+
+```sh
+podman build -t shelldeck:saas .
+podman run --rm -p 8787:8787 \
+  -e DASHBOARD_PASSWORD=replace-dev-password \
+  -e DASHBOARD_UNLOCK_PASSWORD=replace-dev-unlock \
+  -e DASHBOARD_SECRET=replace-with-32-plus-random-bytes \
+  -e DASHBOARD_HOSTNAME=tenant-dev \
+  -e DASHBOARD_TMUX_SOCKET=tenant-dev \
+  -e DASHBOARD_AGENT_PRESETS=claude,codex,aider,opencode \
+  -e DASHBOARD_PANELS=machine,containers,ci-runs,links,tickers \
+  shelldeck:saas
+```

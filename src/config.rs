@@ -49,6 +49,7 @@ pub struct Config {
     pub xai_client_id: String,
     pub attach_template: String,
     pub ssh_attach_template: String,
+    pub tmux_socket: Option<String>,
     pub quick_links: Vec<(String, String)>,
     pub links_file: PathBuf,
     pub ui_config_file: PathBuf,
@@ -112,6 +113,7 @@ impl Config {
             env::var("XAI_BASE_URL").unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
         let xai_api_style = env::var("XAI_API_STYLE").unwrap_or_else(|_| "openai".to_string());
         let xai_model = env::var("XAI_MODEL").unwrap_or_else(|_| "grok-4.3".to_string());
+        let tmux_socket = tmux_socket_from_env();
         Self {
             host: env::var("DASHBOARD_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
             port: env::var("DASHBOARD_PORT")
@@ -172,13 +174,18 @@ impl Config {
                 }),
             xai_client_id: env::var("XAI_CLIENT_ID")
                 .unwrap_or_else(|_| "b1a00492-073a-47ea-816f-4c329264a828".to_string()),
-            attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE")
-                .unwrap_or_else(|_| "tmux attach -t {name}".to_string()),
+            attach_template: env::var("DASHBOARD_ATTACH_TEMPLATE").unwrap_or_else(|_| {
+                tmux_socket
+                    .as_ref()
+                    .map(|socket| format!("tmux -L {socket} attach -t {{name}}"))
+                    .unwrap_or_else(|| "tmux attach -t {name}".to_string())
+            }),
             // SSH-into-tmux command (copy-only, never executed server-side). {name} = session.
             ssh_attach_template: env::var("DASHBOARD_SSH_ATTACH_TEMPLATE")
                 .unwrap_or_default()
                 .trim()
                 .to_string(),
+            tmux_socket,
             quick_links: parse_links(&env::var("DASHBOARD_LINKS").unwrap_or_default()),
             links_file: configured_path(
                 env::var("DASHBOARD_LINKS_FILE").ok(),
@@ -250,6 +257,20 @@ fn split_env(key: &str) -> Vec<String> {
         .filter(|v| !v.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+pub fn tmux_socket_from_env() -> Option<String> {
+    env::var("DASHBOARD_TMUX_SOCKET")
+        .ok()
+        .map(|value| {
+            value
+                .trim()
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+                .take(80)
+                .collect::<String>()
+        })
+        .filter(|value| !value.is_empty())
 }
 
 // Parse DASHBOARD_LINKS into (label, url) quick links. Format: "Label|https://url;Label|https://url".
