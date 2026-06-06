@@ -1,6 +1,6 @@
 use crate::{
     config::RemoteHostConfig,
-    containers::{attach_inspect, attach_stats, parse_inspect, ContainerInfo},
+    containers::{attach_built, attach_inspect, attach_stats, parse_image_built, parse_inspect, ContainerInfo},
     image_versions,
     remote_metrics::{self, RemoteMetrics, REMOTE_METRICS_SCRIPT},
 };
@@ -25,8 +25,11 @@ const STATS_SCRIPT: &str = "echo '##SD_STATS'\n\
 (docker stats --no-stream --format 'docker\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n\
 (podman stats --no-stream --format 'podman\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' 2>/dev/null || true)\n\
 echo '##SD_INSPECT'\n\
-(docker inspect --format '{{.Name}}\t{{.State.StartedAt}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}' $(docker ps -aq) 2>/dev/null || true)\n\
-(podman inspect --format '{{.Name}}\t{{.State.StartedAt}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}' $(podman ps -aq) 2>/dev/null || true)\n";
+(docker inspect --format '{{.Name}}\t{{.State.StartedAt}}\t{{.Image}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}' $(docker ps -aq) 2>/dev/null || true)\n\
+(podman inspect --format '{{.Name}}\t{{.State.StartedAt}}\t{{.Image}}\t{{with index .Config.Labels \"org.opencontainers.image.description\"}}{{.}}{{end}}' $(podman ps -aq) 2>/dev/null || true)\n\
+echo '##SD_IMAGES'\n\
+(docker image inspect --format '{{.Id}}\t{{.Created}}' $(docker images -q 2>/dev/null | sort -u) 2>/dev/null || true)\n\
+(podman image inspect --format '{{.Id}}\t{{.Created}}' $(podman images -q 2>/dev/null | sort -u) 2>/dev/null || true)\n";
 
 #[derive(Serialize)]
 pub struct RemoteHostStatus {
@@ -198,6 +201,9 @@ async fn ssh_probe(target: &str, cap: usize, with_metrics: bool) -> ProbeResult 
     if let Some(inspect) = secs.get("INSPECT") {
         attach_inspect(&mut containers, &parse_inspect(inspect));
     }
+    if let Some(images) = secs.get("IMAGES") {
+        attach_built(&mut containers, &parse_image_built(images));
+    }
     let total = containers.len();
     containers.truncate(cap.max(1));
     image_versions::annotate(&mut containers).await;
@@ -243,6 +249,8 @@ fn parse_remote_containers(raw: &str) -> Vec<ContainerInfo> {
                 started: None,
                 desc: None,
                 version: None,
+                image_id: None,
+                built: None,
             })
         })
         .collect();

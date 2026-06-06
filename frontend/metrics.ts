@@ -34,6 +34,8 @@ interface ContainerInfo {
   started?: string | null;
   desc?: string | null;
   version?: ContainerVersionInfo | null;
+  image_id?: string | null;
+  built?: string | null;
 }
 
 interface ContainerVersionInfo {
@@ -316,6 +318,44 @@ function containerVersionBadgeHtml(c: ContainerInfo): string {
   return `<span class="ci-version current" title="${escapeHtml(title)}">current</span>`;
 }
 
+// Image .Created comes through as RFC3339 (docker) OR Go's time.String() "2026-05-31 15:44:15.7
+// +0000 UTC" (podman). Try native parse first, then massage the Go form into ISO. NaN when unknown.
+function parseBuilt(raw?: string | null): number {
+  if (!raw) return NaN;
+  const direct = Date.parse(raw);
+  if (Number.isFinite(direct)) return direct;
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?\s*([+-]\d{2}):?(\d{2})?/);
+  if (m) {
+    const iso = Date.parse(`${m[1]}T${m[2]}${m[3]}:${m[4] || '00'}`);
+    if (Number.isFinite(iso)) return iso;
+  }
+  return Date.parse(raw.slice(0, 10));
+}
+
+// "updated 2026-06-04 (2d ago)" from the image's build time; '' when unparseable/unknown.
+function builtAge(raw?: string | null): string {
+  const t = parseBuilt(raw);
+  if (!Number.isFinite(t)) return '';
+  const date = new Date(t).toISOString().slice(0, 10);
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const rel = d > 0 ? `${d}d ago` : h > 0 ? `${h}h ago` : 'today';
+  return `${date} (${rel})`;
+}
+
+// Small "updated …" line for a container card: build date + short image digest. '' when unknown.
+function containerBuiltHtml(c: ContainerInfo): string {
+  const age = builtAge(c.built);
+  if (!age && !c.image_id) return '';
+  const idChip = c.image_id ? ` · #${escapeHtml(c.image_id)}` : '';
+  const label = age ? `updated ${age}` : 'image';
+  const t = parseBuilt(c.built);
+  const fullDate = Number.isFinite(t) ? new Date(t).toLocaleString() : (c.built || 'unknown');
+  const title = `Image built: ${fullDate}${c.image_id ? `\ndigest: ${c.image_id}` : ''}`;
+  return `<div class="ci-built" title="${escapeHtml(title)}">${escapeHtml(label)}${idChip}</div>`;
+}
+
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
 // then actions. Stopped/unhealthy get a state class for greying/highlighting.
 function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string {
@@ -331,6 +371,7 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
     + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small>${containerActionsHtml(c, host)}</div>`
     + `<div class="ci-image-line"><div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>${containerVersionBadgeHtml(c)}</div>`
     + descHtml
+    + containerBuiltHtml(c)
     + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
     + statsHtml + `</div>`;
 }
@@ -353,9 +394,11 @@ function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   const subClass = desc ? 'ci-image has-desc' : 'ci-image';
   const versionHtml = containerVersionBadgeHtml(c);
   const badges = versionHtml || badgeHtml ? `<span class="ci-badges">${versionHtml}${badgeHtml}</span>` : '';
+  const builtHtml = containerBuiltHtml(c);
   return `<div class="container-item remote-container compact state-${state}">`
     + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
     + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badges}</div>`
+    + builtHtml
     + `</div>`;
 }
 
