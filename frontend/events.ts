@@ -21,7 +21,6 @@ document.addEventListener('click', async (event: MouseEvent) => {
   const editDescButton = target.closest<HTMLElement>('[data-edit-desc]');
   const shellinButton = target.closest<HTMLButtonElement>('[data-shellin]');
   const resumeButton = target.closest<HTMLButtonElement>('[data-resume]');
-  const moreToggleButton = target.closest<HTMLButtonElement>('[data-more-toggle]');
   const removeImageButton = target.closest<HTMLButtonElement>('[data-remove-image]');
   const tabButton = target.closest<HTMLButtonElement>('[data-shell-tab]');
   const selectItem = target.closest<HTMLElement>('[data-select-session]');
@@ -59,12 +58,6 @@ document.addEventListener('click', async (event: MouseEvent) => {
       return containerAction(d.chost || '', d.cengine || '', d.cname || '', d.containerAction || '');
     }
     if (editDescButton) return editContainerDescription(editDescButton.dataset.editDesc || '');
-    if (moreToggleButton) {
-      const bar = moreToggleButton.closest('.shell-actions');
-      const open = !!bar?.classList.toggle('more-open');
-      moreToggleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-      return;
-    }
     if (shellinButton) {
       openTerminal(shellinButton.dataset.shellin || '');
       return;
