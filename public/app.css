@@ -186,9 +186,6 @@ body.preview-fullscreen-open{overflow:hidden}
    Stop-session) live behind the ⋯ toggle. Always on — the composer is desktop-only
    (it is display:none under 760px), so this keeps the everyday row to ten icons and
    tucks the destructive Stop behind an extra click. */
-.shell-actions .more-toggle{display:inline-flex}
-.shell-actions .shell-action-more{display:none}
-.shell-actions.more-open .shell-action-more{display:inline-flex}
 .shell-actions .mic-btn{border-color:rgba(139,246,255,.55);color:#cdefff}
 .shell-actions .mic-btn:hover{border-color:var(--cyan);background:#102d33}
 .shell-actions .mic-btn.active{background:#e0566a;border-color:#ff97a4;color:#fff;animation:mic-pulse 1.15s ease-in-out infinite}

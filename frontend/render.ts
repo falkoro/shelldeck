@@ -29,10 +29,9 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
       <button class="iconly" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
-      <button class="iconly more-toggle" type="button" data-more-toggle title="More actions" aria-label="More actions" aria-expanded="false">⋯</button>
-      <button class="iconly shell-action-more" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
-      <button class="iconly shell-action-more" type="button" data-restart title="Restart this tmux session (recreate it)" aria-label="Restart tmux session">${icon('restart')}</button>
-      <button class="warn iconly shell-action-more" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
+      <button class="iconly" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
+      <button class="iconly" type="button" data-restart title="Restart this tmux session (recreate it)" aria-label="Restart tmux session">${icon('restart')}</button>
+      <button class="warn iconly" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
       <button class="warn resume-btn iconly" type="button" data-resume title="Re-run the agent's resume command shown in the pane" aria-label="Resume agent">${icon('restart')}</button>
     </div>
     <div class="attach-list" data-role="attachments"></div>
