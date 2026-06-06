@@ -720,3 +720,11 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
 .session-actions{display:none!important}
 .terminal-panel .panel-header{margin-bottom:8px}
 .terminal-panel .panel-header p{display:none}
+/* Tickers ride inside the top bar next to the wordmark now (reclaims their own row). The bar
+   scrolls horizontally so a long ticker list never grows the header's height. */
+.topbar .ticker-strip{flex:1 1 auto;min-width:0;margin:0;align-items:center}
+.topbar .ticker-bar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;min-height:30px;padding:5px 9px}
+.topbar .ticker-bar::-webkit-scrollbar{display:none}
+.topbar .ticker-strip button{min-height:30px}
+/* "shells unlocked" is the redundant happy path — only surface the access pill when LOCKED. */
+.access-pill.on{display:none}

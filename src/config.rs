@@ -60,6 +60,9 @@ pub struct Config {
     // Gather CPU/RAM/load/temps for remote hosts over SSH (one extra /proc read per poll).
     // Default on; set DASHBOARD_REMOTE_METRICS=0 to keep remote cards to ping + containers only.
     pub remote_metrics: bool,
+    // "Safe shot" generates a shareable, redacted screenshot. Off by default; set
+    // DASHBOARD_ENABLE_SAFE_SHOT=1 to show the top-bar button.
+    pub enable_safe_shot: bool,
     pub allowed_origins: Vec<String>,
     pub show_unknown_sessions: bool,
     pub known_sessions: Vec<KnownSession>,
@@ -206,6 +209,7 @@ impl Config {
             remote_metrics: env::var("DASHBOARD_REMOTE_METRICS")
                 .map(|v| parse_flag(&v))
                 .unwrap_or(true),
+            enable_safe_shot: env_flag("DASHBOARD_ENABLE_SAFE_SHOT"),
             // Extra browser Origins allowed to open the /api/term WebSocket (beyond same-host).
             allowed_origins: split_env("DASHBOARD_ALLOWED_ORIGINS"),
             show_unknown_sessions: env_flag("DASHBOARD_SHOW_UNKNOWN_SESSIONS"),

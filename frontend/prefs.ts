@@ -87,7 +87,6 @@ function applyPrefs(): void {
     Array.from(lineSel.options).forEach((opt) => { opt.textContent = `${opt.value} lines`; });
     lineSel.dataset.labeled = '1';
   }
-  q('#authState').textContent = 'dashboard signed in';
   q('#shells').classList.toggle('focus-mode', viewMode === 'focus');
   applySidebar();
 }
