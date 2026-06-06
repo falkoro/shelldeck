@@ -420,10 +420,14 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .links-menu a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;white-space:nowrap}
 .links-menu a:hover{background:#102331}
 /* Card window controls (− / ⤢ / □) in the shell card header */
-.card-window-controls{display:flex;gap:2px;margin-left:auto;opacity:.65;transition:opacity .14s}
-.terminal-card:hover .card-window-controls{opacity:1}
-.card-win-btn{background:transparent;border:1px solid rgba(139,246,255,.18);color:var(--muted);font-size:12px;line-height:1;padding:1px 6px;border-radius:3px;cursor:pointer;min-height:22px}
-.card-win-btn:hover{background:rgba(139,246,255,.1);color:var(--text);border-color:rgba(139,246,255,.35)}
+.card-window-controls{display:flex;align-items:center;gap:7px;margin-left:auto;opacity:.5;transition:opacity .14s}
+.terminal-card.running .card-window-controls,.terminal-card.selected .card-window-controls,.terminal-card:hover .card-window-controls{opacity:1}
+.card-win-btn{position:relative;flex:0 0 auto;box-sizing:border-box;width:13px;height:13px;min-height:13px;padding:0;border:none;border-radius:50%;cursor:pointer;background:var(--muted);box-shadow:inset 0 0 0 1px rgba(0,0,0,.28);font-size:0;line-height:13px;text-align:center;color:transparent;transition:filter .14s}
+.card-win-btn.win-min{background:var(--amber)}
+.card-win-btn.win-full{background:var(--green)}
+.card-win-btn.win-reset{background:var(--red)}
+.card-win-btn:hover{filter:brightness(1.18)}
+.card-window-controls:hover .card-win-btn{font-size:8px;color:rgba(0,0,0,.72)}
 /* Drag-to-reorder visual states */
 .terminal-card.reorder-dragging{opacity:.38;border-style:dashed}
 .terminal-card.reorder-target{border-color:rgba(114,247,200,.6);box-shadow:0 0 0 2px rgba(114,247,200,.25);transform:scale(1.015)}
@@ -485,8 +489,7 @@ body.sidebar-hidden .workspace{grid-template-columns:minmax(0,1fr)}
      running/selected cards so they actually signal state. — */
 .terminal-card{border-color:var(--line);background:#070d13}
 .terminal-card header{background:#0a1119;padding:9px 12px}
-.terminal-card header::before{content:"";flex:0 0 auto;width:9px;height:9px;border-radius:3px;background:var(--red);box-shadow:14px 0 0 var(--amber),28px 0 0 var(--green);margin-right:30px;align-self:center;opacity:.5;transition:opacity .2s}
-.terminal-card.running header::before,.terminal-card.selected header::before{opacity:1}
+
 .terminal-card.running{border-color:rgba(114,247,200,.34)}
 
 /* — Buttons: flat, neutral hairline (mono inherited from body) — */

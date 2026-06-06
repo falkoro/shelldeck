@@ -10,9 +10,9 @@ function createShellCard(shell) {
     <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span></div>
     <div class="terminal-meta"><span class="agent-badge" data-role="agent"></span><span class="dot" data-role="dot"></span><span data-role="cwd"></span></div>
     <div class="card-window-controls">
-      <button type="button" class="card-win-btn" data-minimize-shell title="Minimize this preview to dock" aria-label="Minimize preview to dock">−</button>
-      <button type="button" class="card-win-btn" data-maximize-preview title="Fullscreen this preview" aria-label="Fullscreen preview">⛶</button>
-      <button type="button" class="card-win-btn" data-reset-preview title="Reset this preview size and layout" aria-label="Reset preview">↺</button>
+      <button type="button" class="card-win-btn win-min" data-minimize-shell title="Minimize this preview to dock" aria-label="Minimize preview to dock">−</button>
+      <button type="button" class="card-win-btn win-full" data-maximize-preview title="Fullscreen this preview" aria-label="Fullscreen preview">⛶</button>
+      <button type="button" class="card-win-btn win-reset" data-reset-preview title="Reset this preview size and layout" aria-label="Reset preview">↺</button>
     </div>
   </header>
   <div class="work-title" data-role="worktitle"></div>
