@@ -64,8 +64,9 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .panel-header p{margin-top:4px;font-size:13px}
 .panel-actions{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 .shell-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-.shell-tip{flex:1 1 12rem;min-width:0;max-width:100%;margin-right:auto;font-size:11px;color:var(--muted);opacity:.85;transition:opacity .25s ease;line-height:1.35;overflow-wrap:anywhere}
-@media (max-width:520px){.shell-tip{display:none}}
+.shell-tip-bar{display:flex;align-items:center;margin:0 0 6px;padding:0 2px;min-width:0}
+.shell-tip{font-size:11px;color:var(--muted);opacity:.85;transition:opacity .25s ease;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
+@media (max-width:520px){.shell-tip-bar{display:none}}
 .stream-pill.on{border-color:rgba(114,247,200,.42);color:#bfffe6}
 .quick-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:rgba(255,200,87,.24);background:#10151a}
 .quick-strip code{display:block;margin-top:6px;white-space:normal;word-break:break-word;font-size:12px}
@@ -157,8 +158,8 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 @media (min-width:1500px){
   .terminal-panel .panel-header{position:absolute;top:0;right:0;z-index:8;margin:0;max-width:min(58vw,900px);pointer-events:none;align-items:flex-start}
   .terminal-panel .panel-header>div:first-child{display:none}
-  .terminal-panel .shell-tools{pointer-events:auto;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;row-gap:4px}
-  .terminal-panel .shell-tip{flex:1 1 100%;order:10;margin-right:0;text-align:right;font-size:10.5px;line-height:1.3;opacity:.78}
+  .terminal-panel .shell-tools{pointer-events:auto;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:nowrap}
+  .terminal-panel .shell-tip-bar{padding-right:min(58vw,900px)}
   .terminal-panel .shell-tabs{padding-right:min(58vw,900px);min-height:42px;align-items:flex-end}
 }
 .terminal-grid{--shell-card-min-height:clamp(420px,58svh,860px);display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:10px;align-items:stretch;align-content:start;grid-auto-rows:minmax(var(--shell-card-min-height),var(--shell-card-min-height))}

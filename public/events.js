@@ -379,7 +379,8 @@ if (shellTools && !document.querySelector('#legendToggleBtn')) {
     });
     document.getElementById('streamState')?.insertAdjacentElement('afterend', legendBtn);
 }
-// Rotating keyboard-shortcut tip in the spare space of the shell toolbar.
+// Rotating keyboard-shortcut tip on its own row above the shell tabs (not inside shell-tools,
+// which floats over the tab bar on wide screens and caused overlap with card headers).
 const SHELL_TIPS = [
     'Tip: r refresh · g grid/focus · c density',
     'Tip: f follow output · [ ] cycle shells',
@@ -388,20 +389,28 @@ const SHELL_TIPS = [
     'Tip: ⚙ Configure hides sidebar panels (e.g. Machine)',
     'Tip: the Panels button (top bar) shows/hides the side rail',
 ];
-if (shellTools && !document.querySelector('#shellTip')) {
+const shellTabs = document.getElementById('shellTabs');
+if (shellTabs && !document.querySelector('#shellTip')) {
+    document.querySelector('.shell-tools .shell-tip')?.remove();
+    const bar = document.createElement('div');
+    bar.id = 'shellTipBar';
+    bar.className = 'shell-tip-bar';
     const tip = document.createElement('span');
     tip.id = 'shellTip';
     tip.className = 'shell-tip';
     tip.textContent = SHELL_TIPS[0];
-    // Insert just after the Legend button (which sits right after the stream-state pill) so the
-    // Legend stays next to the live time and the tip fills the empty space before the buttons.
-    const tipAnchor = document.getElementById('legendToggleBtn') || document.getElementById('streamState') || shellTools.children[0];
-    tipAnchor?.insertAdjacentElement('afterend', tip);
+    tip.title = SHELL_TIPS[0];
+    bar.appendChild(tip);
+    shellTabs.insertAdjacentElement('beforebegin', bar);
     let tipIndex = 0;
     setInterval(() => {
         tipIndex = (tipIndex + 1) % SHELL_TIPS.length;
         tip.style.opacity = '0';
-        setTimeout(() => { tip.textContent = SHELL_TIPS[tipIndex]; tip.style.opacity = ''; }, 250);
+        setTimeout(() => {
+            tip.textContent = SHELL_TIPS[tipIndex];
+            tip.title = SHELL_TIPS[tipIndex];
+            tip.style.opacity = '';
+        }, 250);
     }, 7000);
 }
 // Step the selected shell to the previous/next tab.
