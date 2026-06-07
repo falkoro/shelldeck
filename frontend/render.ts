@@ -8,7 +8,10 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.dataset.selectSession = shell.name;
   article.innerHTML = `<header>
     <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span></div>
-    <button type="button" class="card-create-btn" data-create title="Create this tmux session">${icon('plus')}<span>New tmux</span></button>
+    <div class="card-offline-actions">
+      <button type="button" class="card-create-btn" data-create title="Create this tmux session" aria-label="Create this tmux session">${icon('plus')}<span>New tmux</span></button>
+      <button type="button" class="card-remove-btn" data-remove-closed title="Remove this closed session from the dashboard" aria-label="Remove closed session from dashboard">${icon('trash')}</button>
+    </div>
     <div class="terminal-meta"><span class="agent-badge" data-role="agent"></span><span class="dot" data-role="dot"></span><span data-role="cwd"></span></div>
     <div class="card-window-controls">
       <button type="button" class="card-win-btn win-min" data-minimize-shell title="Minimize this preview to dock" aria-label="Minimize preview to dock">−</button>
@@ -48,6 +51,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.querySelector<HTMLButtonElement>('[data-history]')!.dataset.history = shell.name;
   article.querySelector<HTMLButtonElement>('[data-copy-output]')!.dataset.copyOutput = shell.name;
   article.querySelector<HTMLButtonElement>('[data-privacy-shell]')!.dataset.privacyShell = shell.name;
+  article.querySelector<HTMLButtonElement>('[data-remove-closed]')!.dataset.removeClosed = shell.name;
   article.querySelector<HTMLButtonElement>('[data-rename-shell]')!.dataset.renameShell = shell.name;
   article.querySelector<HTMLButtonElement>('[data-reset-shell-label]')!.dataset.resetShellLabel = shell.name;
   article.querySelector<HTMLButtonElement>('[data-minimize-shell]')!.dataset.minimizeShell = shell.name;
@@ -76,6 +80,7 @@ function updateShellCard(card: HTMLElement, shell: ShellPreview): void {
   card.classList.toggle('preview-enlarged', keepEnlarged);
   card.classList.toggle('resizing', keepResizing);
   card.classList.toggle('shell-refreshing', shellsLoading);
+  card.classList.toggle('removable-closed', canRemoveClosedShell(sessionByName(shell.name)));
   applyShellPrivacy(card, shell.name);
   const displayLabel = updateShellCardTitle(card, shell);
   setText(card, '[data-role="command"]', shell.command || 'offline');
@@ -165,7 +170,8 @@ function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean })
   grid.querySelectorAll(':scope > .locked-note, :scope > .unlock-cta').forEach((note) => note.remove());
   const seen = new Set<string>();
   // Use ordered list so drag-reorder persists across refreshes.
-  const ordered = orderedShellList(latestShells);
+  const visibleShells = visibleShellPreviews(latestShells);
+  const ordered = orderedShellList(visibleShells);
   ordered.forEach((shell, idx) => {
     seen.add(shell.name);
     let card = grid.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(shell.name)}"]`);
@@ -189,7 +195,7 @@ function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean })
   }
   // Respect minimized previews (they live in the dock instead of the grid)
   const minPreviews = (window as any).minimizedPreviews || new Set<string>();
-  latestShells.forEach((shell) => {
+  visibleShells.forEach((shell) => {
     const card = grid.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(shell.name)}"]`);
     if (card) card.style.display = minPreviews.has(shell.name) ? 'none' : '';
   });

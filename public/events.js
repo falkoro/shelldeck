@@ -24,6 +24,7 @@ document.addEventListener('click', async (event) => {
     const shellinButton = target.closest('[data-shellin]');
     const resumeButton = target.closest('[data-resume]');
     const removeImageButton = target.closest('[data-remove-image]');
+    const removeClosedButton = target.closest('[data-remove-closed]');
     const tabButton = target.closest('[data-shell-tab]');
     const selectItem = target.closest('[data-select-session]');
     const interactive = target.closest('textarea,input,button,a,pre');
@@ -82,15 +83,12 @@ document.addEventListener('click', async (event) => {
             maximizeShellPreview(maximizePreviewButton.dataset.maximizePreview || '');
             return;
         }
-        const resetPreviewButton = target.closest('[data-reset-preview]');
-        if (resetPreviewButton) {
-            resetShellPreview(resetPreviewButton.dataset.resetPreview || '');
-            return;
-        }
         if (resumeButton && resumeButton.dataset.resumeCmd)
             return runCommand(resumeButton.dataset.resume || '', resumeButton.dataset.resumeCmd);
         if (removeImageButton)
             return removeShellImage(removeImageButton.dataset.shell || '', removeImageButton.dataset.removeImage || '');
+        if (removeClosedButton)
+            return removeClosedShell(removeClosedButton.dataset.removeClosed || '');
         if (tabButton) {
             selectSession(tabButton.dataset.shellTab);
             focusComposer(tabButton.dataset.shellTab || '');
@@ -102,10 +100,12 @@ document.addEventListener('click', async (event) => {
             return;
         }
         if (createButton && !createButton.disabled) {
+            unhideShell(createButton.dataset.create || '');
             await sessionAction('/api/create', createButton.dataset.create || '');
             return selectSession(createButton.dataset.create);
         }
         if (startButton && !startButton.disabled) {
+            unhideShell(startButton.dataset.start || '');
             await sessionAction('/api/start', startButton.dataset.start || '');
             return selectSession(startButton.dataset.start);
         }
@@ -119,6 +119,7 @@ document.addEventListener('click', async (event) => {
             return;
         }
         if (restartButton && !restartButton.disabled) {
+            unhideShell(restartButton.dataset.restart || '');
             await sessionAction('/api/restart', restartButton.dataset.restart || '');
             return selectSession(restartButton.dataset.restart);
         }
@@ -410,7 +411,7 @@ document.addEventListener('mousedown', (event) => {
     if (!header)
         return;
     // Don't initiate drag when clicking buttons, inputs, or the card window controls
-    if (event.target?.closest('button,input,textarea,select,[data-minimize-shell],[data-maximize-shell],[data-reset-preview]'))
+    if (event.target?.closest('button,input,textarea,select,[data-minimize-shell],[data-maximize-shell]'))
         return;
     const card = header.closest('[data-shell-card]');
     if (!card)

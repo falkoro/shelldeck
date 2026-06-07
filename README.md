@@ -153,7 +153,7 @@ Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally
 
 1. Sign in, then enter `DASHBOARD_UNLOCK_PASSWORD` in **Shell Unlock**. Until unlocked, pane previews, input, summaries, and live terminals stay gated.
 2. Use **Send** to paste text and press Enter in a pane. Use **Paste** to insert text without pressing Enter. On mobile, plain Enter in the textarea sends; Shift+Enter inserts a newline.
-3. Use **New tmux** on an offline slot to create it. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
+3. Use **New tmux** on an offline slot to create it. Closed non-core sessions can be removed from the dashboard. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
 4. Use **Mic** to dictate into a shell input: click to start recording, click again to stop and transcribe (server-side whisper.cpp; needs a model configured).
 5. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box. Use **Privacy** to blur shell text without clearing it. Attachment chips clear after a successful send/paste into tmux.
 6. Use **Shell in** to open a real interactive terminal. Paste/drop an image there, or use **Image**, to upload it and insert the saved file path into the live terminal input. On mobile, the terminal opens full-screen with a visible **Close x** button in the title bar.
