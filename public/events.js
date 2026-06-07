@@ -26,6 +26,7 @@ document.addEventListener('click', async (event) => {
     const resumeButton = target.closest('[data-resume]');
     const removeImageButton = target.closest('[data-remove-image]');
     const removeClosedButton = target.closest('[data-remove-closed]');
+    const restoreHiddenButton = target.closest('[data-restore-hidden-closed]');
     const tabButton = target.closest('[data-shell-tab]');
     const selectItem = target.closest('[data-select-session]');
     const interactive = target.closest('textarea,input,button,a,pre');
@@ -92,6 +93,8 @@ document.addEventListener('click', async (event) => {
             return removeShellImage(removeImageButton.dataset.shell || '', removeImageButton.dataset.removeImage || '');
         if (removeClosedButton)
             return removeClosedShell(removeClosedButton.dataset.removeClosed || '');
+        if (restoreHiddenButton)
+            return restoreHiddenClosedShells();
         if (tabButton) {
             selectSession(tabButton.dataset.shellTab);
             focusComposer(tabButton.dataset.shellTab || '');
@@ -119,11 +122,10 @@ document.addEventListener('click', async (event) => {
         }
         if (stopButton && !stopButton.disabled) {
             const stopped = stopButton.dataset.stop || '';
-            if (!confirm(`Kill tmux session "${stopped}"? Everything running in it stops. This cannot be undone.`))
+            if (!confirm(`Terminate tmux session "${stopped}" and remove it from this dashboard? Everything running in it stops. This cannot be undone.`))
                 return;
             await sessionAction('/api/stop', stopped);
-            if (sessionByName(stopped))
-                selectSession(stopped);
+            terminateShellInDashboard(stopped);
             return;
         }
         if (restartButton && !restartButton.disabled) {
