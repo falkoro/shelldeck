@@ -408,6 +408,73 @@ let remoteHostsLoaded = false;
 let remoteHostsLoading = false;
 let ghRunsLoaded = false;
 let ghRunsLoading = false;
+type ContainerPrivacyScope = 'local' | 'remote';
+const CONTAINER_PRIVACY_KEY = 'sdContainerPrivacy';
+
+function containerPrivacyState(): Record<ContainerPrivacyScope, boolean> {
+  const saved = storageJson<Partial<Record<ContainerPrivacyScope, boolean>> | null>(CONTAINER_PRIVACY_KEY, null);
+  return { local: Boolean(saved?.local), remote: Boolean(saved?.remote) };
+}
+
+function containerPrivacyOn(scope: ContainerPrivacyScope): boolean {
+  return containerPrivacyState()[scope];
+}
+
+function saveContainerPrivacy(scope: ContainerPrivacyScope, on: boolean): void {
+  const state = containerPrivacyState();
+  state[scope] = on;
+  localStorage.setItem(CONTAINER_PRIVACY_KEY, JSON.stringify(state));
+}
+
+function containerPrivacyPanel(scope: ContainerPrivacyScope): HTMLElement | null {
+  return document.getElementById(scope === 'local' ? 'containersPanel' : 'remotePanel');
+}
+
+function syncContainerPrivacyTitles(panel: HTMLElement, on: boolean): void {
+  panel.querySelectorAll<HTMLElement>('[title]').forEach((el) => {
+    if (el.matches('[data-container-privacy]')) return;
+    if (on) {
+      if (el.dataset.privacyTitle === undefined) {
+        el.dataset.privacyTitle = el.getAttribute('title') || '';
+      }
+      el.removeAttribute('title');
+    } else if (el.dataset.privacyTitle !== undefined) {
+      const title = el.dataset.privacyTitle;
+      if (title) el.setAttribute('title', title);
+      delete el.dataset.privacyTitle;
+    }
+  });
+}
+
+function applyContainerPrivacy(scope: ContainerPrivacyScope): void {
+  const on = containerPrivacyOn(scope);
+  const panel = containerPrivacyPanel(scope);
+  panel?.classList.toggle('container-privacy-blur', on);
+  if (panel) syncContainerPrivacyTitles(panel, on);
+  const button = document.querySelector<HTMLButtonElement>(`[data-container-privacy="${scope}"]`);
+  if (!button) return;
+  button.classList.toggle('active', on);
+  button.setAttribute('aria-pressed', String(on));
+  button.title = on
+    ? `Show ${scope === 'local' ? 'local' : 'remote'} container text`
+    : `Blur ${scope === 'local' ? 'local' : 'remote'} container text`;
+  button.setAttribute('aria-label', button.title);
+}
+
+function applyAllContainerPrivacy(): void {
+  applyContainerPrivacy('local');
+  applyContainerPrivacy('remote');
+}
+
+function toggleContainerPrivacy(rawScope: string): void {
+  const scope = rawScope === 'remote' ? 'remote' : rawScope === 'local' ? 'local' : null;
+  if (!scope) return;
+  const next = !containerPrivacyOn(scope);
+  saveContainerPrivacy(scope, next);
+  applyContainerPrivacy(scope);
+  toast(next ? 'Container text blurred' : 'Container text visible');
+}
+(window as any).toggleContainerPrivacy = toggleContainerPrivacy;
 
 function meterLevel(pct: number): string {
   return pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : 'ok';
@@ -537,10 +604,12 @@ function renderContainers(containers: ContainerInfo[]): void {
   if (!list) return;
   if (!containers.length) {
     list.innerHTML = '<div class="muted container-empty">No containers</div>';
+    applyContainerPrivacy('local');
     return;
   }
   const summary = `<div class="container-health">${escapeHtml(containerOverview(containers))}</div>`;
   list.innerHTML = summary + containers.map((c) => containerRowHtml(c)).join('');
+  applyContainerPrivacy('local');
 }
 
 function remoteProbeText(host: RemoteHostStatus): string {
@@ -582,6 +651,7 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
   if (!list) return;
   if (!hosts.length) {
     list.innerHTML = '<div class="muted remote-empty">No remote hosts configured</div>';
+    applyContainerPrivacy('remote');
     return;
   }
   const legendStates: ContainerStateKind[] = ['running', 'unhealthy', 'restarting', 'crashed', 'paused', 'stopped'];
@@ -600,6 +670,7 @@ function renderRemoteHosts(hosts: RemoteHostStatus[]): void {
     const ipText = host.ip ? ` · ${host.ip}` : '';
     return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'}${escapeHtml(ipText)} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${metricsHtml}${containerHtml}${error}</div>`;
   }).join('');
+  applyContainerPrivacy('remote');
 }
 
 function remoteHostsLoadingHtml(): string {
@@ -774,3 +845,4 @@ async function containerAction(host: string, engine: string, name: string, actio
 (window as any).loadContainers = loadContainers;
 (window as any).loadRemoteHosts = loadRemoteHosts;
 (window as any).loadGhRuns = loadGhRuns;
+applyAllContainerPrivacy();

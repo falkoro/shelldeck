@@ -324,6 +324,70 @@ let remoteHostsLoaded = false;
 let remoteHostsLoading = false;
 let ghRunsLoaded = false;
 let ghRunsLoading = false;
+const CONTAINER_PRIVACY_KEY = 'sdContainerPrivacy';
+function containerPrivacyState() {
+    const saved = storageJson(CONTAINER_PRIVACY_KEY, null);
+    return { local: Boolean(saved?.local), remote: Boolean(saved?.remote) };
+}
+function containerPrivacyOn(scope) {
+    return containerPrivacyState()[scope];
+}
+function saveContainerPrivacy(scope, on) {
+    const state = containerPrivacyState();
+    state[scope] = on;
+    localStorage.setItem(CONTAINER_PRIVACY_KEY, JSON.stringify(state));
+}
+function containerPrivacyPanel(scope) {
+    return document.getElementById(scope === 'local' ? 'containersPanel' : 'remotePanel');
+}
+function syncContainerPrivacyTitles(panel, on) {
+    panel.querySelectorAll('[title]').forEach((el) => {
+        if (el.matches('[data-container-privacy]'))
+            return;
+        if (on) {
+            if (el.dataset.privacyTitle === undefined) {
+                el.dataset.privacyTitle = el.getAttribute('title') || '';
+            }
+            el.removeAttribute('title');
+        }
+        else if (el.dataset.privacyTitle !== undefined) {
+            const title = el.dataset.privacyTitle;
+            if (title)
+                el.setAttribute('title', title);
+            delete el.dataset.privacyTitle;
+        }
+    });
+}
+function applyContainerPrivacy(scope) {
+    const on = containerPrivacyOn(scope);
+    const panel = containerPrivacyPanel(scope);
+    panel?.classList.toggle('container-privacy-blur', on);
+    if (panel)
+        syncContainerPrivacyTitles(panel, on);
+    const button = document.querySelector(`[data-container-privacy="${scope}"]`);
+    if (!button)
+        return;
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-pressed', String(on));
+    button.title = on
+        ? `Show ${scope === 'local' ? 'local' : 'remote'} container text`
+        : `Blur ${scope === 'local' ? 'local' : 'remote'} container text`;
+    button.setAttribute('aria-label', button.title);
+}
+function applyAllContainerPrivacy() {
+    applyContainerPrivacy('local');
+    applyContainerPrivacy('remote');
+}
+function toggleContainerPrivacy(rawScope) {
+    const scope = rawScope === 'remote' ? 'remote' : rawScope === 'local' ? 'local' : null;
+    if (!scope)
+        return;
+    const next = !containerPrivacyOn(scope);
+    saveContainerPrivacy(scope, next);
+    applyContainerPrivacy(scope);
+    toast(next ? 'Container text blurred' : 'Container text visible');
+}
+window.toggleContainerPrivacy = toggleContainerPrivacy;
 function meterLevel(pct) {
     return pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : 'ok';
 }
@@ -461,10 +525,12 @@ function renderContainers(containers) {
         return;
     if (!containers.length) {
         list.innerHTML = '<div class="muted container-empty">No containers</div>';
+        applyContainerPrivacy('local');
         return;
     }
     const summary = `<div class="container-health">${escapeHtml(containerOverview(containers))}</div>`;
     list.innerHTML = summary + containers.map((c) => containerRowHtml(c)).join('');
+    applyContainerPrivacy('local');
 }
 function remoteProbeText(host) {
     if (typeof host.ping_ms === 'number')
@@ -504,6 +570,7 @@ function renderRemoteHosts(hosts) {
         return;
     if (!hosts.length) {
         list.innerHTML = '<div class="muted remote-empty">No remote hosts configured</div>';
+        applyContainerPrivacy('remote');
         return;
     }
     const legendStates = ['running', 'unhealthy', 'restarting', 'crashed', 'paused', 'stopped'];
@@ -522,6 +589,7 @@ function renderRemoteHosts(hosts) {
         const ipText = host.ip ? ` · ${host.ip}` : '';
         return `<div class="remote-host-card ${host.online ? 'online' : 'offline'}"><div class="remote-head"><span class="dot ${host.online ? 'on' : ''}"></span><div><b>${escapeHtml(host.label || host.id)}</b><small title="${escapeHtml(host.target)}">${host.online ? 'Online' : 'Offline'}${escapeHtml(ipText)} · ${escapeHtml(remoteCheckedText(host))}</small></div></div>${metricsHtml}${containerHtml}${error}</div>`;
     }).join('');
+    applyContainerPrivacy('remote');
 }
 function remoteHostsLoadingHtml() {
     return `<div class="remote-loading"><div><b>Checking remote hosts</b><span>Checking...</span></div><div class="skeleton skel-line skel-w70"></div><div class="skeleton skel-bar"></div><div class="skeleton skel-crow"></div><div class="skeleton skel-crow"></div></div>`;
@@ -713,3 +781,4 @@ window.loadMetrics = loadMetrics;
 window.loadContainers = loadContainers;
 window.loadRemoteHosts = loadRemoteHosts;
 window.loadGhRuns = loadGhRuns;
+applyAllContainerPrivacy();
