@@ -101,6 +101,17 @@ function applySidebar(): void {
     btn.classList.toggle('active', sidebarVisible);
     btn.title = sidebarVisible ? 'Side panels shown — click to hide' : 'Side panels hidden — click to show';
   }
+  const collapseBtn = document.getElementById('sidebarCollapseBtn');
+  if (collapseBtn) {
+    collapseBtn.title = 'Collapse sidebar';
+    collapseBtn.setAttribute('aria-label', 'Collapse sidebar');
+  }
+  const expandBtn = document.getElementById('sidebarExpandBtn');
+  if (expandBtn) {
+    expandBtn.hidden = sidebarVisible;
+    expandBtn.title = 'Expand sidebar';
+    expandBtn.setAttribute('aria-label', 'Expand sidebar');
+  }
 }
 
 function toggleSidebar(): void {
@@ -176,7 +187,7 @@ function saveHiddenClosedShells(): void {
 }
 
 function coreShellName(name: string): boolean {
-  return name === 'main' || /^slot\d+$/.test(name);
+  return /^\d+$/.test(name) || name === 'main' || /^slot\d+$/.test(name);
 }
 
 function canRemoveClosedShell(session: SessionItem | null | undefined): boolean {

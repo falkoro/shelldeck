@@ -32,7 +32,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.dataset.shellCard = shell.name;
   article.dataset.selectSession = shell.name;
   article.innerHTML = `<header>
-    <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span></div>
+    <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span><div class="work-title" data-role="worktitle"></div></div>
     <div class="card-offline-actions">
       <button type="button" class="card-create-btn" data-create title="Create this tmux session" aria-label="Create this tmux session">${icon('plus')}<span>New tmux</span></button>
       <button type="button" class="card-remove-btn" data-remove-closed title="Remove this closed session from the dashboard" aria-label="Remove closed session from dashboard">${icon('trash')}<span>Remove</span></button>
@@ -44,7 +44,6 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button type="button" class="card-win-btn win-close" data-stop title="Kill this tmux session" aria-label="Kill tmux session">×</button>
     </div>
   </header>
-  <div class="work-title" data-role="worktitle"></div>
   <div class="shell-composer">
     <textarea spellcheck="false" data-command placeholder="Type for this shell. Enter sends on mobile; Ctrl+Enter on desktop."></textarea>
     <div class="shell-actions">
@@ -146,15 +145,25 @@ function updateShellCardTitle(card: HTMLElement, shell: ShellPreview): string {
   const displayLabel = shellDisplayLabel(shell.name, shell.label);
   const rawName = shellRawNameBadge(shell.name, displayLabel);
   const label = card.querySelector<HTMLElement>('[data-role="label"]');
-  renderCardTitleLabel(label, displayLabel, shellboxSummary(shell.name) || displayLabel);
+  const summary = shellboxSummary(shell.name);
+  renderCardTitleLabel(label, displayLabel, summary || displayLabel || shell.label || shell.name);
+  card.querySelector<HTMLElement>('.card-title')?.classList.toggle('solo-summary', !displayLabel);
   setText(card, '[data-role="rawname"]', rawName);
   card.querySelector<HTMLElement>('.shell-name-pill')?.classList.toggle('empty', !rawName);
   card.querySelector<HTMLButtonElement>('[data-reset-shell-label]')?.classList.toggle('show', shellHasCustomLabel(shell.name));
-  return displayLabel;
+  return displayLabel || summary || shell.label || shell.name;
 }
 
 function renderCardTitleLabel(label: HTMLElement | null, displayLabel: string, title: string): void {
   if (!label) return;
+  if (!displayLabel) {
+    label.hidden = true;
+    label.classList.remove('moving');
+    label.textContent = '';
+    delete label.dataset.renderedLabel;
+    return;
+  }
+  label.hidden = false;
   const moving = window.innerWidth <= 760 && displayLabel.length > 34;
   const signature = `${moving ? '1' : '0'}:${displayLabel}`;
   label.classList.toggle('moving', moving);
@@ -312,15 +321,12 @@ function renderSelectedSessionActions(): void {
   const state = sessionRuntime(selected);
   const createReason = !shellUnlocked
     ? 'Unlock shells before creating tmux sessions'
-    : selected.running
-      ? 'This tmux session is already running'
-      : selected.family === 'custom'
-        ? 'ShellDeck can only create configured tmux sessions'
+    : selected.family === 'custom'
+      ? 'ShellDeck can only create new tmux sessions from configured shell slots'
+      : selected.running
+        ? 'Create another tmux session using this shell slot as the template'
         : 'Create this tmux session';
-  const createDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-  const createLabel = selected.running ? 'Running' : 'New tmux';
-  const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-  const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
+  const createDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
   const removeButton = canRemoveClosedShell(selected)
     ? `<button class="warn remove-closed-action" type="button" data-remove-closed="${escapeHtml(selected.name)}" title="Remove this closed session from the dashboard">${icon('trash')}<span>Remove</span></button>`
     : '';
@@ -331,7 +337,7 @@ function renderSelectedSessionActions(): void {
     : '';
   el.hidden = false;
   el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button>${removeButton}<button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Terminate = kill this tmux session, stop everything inside it, and hide it from this dashboard">${icon('stop')}<span>Terminate</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}" title="Restart = kill and recreate this tmux session, keeping this dashboard slot visible">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 
 let shellTabsSignature = '';
@@ -355,8 +361,14 @@ function shellbarSummary(session: string): string {
   return sessionWorkBrief(session, shellbarSummaryWords());
 }
 
+function sessionTabLabel(session: SessionItem): string {
+  const alias = shellLabelAliases()[session.name]?.trim();
+  if (alias) return alias;
+  return compactShellLabel(session.name, session.label || session.name);
+}
+
 function sessionTabFallback(session: SessionItem, state: { label: string }): string {
-  const label = compactShellLabel(session.name, session.label || session.name);
+  const label = sessionTabLabel(session);
   const status = `${state.label} · ${fmtTime(session.activity)}`;
   return label ? `${label} · ${status}` : status;
 }
@@ -383,8 +395,11 @@ function renderShellTabs(): void {
     const workBrief = shellbarSummary(session.name);
     const briefText = workBrief || sessionTabFallback(session, state);
     const moving = shellbarSummaryMoving(workBrief) ? ' moving' : '';
-    const labelText = session.label || session.name;
-    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || session.label || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line"><span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span><span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
+    const labelText = sessionTabLabel(session);
+    const labelBlock = labelText
+      ? `<span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span>`
+      : '';
+    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}${labelText ? '' : ' no-label'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line">${labelBlock}<span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
   }).join('') + restored;
   markSelectedShell();
   renderSelectedSessionActions();

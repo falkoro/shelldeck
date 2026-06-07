@@ -152,7 +152,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
     }
     if (createButton && !createButton.disabled) {
       const baseName = createButton.dataset.create || '';
-      const requestedName = promptNewTmuxSessionName(baseName);
+      const requestedName = promptNewTmuxSessionName(baseName, Boolean(sessionByName(baseName)?.running));
       if (requestedName === null) return;
       const targetName = requestedName || baseName;
       unhideShell(targetName);
@@ -299,6 +299,29 @@ if (topActions && !document.getElementById('sidebarToggle')) {
   applySidebar();
 }
 
+const sidebarHead = document.querySelector<HTMLElement>('.sidebar-head');
+if (sidebarHead && !document.getElementById('sidebarCollapseBtn')) {
+  const collapseBtn = document.createElement('button');
+  collapseBtn.id = 'sidebarCollapseBtn';
+  collapseBtn.type = 'button';
+  collapseBtn.className = 'ghost sidebar-collapse';
+  collapseBtn.innerHTML = icon('chevronLeft');
+  collapseBtn.addEventListener('click', toggleSidebar);
+  sidebarHead.insertAdjacentElement('afterbegin', collapseBtn);
+}
+
+const workspace = document.querySelector<HTMLElement>('.workspace');
+if (workspace && !document.getElementById('sidebarExpandBtn')) {
+  const expandBtn = document.createElement('button');
+  expandBtn.id = 'sidebarExpandBtn';
+  expandBtn.type = 'button';
+  expandBtn.className = 'sidebar-expand';
+  expandBtn.innerHTML = icon('chevronRight');
+  expandBtn.addEventListener('click', toggleSidebar);
+  workspace.insertAdjacentElement('afterbegin', expandBtn);
+  applySidebar();
+}
+
 // Restore all minimized shell previews button (injected)
 const shellTools = document.querySelector<HTMLElement>('.shell-tools');
 if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
@@ -340,7 +363,8 @@ if (shellTools && !document.querySelector('#legendToggleBtn')) {
   document.getElementById('streamState')?.insertAdjacentElement('afterend', legendBtn);
 }
 
-// Rotating keyboard-shortcut tip in the spare space of the shell toolbar.
+// Rotating keyboard-shortcut tip on its own row above the shell tabs (not inside shell-tools,
+// which floats over the tab bar on wide screens and caused overlap with card headers).
 const SHELL_TIPS = [
   'Tip: r refresh · g grid/focus · c density',
   'Tip: f follow output · [ ] cycle shells',
@@ -349,20 +373,28 @@ const SHELL_TIPS = [
   'Tip: ⚙ Configure hides sidebar panels (e.g. Machine)',
   'Tip: the Panels button (top bar) shows/hides the side rail',
 ];
-if (shellTools && !document.querySelector('#shellTip')) {
+const shellTabs = document.getElementById('shellTabs');
+if (shellTabs && !document.querySelector('#shellTip')) {
+  document.querySelector('.shell-tools .shell-tip')?.remove();
+  const bar = document.createElement('div');
+  bar.id = 'shellTipBar';
+  bar.className = 'shell-tip-bar';
   const tip = document.createElement('span');
   tip.id = 'shellTip';
   tip.className = 'shell-tip';
   tip.textContent = SHELL_TIPS[0];
-  // Insert just after the Legend button (which sits right after the stream-state pill) so the
-  // Legend stays next to the live time and the tip fills the empty space before the buttons.
-  const tipAnchor = document.getElementById('legendToggleBtn') || document.getElementById('streamState') || shellTools.children[0];
-  tipAnchor?.insertAdjacentElement('afterend', tip);
+  tip.title = SHELL_TIPS[0];
+  bar.appendChild(tip);
+  shellTabs.insertAdjacentElement('beforebegin', bar);
   let tipIndex = 0;
   setInterval(() => {
     tipIndex = (tipIndex + 1) % SHELL_TIPS.length;
     tip.style.opacity = '0';
-    setTimeout(() => { tip.textContent = SHELL_TIPS[tipIndex]; tip.style.opacity = ''; }, 250);
+    setTimeout(() => {
+      tip.textContent = SHELL_TIPS[tipIndex];
+      tip.title = SHELL_TIPS[tipIndex];
+      tip.style.opacity = '';
+    }, 250);
   }, 7000);
 }
 

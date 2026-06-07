@@ -117,6 +117,8 @@ async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
     };
     let mut cmd = tmux::tmux_pty_command(&["attach-session", "-t", &name]);
     cmd.env("TERM", "xterm-256color");
+    cmd.env("SHELLDECK_TERM", "1");
+    cmd.env("TERM_PROGRAM", "ShellDeck");
     let Ok(mut child) = pair.slave.spawn_command(cmd) else {
         return;
     };
