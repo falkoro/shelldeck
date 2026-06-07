@@ -24,7 +24,10 @@ jobs:
         id: dario
         run: |
           set -euo pipefail
-          GW="$(ip route 2>/dev/null | awk '/default/{print $3; exit}')"
+          GW=""
+          if command -v ip >/dev/null 2>&1; then
+            GW="$(ip route 2>/dev/null | awk '/default/{print $3; exit}' || true)"
+          fi
           for H in host.containers.internal "$GW" 172.18.0.1 172.17.0.1 127.0.0.1; do
             [ -z "$H" ] && continue
             if curl -fsS --max-time 8 \
@@ -36,7 +39,6 @@ jobs:
               {
                 echo "available=true"
                 echo "base_url=http://$H:3456"
-                echo "api_key=dario"
               } >> "$GITHUB_OUTPUT"
               echo "Dario proxy reachable at $H:3456"
               exit 0
@@ -53,7 +55,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ steps.dario.outputs.base_url }}
-          ANTHROPIC_API_KEY: ${{ steps.dario.outputs.api_key }}
+          ANTHROPIC_API_KEY: dario
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: "--max-turns 25"
