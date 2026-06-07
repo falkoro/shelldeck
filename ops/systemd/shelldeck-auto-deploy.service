@@ -1,0 +1,9 @@
+[Unit]
+Description=Deploy ShellDeck from origin/master when it changes
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/shelldeck
+ExecStart=%h/repos/shelldeck/scripts/watch-deploy-logan-laptop.sh

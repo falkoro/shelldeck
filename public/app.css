@@ -432,8 +432,9 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .card-offline-actions{display:none;align-items:center;gap:6px;flex:0 0 auto}
 .card-create-btn{display:none;align-self:center;flex:0 0 auto;min-height:26px;padding:4px 8px;font-size:11px;border-color:rgba(114,247,200,.34);color:#bfffe6;background:rgba(114,247,200,.07);white-space:nowrap}
 .card-create-btn .ic{width:12px;height:12px}
-.card-remove-btn{display:none;align-self:center;flex:0 0 auto;width:26px;min-height:26px;padding:4px;border-color:rgba(255,91,111,.38);color:#ffb8c3;background:rgba(255,91,111,.08)}
+.card-remove-btn{display:none;align-self:center;flex:0 0 auto;min-height:26px;padding:4px 8px;border-color:rgba(255,91,111,.38);color:#ffb8c3;background:rgba(255,91,111,.08);white-space:nowrap}
 .card-remove-btn .ic{width:12px;height:12px}
+.card-remove-btn span{font-size:11px}
 .terminal-card.offline .card-offline-actions,.terminal-card.offline .card-create-btn{display:inline-flex}
 .terminal-card.removable-closed .card-remove-btn{display:inline-flex}
 .terminal-card.privacy-blur .card-title-row b,
@@ -749,7 +750,8 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
   .card-offline-actions{gap:5px}
   .card-create-btn{min-height:30px;padding:5px 8px;font-size:11px}
   .card-create-btn span{display:none}
-  .card-remove-btn{width:30px;min-height:30px;padding:5px}
+  .card-remove-btn{min-height:30px;padding:5px 8px}
+  .card-remove-btn span{display:none}
 
   /* Keybar to the bottom as a short rail. This keeps Esc/arrow helpers from eating
      several rows on 390px-wide phones while still leaving every key reachable by swipe. */

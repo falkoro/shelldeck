@@ -176,6 +176,14 @@ If you edit files in `frontend/`, rebuild the served JavaScript before committin
 bun run build:frontend
 ```
 
+### Logan laptop deploy
+
+The Logan laptop can auto-deploy after a squash merge by polling `origin/master`
+with `ops/systemd/shelldeck-auto-deploy.timer`. The watcher uses a clean cache
+checkout, builds the app, installs the release binary and `public/` assets into
+`/home/falk/repos/shelldeck`, restarts `shelldeck.service`, and checks
+`http://127.0.0.1:8787/`. It does not reset the active development checkout.
+
 ## Security notes
 
 - The **in-browser terminal attaches to your real tmux sessions** — anyone who can authenticate gets a shell. Treat the credentials accordingly and don't expose it unauthenticated.
