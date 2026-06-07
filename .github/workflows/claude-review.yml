@@ -1,5 +1,8 @@
 name: Claude Review
 
+# PR merge should wait on "Claude merge gate" (spot-tech pattern): the review job runs on
+# the self-hosted runner; the gate job polls until it finishes or 15 minutes elapse.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -7,13 +10,30 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: read
 
 jobs:
+  enabled:
+    name: Claude review enabled
+    runs-on: ubuntu-latest
+    outputs:
+      run_review: ${{ steps.check.outputs.run_review }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ vars.CLAUDE_REVIEW_ENABLED }}" = "true" ] && [ "${{ vars.CLAUDE_REVIEW_CONFIGURED }}" = "true" ]; then
+            echo "run_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
   review:
     name: Claude review
-    if: vars.CLAUDE_REVIEW_ENABLED == 'true' && vars.CLAUDE_REVIEW_CONFIGURED == 'true'
+    needs: enabled
+    if: needs.enabled.outputs.run_review == 'true'
     runs-on: [self-hosted, linux, x64, shelldeck-review]
-    timeout-minutes: 6
+    timeout-minutes: 20
+    continue-on-error: true
     steps:
       - name: Resolve Dario proxy
         id: dario
@@ -46,8 +66,7 @@ jobs:
       - name: Claude review
         id: claude
         if: steps.dario.outputs.available == 'true'
-        continue-on-error: true
-        timeout-minutes: 4
+        timeout-minutes: 10
         env:
           DARIO_BASE_URL: ${{ steps.dario.outputs.base_url }}
           DARIO_API_KEY: dario
@@ -206,13 +225,31 @@ jobs:
               main()
           PY
 
-      - name: Report Claude review status
-        if: always()
+  merge-gate:
+    name: Claude merge gate
+    needs: enabled
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - name: Wait for Claude review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ steps.dario.outputs.available }}" != "true" ]; then
-            echo "::warning::Claude review skipped because Dario was unavailable."
-          elif [ "${{ steps.claude.outcome }}" = "failure" ]; then
-            echo "::warning::Claude review failed; leaving required check green so merge is not blocked by review infrastructure."
-          else
-            echo "Claude review completed with outcome: ${{ steps.claude.outcome }}"
+          if [ "${{ needs.enabled.outputs.run_review }}" != "true" ]; then
+            echo "Claude review disabled — merge allowed."
+            exit 0
           fi
+
+          DEADLINE=$(( $(date +%s) + 900 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            CONCLUSION="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+              --jq '.jobs[] | select(.name == "Claude review") | .conclusion' 2>/dev/null || true)"
+            if [ -n "$CONCLUSION" ] && [ "$CONCLUSION" != "null" ]; then
+              echo "Claude review finished ($CONCLUSION) — merge allowed."
+              exit 0
+            fi
+            sleep 20
+          done
+
+          echo "15-minute Claude review window elapsed — merge allowed."

@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and test
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Frontend typecheck
+        run: |
+          bun install --frozen-lockfile
+          bun run check
+
+      - name: Rust tests
+        run: cargo test
+
+      - name: Rust format
+        run: cargo fmt --check
