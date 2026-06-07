@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="${BUN_HOME:-$HOME/.bun}/bin:${CARGO_HOME:-$HOME/.cargo}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 REMOTE="${SHELLDECK_DEPLOY_REMOTE:-https://github.com/falkoro/shelldeck.git}"
 BRANCH="${SHELLDECK_DEPLOY_BRANCH:-master}"
 STATE_DIR="${SHELLDECK_DEPLOY_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/shelldeck}"
