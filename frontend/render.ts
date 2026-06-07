@@ -2,6 +2,31 @@ function renderBasicMarkdown(value: string): string {
   return escapeHtml(value).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
 }
 
+const SHELL_OUTPUT_URL_RE = /\bhttps?:\/\/[^\s<>"'`]+/gi;
+const SHELL_OUTPUT_TRAILING_PUNCT_RE = /[),.;:!?]+$/;
+
+function renderLinkedShellOutput(value: string): string {
+  let html = '';
+  let lastIndex = 0;
+  value.replace(SHELL_OUTPUT_URL_RE, (match: string, offset: number) => {
+    let url = match;
+    let trailing = '';
+    const trailingMatch = url.match(SHELL_OUTPUT_TRAILING_PUNCT_RE);
+    if (trailingMatch) {
+      trailing = trailingMatch[0];
+      url = url.slice(0, -trailing.length);
+    }
+    if (!url) return match;
+    html += escapeHtml(value.slice(lastIndex, offset));
+    html += `<a class="shell-log-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+    html += escapeHtml(trailing);
+    lastIndex = offset + match.length;
+    return match;
+  });
+  html += escapeHtml(value.slice(lastIndex));
+  return html;
+}
+
 function createShellCard(shell: ShellPreview): HTMLElement {
   const article = document.createElement('article');
   article.dataset.shellCard = shell.name;
@@ -107,7 +132,10 @@ function updateShellCard(card: HTMLElement, shell: ShellPreview): void {
   // Only auto-follow when the viewer is already at the bottom, so scrolling up to read
   // older output isn't yanked back down on every 1.2s stream tick.
   const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 48;
-  setText(card, '[data-role="output"]', output);
+  if (pre.dataset.rawOutput !== output) {
+    pre.dataset.rawOutput = output;
+    pre.innerHTML = renderLinkedShellOutput(output);
+  }
   const input = card.querySelector<HTMLTextAreaElement>('[data-command]')!;
   input.placeholder = shell.running ? `Input for ${displayLabel}` : 'Create this session before sending input';
   if (followOutput && atBottom) pre.scrollTop = pre.scrollHeight;
@@ -202,7 +230,41 @@ function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean })
   markSelectedShell();
   renderShellTabs();
   updateUnlockState();
+  scheduleShellGridFit();
 }
+
+let shellGridFitFrame = 0;
+
+function scheduleShellGridFit(): void {
+  if (shellGridFitFrame) cancelAnimationFrame(shellGridFitFrame);
+  shellGridFitFrame = requestAnimationFrame(() => {
+    shellGridFitFrame = 0;
+    updateShellGridViewportFit();
+  });
+}
+
+function updateShellGridViewportFit(): void {
+  const grid = document.getElementById('shells');
+  if (!grid) return;
+  if (window.innerWidth <= 760) {
+    grid.style.removeProperty('--shell-card-min-height');
+    return;
+  }
+  const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-shell-card]'))
+    .filter((card) => getComputedStyle(card).display !== 'none');
+  if (!cards.length) return;
+  const rowTops = new Set(cards.map((card) => Math.round(card.offsetTop)));
+  const rows = Math.max(1, rowTops.size);
+  const styles = getComputedStyle(grid);
+  const rowGap = Number.parseFloat(styles.rowGap || styles.gap || '10') || 10;
+  const rect = grid.getBoundingClientRect();
+  const available = window.innerHeight - rect.top - 18;
+  const perRow = Math.floor((available - rowGap * (rows - 1)) / rows);
+  const height = Math.max(360, Math.min(1100, perRow));
+  grid.style.setProperty('--shell-card-min-height', `${height}px`);
+}
+
+window.addEventListener('resize', scheduleShellGridFit);
 
 function markSelectedShell(): void {
   document.querySelectorAll<HTMLElement>('.terminal-card,.session-tab').forEach((item) => {
