@@ -342,10 +342,6 @@ function renderSelectedSessionActions(): void {
 
 let shellTabsSignature = '';
 
-function shellbarSummaryMoving(text: string): boolean {
-  return window.innerWidth <= 760 && text.length > 18;
-}
-
 function shellbarSummaryWords(): number {
   // Tabs now fill the bar (flex-wrap), so each tab is narrower than the old wide grid; the
   // brief is clamped to 2 lines per tab. Keep word counts modest so it reads cleanly — the
@@ -388,13 +384,12 @@ function renderShellTabs(): void {
     : '';
   q('#shellTabs').innerHTML = modelSessions.map((session) => {
     const state = sessionRuntime(session);
-    // Compact one-line tab: badge · status-dot · label · work-title (truncated, marquee when
-    // selected) · relative time. Full title stays reachable via the tooltip + the card below.
+    // Tab: badge · status-dot · label · full work-title (wraps, never truncated) · time.
     const timeShort = fmtTime(session.activity).replace(/\s*ago$/, '').replace('just now', 'now').replace('never', '');
     const workTitle = sessionWorkTitle(session.name);
-    const workBrief = shellbarSummary(session.name);
+    const workBrief = workTitle || shellbarSummary(session.name);
     const briefText = workBrief || sessionTabFallback(session, state);
-    const moving = shellbarSummaryMoving(workBrief) ? ' moving' : '';
+    const moving = '';
     const labelText = sessionTabLabel(session);
     const labelBlock = labelText
       ? `<span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span>`
@@ -438,17 +433,12 @@ function setWorkTitle(card: HTMLElement, name: string): void {
 }
 
 function renderWorkTitle(el: HTMLElement, title: string): void {
-  const moving = window.innerWidth <= 760 && title.length > 36;
-  const signature = `${moving ? '1' : '0'}:${title}`;
-  el.className = `work-title show${moving ? ' moving' : ''}`;
+  const signature = title;
+  el.className = 'work-title show';
   el.title = title;
   if (el.dataset.renderedTitle === signature) return;
   el.dataset.renderedTitle = signature;
-  if (moving) {
-    el.innerHTML = `<span class="marquee-track"><span>${escapeHtml(title)}</span><span aria-hidden="true">${escapeHtml(title)}</span></span>`;
-  } else {
-    el.textContent = title;
-  }
+  el.textContent = title;
 }
 
 // Refresh per-slot work titles on all cards (used when a fresh summary arrives).

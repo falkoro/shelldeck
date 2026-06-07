@@ -1127,8 +1127,9 @@ function copyShellOutput(name: string): Promise<void> {
   if (selText.trim() && card && sel?.anchorNode && card.contains(sel.anchorNode)) {
     return copyText(selText);
   }
-  const text = shellPreviewByName(name)?.output || '';
-  if (!text) throw new Error('No output to copy');
+  const pre = card?.querySelector<HTMLElement>('[data-role="output"]');
+  const text = pre?.dataset.rawOutput || shellPreviewByName(name)?.output || '';
+  if (!text.trim()) throw new Error('No output to copy');
   return copyText(text);
 }
 
