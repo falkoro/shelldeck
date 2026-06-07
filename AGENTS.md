@@ -9,6 +9,7 @@ Falk expects agents to **persist** these rules here (and in Cursor memory when a
 3. **Shell slots are numbered only** (`1`, `2`, `3`…) — no `main` / `slotN` layout.
 4. **When all three merge checks are green, squash-merge the PR** — Falk expects agents to land it without waiting for a separate "merge now" prompt.
 5. **Shell card input is always visible** — never hide `.shell-composer` on grid cards. Layout order: `header` → **composer (input)** → `pre` (pane output). Input stays **above** the log, not below.
+6. **After ShellDeck UI/frontend changes, always restart the live service** on beefy (`systemctl --user restart shelldeck` after `bun run build:frontend` and `cargo build --release` when Rust changed). Falk should not need a manual hard-refresh to see CSS/layout fixes land.
 
 ## Workflow
 
@@ -31,3 +32,4 @@ Falk expects agents to **persist** these rules here (and in Cursor memory when a
 - Run `cargo test` for backend changes.
 - Run `npm run build:frontend` or `bun run build:frontend` for frontend changes, matching the machine setup.
 - Rebuild `cargo build --release` before restarting the live ShellDeck service.
+- After frontend/CSS changes: `bun run build:frontend`, then `systemctl --user restart shelldeck` (see Memory #6).
