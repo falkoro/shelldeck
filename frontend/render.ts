@@ -44,7 +44,6 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button type="button" class="card-win-btn win-close" data-stop title="Kill this tmux session" aria-label="Kill tmux session">×</button>
     </div>
   </header>
-  <pre data-role="output"></pre>
   <div class="shell-composer">
     <textarea spellcheck="false" data-command placeholder="Type for this shell. Enter sends on mobile; Ctrl+Enter on desktop."></textarea>
     <div class="shell-actions">
@@ -65,7 +64,8 @@ function createShellCard(shell: ShellPreview): HTMLElement {
     </div>
     <div class="attach-list" data-role="attachments"></div>
     <div class="shell-status" data-role="status">Paste or drop an image into this input to insert its saved path.</div>
-  </div>`;
+  </div>
+  <pre data-role="output"></pre>`;
   article.querySelector<HTMLTextAreaElement>('[data-command]')!.dataset.command = shell.name;
   article.querySelector<HTMLButtonElement>('[data-send-shell]')!.dataset.sendShell = shell.name;
   article.querySelector<HTMLButtonElement>('[data-paste-shell]')!.dataset.pasteShell = shell.name;
@@ -264,8 +264,8 @@ function updateShellGridViewportFit(): void {
     .filter((card) => getComputedStyle(card).display !== 'none');
   if (!cards.length) return;
   const rect = grid.getBoundingClientRect();
-  const available = window.innerHeight - rect.top - 8;
-  const height = Math.max(560, Math.min(Math.floor(window.innerHeight * 0.92), Math.floor(available)));
+  const available = window.innerHeight - rect.top - 4;
+  const height = Math.max(680, Math.min(Math.floor(window.innerHeight * 0.94), Math.floor(available)));
   grid.style.setProperty('--shell-card-min-height', `${height}px`);
   grid.style.setProperty('--shell-grid-viewport-height', `${height}px`);
 }
