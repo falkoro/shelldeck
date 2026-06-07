@@ -663,8 +663,8 @@ mod tests {
     #[test]
     fn gh_repos_parse_owner_repo_pairs_and_dedupe() {
         let repos =
-            parse_gh_repos(" falkoro/shelldeck ;bad;FALKORO/shelldeck;spot-techno/spot_suite ");
-        assert_eq!(repos, vec!["falkoro/shelldeck", "spot-techno/spot_suite"]);
+            parse_gh_repos(" spot-techno/shelldeck ;bad;SPOT-TECHNO/shelldeck;spot-techno/spot_suite ");
+        assert_eq!(repos, vec!["spot-techno/shelldeck", "spot-techno/spot_suite"]);
     }
 
     #[test]

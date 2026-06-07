@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Register a persistent host runner for falkoro/shelldeck deploy jobs (label: shelldeck-host).
+# Register a persistent host runner for spot-techno/shelldeck deploy jobs (label: shelldeck-host).
 set -euo pipefail
 
 RUNNER_ROOT="${SHELLDECK_HOST_RUNNER_ROOT:-$HOME/actions-runners/shelldeck-host}"
 RUNNER_VERSION="${RUNNER_VERSION:-2.334.0}"
-REPO="${SHELLDECK_HOST_RUNNER_REPO:-falkoro/shelldeck}"
+REPO="${SHELLDECK_HOST_RUNNER_REPO:-spot-techno/shelldeck}"
 RUNNER_NAME="${SHELLDECK_HOST_RUNNER_NAME:-logan-laptop-shelldeck-host}"
 LABELS="${SHELLDECK_HOST_RUNNER_LABELS:-shelldeck-host}"
 TOKEN_FILE="${GITHUB_TOKEN_FILE:-$HOME/.config/mcp/secrets/github-mcp-token}"

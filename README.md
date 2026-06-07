@@ -201,9 +201,9 @@ active development checkout.
 
 | Machine | Labels | Repos |
 |---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `falkoro/shelldeck` PR CI + Grok/Claude review |
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude review |
 | **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org deploys |
-| **logan-laptop** | `shelldeck-host` | `falkoro/shelldeck` host deploy only |
+| **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` host deploy only |
 
 Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
 
