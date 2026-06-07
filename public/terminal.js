@@ -270,9 +270,8 @@ function handleTerminalDrop(tw, event) {
 }
 async function copyTerminalSelection(tw) {
     const selection = terminalSelection(tw);
-    if (!selection) {
-        tw.statusEl.textContent = 'select text to copy';
-        return;
+    if (!selection?.trim()) {
+        return copyTerminalAll(tw);
     }
     await copyTerminalText(tw, selection);
 }
@@ -539,9 +538,15 @@ function createTermWindow(name) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (act === 'copy')
-                copyTerminalSelection(tw).catch(() => { });
+                copyTerminalSelection(tw).catch((error) => {
+                    tw.statusEl.textContent = 'copy failed';
+                    toast(error.message);
+                });
             else if (act === 'copyall')
-                copyTerminalAll(tw).catch(() => { });
+                copyTerminalAll(tw).catch((error) => {
+                    tw.statusEl.textContent = 'copy failed';
+                    toast(error.message);
+                });
             else if (act === 'upload')
                 openTerminalImagePicker(tw);
             else if (act === 'min')

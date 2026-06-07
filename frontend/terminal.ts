@@ -301,9 +301,8 @@ function handleTerminalDrop(tw: TermWindow, event: DragEvent): void {
 
 async function copyTerminalSelection(tw: TermWindow): Promise<void> {
   const selection = terminalSelection(tw);
-  if (!selection) {
-    tw.statusEl.textContent = 'select text to copy';
-    return;
+  if (!selection?.trim()) {
+    return copyTerminalAll(tw);
   }
   await copyTerminalText(tw, selection);
 }
@@ -569,8 +568,14 @@ function createTermWindow(name: string): TermWindow {
     }
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (act === 'copy') copyTerminalSelection(tw).catch(() => {});
-      else if (act === 'copyall') copyTerminalAll(tw).catch(() => {});
+      if (act === 'copy') copyTerminalSelection(tw).catch((error: Error) => {
+        tw.statusEl.textContent = 'copy failed';
+        toast(error.message);
+      });
+      else if (act === 'copyall') copyTerminalAll(tw).catch((error: Error) => {
+        tw.statusEl.textContent = 'copy failed';
+        toast(error.message);
+      });
       else if (act === 'upload') openTerminalImagePicker(tw);
       else if (act === 'min') minimizeWindow(tw);
       else if (act === 'max') toggleMaximize(tw);

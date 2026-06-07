@@ -343,9 +343,6 @@ function renderSelectedSessionActions() {
     el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 let shellTabsSignature = '';
-function shellbarSummaryMoving(text) {
-    return window.innerWidth <= 760 && text.length > 18;
-}
 function shellbarSummaryWords() {
     // Tabs now fill the bar (flex-wrap), so each tab is narrower than the old wide grid; the
     // brief is clamped to 2 lines per tab. Keep word counts modest so it reads cleanly — the
@@ -390,13 +387,12 @@ function renderShellTabs() {
         : '';
     q('#shellTabs').innerHTML = modelSessions.map((session) => {
         const state = sessionRuntime(session);
-        // Compact one-line tab: badge · status-dot · label · work-title (truncated, marquee when
-        // selected) · relative time. Full title stays reachable via the tooltip + the card below.
+        // Tab: badge · status-dot · label · full work-title (wraps, never truncated) · time.
         const timeShort = fmtTime(session.activity).replace(/\s*ago$/, '').replace('just now', 'now').replace('never', '');
         const workTitle = sessionWorkTitle(session.name);
-        const workBrief = shellbarSummary(session.name);
+        const workBrief = workTitle || shellbarSummary(session.name);
         const briefText = workBrief || sessionTabFallback(session, state);
-        const moving = shellbarSummaryMoving(workBrief) ? ' moving' : '';
+        const moving = '';
         const labelText = sessionTabLabel(session);
         const labelBlock = labelText
             ? `<span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span>`
@@ -440,19 +436,13 @@ function setWorkTitle(card, name) {
     }
 }
 function renderWorkTitle(el, title) {
-    const moving = window.innerWidth <= 760 && title.length > 36;
-    const signature = `${moving ? '1' : '0'}:${title}`;
-    el.className = `work-title show${moving ? ' moving' : ''}`;
+    const signature = title;
+    el.className = 'work-title show';
     el.title = title;
     if (el.dataset.renderedTitle === signature)
         return;
     el.dataset.renderedTitle = signature;
-    if (moving) {
-        el.innerHTML = `<span class="marquee-track"><span>${escapeHtml(title)}</span><span aria-hidden="true">${escapeHtml(title)}</span></span>`;
-    }
-    else {
-        el.textContent = title;
-    }
+    el.textContent = title;
 }
 // Refresh per-slot work titles on all cards (used when a fresh summary arrives).
 function applyWorkTitles() {
