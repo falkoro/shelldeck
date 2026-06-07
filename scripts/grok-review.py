@@ -19,6 +19,7 @@ Check, in priority order:
 2. CORRECTNESS — tmux attach/capture edge cases, SSE/WebSocket lifecycle, SaaS provisioning paths, config persistence regressions.
 3. PRIVACY / UX — privacy blur/safe-shot regressions, misleading operator-facing copy, breaking changes to env/config without docs.
 4. VISUAL / LAYOUT (when `public/app.css` or `frontend/` changes) — card-header gaps, tmux attach-command lines leaking into `.card-title`, `solo-summary` row order (summary left, rename controls right), shell-tip overlap with RUNNING/cwd, ultra-wide floating `shell-tools` collisions, terminal `pre` max-height caps that truncate readable output. **Never hide `.shell-composer` on grid cards** — input must stay visible on every card, above pane output (`header` → composer → `pre`). Flag CSS removals that undo intentional `display:none` / flex `order` fixes.
+5. ANTI-AI-SLOP (when `frontend/`, `public/`, or operator-facing copy changes) — flag decorative pill/chip/badge chrome (rounded-full + filled background + short uppercase label) that is NOT a functional session/run status indicator. Flag marketing-template copy: delve/leverage/unlock/streamline/seamless/cutting-edge/elevate, "in today's fast-paced", "whether you're X or Y", empty trust claims, emoji-bullet hero patterns. Functional `.badge` / `.agent-badge` / `.run-status-badge` for tmux sessions and CI status are OK — decorative "NEW"/"FEATURED" pills are not.
 
 End with a single final line: `Verdict: <one sentence>`.
 
