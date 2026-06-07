@@ -3,7 +3,8 @@
   "packageManager": "bun@1.3.14",
   "scripts": {
     "build:frontend": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "check": "tsc -p tsconfig.json --noEmit",
+    "slop:check": "bun scripts/check-ai-slop.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3"
