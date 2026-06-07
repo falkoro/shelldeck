@@ -253,21 +253,18 @@ function updateShellGridViewportFit() {
         return;
     if (window.innerWidth <= 760) {
         grid.style.removeProperty('--shell-card-min-height');
+        grid.style.removeProperty('--shell-grid-viewport-height');
         return;
     }
     const cards = Array.from(grid.querySelectorAll('[data-shell-card]'))
         .filter((card) => getComputedStyle(card).display !== 'none');
     if (!cards.length)
         return;
-    const rowTops = new Set(cards.map((card) => Math.round(card.offsetTop)));
-    const rows = Math.max(1, rowTops.size);
-    const styles = getComputedStyle(grid);
-    const rowGap = Number.parseFloat(styles.rowGap || styles.gap || '10') || 10;
     const rect = grid.getBoundingClientRect();
     const available = window.innerHeight - rect.top - 18;
-    const perRow = Math.floor((available - rowGap * (rows - 1)) / rows);
-    const height = Math.max(360, Math.min(1100, perRow));
+    const height = Math.max(420, Math.min(1100, Math.floor(available)));
     grid.style.setProperty('--shell-card-min-height', `${height}px`);
+    grid.style.setProperty('--shell-grid-viewport-height', `${height}px`);
 }
 window.addEventListener('resize', scheduleShellGridFit);
 function markSelectedShell() {
@@ -305,6 +302,11 @@ function renderSelectedSessionActions() {
     const el = document.getElementById('sessionActions');
     if (!el)
         return;
+    const tools = document.querySelector('.shell-tools');
+    if (tools && el.parentElement !== tools) {
+        el.classList.add('toolbar-session-actions');
+        tools.insertAdjacentElement('afterbegin', el);
+    }
     if (!selected) {
         el.innerHTML = '';
         el.hidden = true;
@@ -331,7 +333,8 @@ function renderSelectedSessionActions() {
         ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
         : '';
     el.hidden = false;
-    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button>${removeButton}<button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Terminate this tmux session and hide it from the dashboard">${icon('stop')}<span>Terminate</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+    el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
+    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button>${removeButton}<button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Terminate = kill this tmux session, stop everything inside it, and hide it from this dashboard">${icon('stop')}<span>Terminate</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}" title="Restart = kill and recreate this tmux session, keeping this dashboard slot visible">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 let shellTabsSignature = '';
 function shellbarSummaryMoving(text) {
