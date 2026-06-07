@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Register a persistent host runner for spot-techno/shelldeck deploy jobs (label: shelldeck-host).
+# Register a persistent host runner for spot-techno/shelldeck deploy jobs on cachy-beefy.
 set -euo pipefail
 
-RUNNER_ROOT="${SHELLDECK_HOST_RUNNER_ROOT:-$HOME/actions-runners/shelldeck-host}"
+RUNNER_ROOT="${SHELLDECK_BEEFY_RUNNER_ROOT:-$HOME/actions-runners/shelldeck-beefy}"
 RUNNER_VERSION="${RUNNER_VERSION:-2.334.0}"
-REPO="${SHELLDECK_HOST_RUNNER_REPO:-spot-techno/shelldeck}"
-RUNNER_NAME="${SHELLDECK_HOST_RUNNER_NAME:-logan-laptop-shelldeck-host}"
-LABELS="${SHELLDECK_HOST_RUNNER_LABELS:-shelldeck-host}"
+REPO="${SHELLDECK_BEEFY_RUNNER_REPO:-spot-techno/shelldeck}"
+RUNNER_NAME="${SHELLDECK_BEEFY_RUNNER_NAME:-cachy-beefy-shelldeck-beefy}"
+LABELS="${SHELLDECK_BEEFY_RUNNER_LABELS:-shelldeck-beefy}"
 TOKEN_FILE="${GITHUB_TOKEN_FILE:-$HOME/.config/mcp/secrets/github-mcp-token}"
 
 read_github_token() {
@@ -32,7 +32,7 @@ read_github_token() {
   exit 1
 }
 
-if [ "$(hostname)" != "${SHELLDECK_DEPLOY_HOSTNAME:-logan-laptop}" ]; then
+if [ "$(hostname)" != "${SHELLDECK_DEPLOY_HOSTNAME:-cachy-beefy}" ]; then
   echo "Refusing install on unexpected host: $(hostname)" >&2
   exit 1
 fi
@@ -67,9 +67,9 @@ fi
   --unattended \
   --replace
 
-unit_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/systemd/shelldeck-host-runner.service"
-unit_dst="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/shelldeck-host-runner.service"
+unit_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/systemd/shelldeck-beefy-runner.service"
+unit_dst="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/shelldeck-beefy-runner.service"
 install -D -m 0644 "$unit_src" "$unit_dst"
 systemctl --user daemon-reload
-systemctl --user enable --now shelldeck-host-runner.service
-echo "Installed $RUNNER_NAME ($LABELS) at $RUNNER_ROOT (user systemd: shelldeck-host-runner.service)"
+systemctl --user enable --now shelldeck-beefy-runner.service
+echo "Installed $RUNNER_NAME ($LABELS) at $RUNNER_ROOT (user systemd: shelldeck-beefy-runner.service)"

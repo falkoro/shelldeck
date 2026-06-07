@@ -7,7 +7,7 @@ edits are append-only and preserve production routes — see sd_cf.py. No secret
 ever printed. Runs ON the VM (docker local); CF auth via a scoped SD_CF_TOKEN.
 
 Env: SD_CF_TOKEN (required), SD_TENANT_EMAIL (customer login email for Access),
-SD_IMAGE (default ghcr.io/falkoro/shelldeck:saas), SD_NETWORK (cloudflared's docker
+SD_IMAGE (default ghcr.io/spot-techno/shelldeck:saas), SD_NETWORK (cloudflared's docker
 net, default discord-bot-runner_default), SD_SECRETS_DIR (0600 tenant envs), plus
 the SD_CF_* / SD_TUNNEL_ID / SD_ROOT_DOMAIN knobs read by sd_cf.
 
@@ -21,7 +21,7 @@ import sys
 import sd_cf
 from sd_cf import die, hostname, valid_tenant
 
-IMAGE = os.environ.get("SD_IMAGE", "ghcr.io/falkoro/shelldeck:saas")
+IMAGE = os.environ.get("SD_IMAGE", "ghcr.io/spot-techno/shelldeck:saas")
 NETWORK = os.environ.get("SD_NETWORK", "discord-bot-runner_default")
 SECRETS_DIR = os.path.expanduser(os.environ.get("SD_SECRETS_DIR", "~/.shelldeck-tenants"))
 EMAIL = os.environ.get("SD_TENANT_EMAIL", "").strip()

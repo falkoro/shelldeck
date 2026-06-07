@@ -178,18 +178,27 @@ bun run build:frontend
 
 ### Host deploy (logan-laptop)
 
-ShellDeck’s live service runs on **logan-laptop** (CachyOS beefy). After a squash
-merge to `master`, deploy happens two ways (either is enough):
+Two live ShellDeck hosts serve the public dashboards:
 
-1. **GitHub Actions** — `.github/workflows/deploy-host.yml` on push to `master`,
-   using the dedicated `shelldeck-host` runner on logan-laptop.
-2. **systemd fallback** — `ops/systemd/shelldeck-auto-deploy.timer` polls
-   `origin/master` and runs `scripts/watch-deploy-host.sh`.
+| Host | Public URL | Machine |
+|---|---|---|
+| Personal | `code.falkinator.org` | **cachy-beefy** (`192.168.1.66:8787`) |
+| Spot/work | `code.spotcloud.nl` | **logan-laptop** (`127.0.0.1:8787`) |
 
-Install the host runner once:
+`host-code.falkinator.org` is a debug alias to logan-laptop’s ShellDeck.
+
+After a squash merge to `master`, deploy happens via GitHub Actions
+(`.github/workflows/deploy-host.yml`) on both runners, with a logan-laptop systemd
+fallback timer.
+
+Install the host runners once:
 
 ```sh
+# logan-laptop (code.spotcloud.nl)
 bash ops/scripts/install-shelldeck-host-runner.sh
+
+# cachy-beefy (code.falkinator.org)
+bash ops/scripts/install-shelldeck-beefy-runner.sh
 ```
 
 The deploy scripts use a clean cache checkout, build the app, install the release
@@ -201,9 +210,10 @@ active development checkout.
 
 | Machine | Labels | Repos |
 |---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `falkoro/shelldeck` PR CI + Grok/Claude review |
-| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org deploys |
-| **logan-laptop** | `shelldeck-host` | `falkoro/shelldeck` host deploy only |
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude review (personal host) |
+| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product deploys |
+| **cachy-beefy** | `shelldeck-beefy` | `spot-techno/shelldeck` deploy to `code.falkinator.org` |
+| **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` deploy to `code.spotcloud.nl` |
 
 Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
 

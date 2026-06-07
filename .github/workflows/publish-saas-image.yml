@@ -5,7 +5,7 @@ name: Publish SaaS image
 # tenant. The host install (code.falkinator.org) does NOT use this image — it runs the
 # default no-feature build straight from the repo.
 #
-# Tags: ghcr.io/falkoro/shelldeck:saas (rolling) and :saas-<sha> (pinned).
+# Tags: ghcr.io/spot-techno/shelldeck:saas (rolling) and :saas-<sha> (pinned).
 
 on:
   push:
@@ -55,7 +55,7 @@ jobs:
           # (validation) but must NOT push the rolling :saas tag or write the shared cache.
           push: ${{ github.ref == 'refs/heads/master' }}
           tags: |
-            ghcr.io/falkoro/shelldeck:saas
-            ghcr.io/falkoro/shelldeck:saas-${{ github.sha }}
+            ghcr.io/spot-techno/shelldeck:saas
+            ghcr.io/spot-techno/shelldeck:saas-${{ github.sha }}
           cache-from: type=gha
           cache-to: ${{ github.ref == 'refs/heads/master' && 'type=gha,mode=max' || '' }}
