@@ -180,17 +180,41 @@ function coreShellName(name: string): boolean {
 }
 
 function canRemoveClosedShell(session: SessionItem | null | undefined): boolean {
-  return Boolean(session && !session.running && !coreShellName(session.name));
+  return Boolean(session && !session.running);
 }
 
 function removeClosedShell(name: string): void {
   const session = sessionByName(name);
-  if (!canRemoveClosedShell(session)) throw new Error('Only closed non-core sessions can be removed from the dashboard');
+  if (!canRemoveClosedShell(session)) throw new Error('Only closed sessions can be removed from the dashboard');
+  hideClosedShell(name);
+}
+
+function hideClosedShell(name: string): void {
+  if (!name) return;
   hiddenClosedShells.add(name);
   saveHiddenClosedShells();
   if (selectedSession === name) chooseSession(false);
   renderShells({ shells: latestShells });
-  toast('Removed closed session');
+  renderSelectedSessionActions();
+}
+
+function terminateShellInDashboard(name: string): void {
+  hideClosedShell(name);
+  toast('Terminated session');
+}
+
+function restoreHiddenClosedShells(): void {
+  if (!hiddenClosedShells.size) return;
+  hiddenClosedShells.clear();
+  saveHiddenClosedShells();
+  renderShells({ shells: latestShells });
+  renderShellTabs();
+  renderSelectedSessionActions();
+  toast('Terminated sessions shown');
+}
+
+function hiddenClosedShellCount(): number {
+  return hiddenClosedShells.size;
 }
 
 function unhideShell(name: string): void {

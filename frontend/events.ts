@@ -24,6 +24,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
   const resumeButton = target.closest<HTMLButtonElement>('[data-resume]');
   const removeImageButton = target.closest<HTMLButtonElement>('[data-remove-image]');
   const removeClosedButton = target.closest<HTMLButtonElement>('[data-remove-closed]');
+  const restoreHiddenButton = target.closest<HTMLButtonElement>('[data-restore-hidden-closed]');
   const tabButton = target.closest<HTMLButtonElement>('[data-shell-tab]');
   const selectItem = target.closest<HTMLElement>('[data-select-session]');
   const interactive = target.closest('textarea,input,button,a,pre');
@@ -78,6 +79,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
     if (resumeButton && resumeButton.dataset.resumeCmd) return runCommand(resumeButton.dataset.resume || '', resumeButton.dataset.resumeCmd);
     if (removeImageButton) return removeShellImage(removeImageButton.dataset.shell || '', removeImageButton.dataset.removeImage || '');
     if (removeClosedButton) return removeClosedShell(removeClosedButton.dataset.removeClosed || '');
+    if (restoreHiddenButton) return restoreHiddenClosedShells();
     if (tabButton) {
       selectSession(tabButton.dataset.shellTab);
       focusComposer(tabButton.dataset.shellTab || '');
@@ -104,9 +106,9 @@ document.addEventListener('click', async (event: MouseEvent) => {
     }
     if (stopButton && !stopButton.disabled) {
       const stopped = stopButton.dataset.stop || '';
-      if (!confirm(`Kill tmux session "${stopped}"? Everything running in it stops. This cannot be undone.`)) return;
+      if (!confirm(`Terminate tmux session "${stopped}" and remove it from this dashboard? Everything running in it stops. This cannot be undone.`)) return;
       await sessionAction('/api/stop', stopped);
-      if (sessionByName(stopped)) selectSession(stopped);
+      terminateShellInDashboard(stopped);
       return;
     }
     if (restartButton && !restartButton.disabled) {
