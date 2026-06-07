@@ -193,6 +193,7 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .terminal-card b{display:block;font-size:14px;margin-bottom:2px}
 .terminal-card .card-title-row b{margin-bottom:0}
 .terminal-card span{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.terminal-card .card-title [data-role="command"]{display:none!important}
 .terminal-card pre{margin:0;padding:13px;min-height:230px;max-height:none;flex:1 1 auto;overflow:auto;overflow-wrap:anywhere;color:#c9fff3;background:#03070b;font:13px/1.38 "Cascadia Mono","JetBrains Mono",Consolas,monospace;white-space:pre-wrap}
 .terminal-card pre a.shell-log-link{color:var(--cyan);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
 .terminal-card pre a.shell-log-link:hover{color:#eaffff;text-decoration-style:solid}
@@ -203,10 +204,11 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
   .terminal-card .card-title{flex-wrap:nowrap;align-items:flex-start}
   .terminal-card .card-title-row{flex:0 1 auto;min-width:0;max-width:58%}
   .terminal-card .work-title.show{flex:1 1 0;min-width:0}
-  .terminal-card .card-title.solo-summary{column-gap:8px}
-  .terminal-card .card-title.solo-summary .card-title-row{flex:0 0 auto;max-width:none}
+  .terminal-card .card-title.solo-summary{column-gap:0;align-items:center}
+  .terminal-card .card-title.solo-summary .card-title-row{flex:0 0 auto;max-width:none;margin-left:auto;order:2;gap:4px}
   .terminal-card .card-title.solo-summary .card-title-row b{display:none}
-  .terminal-card .card-title.solo-summary .work-title.show{flex:1 1 auto;min-width:0;border-left:0;padding-left:0;font-size:13px;line-height:1.45}
+  .terminal-card .card-title.solo-summary .work-title.show{order:1;flex:1 1 auto;min-width:0;border-left:0;padding:0;margin:0;font-size:13px;line-height:1.45;font-style:normal}
+  .terminal-card .card-title.solo-summary .work-title.show::before{margin-right:4px}
 }
 body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.preview-fullscreen{position:fixed;inset:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));z-index:80;width:auto!important;max-width:none!important;height:auto;min-height:0!important;display:flex!important;flex-direction:column;box-shadow:0 24px 90px rgba(0,0,0,.72);border-color:rgba(139,246,255,.9);background:#050a0f}

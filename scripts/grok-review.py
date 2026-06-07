@@ -18,6 +18,7 @@ Check, in priority order:
 1. SECURITY — auth bypass, unlock-password handling, IP allowlist mistakes, secret leakage in logs/env examples, unsafe WebSocket/PTY bridging.
 2. CORRECTNESS — tmux attach/capture edge cases, SSE/WebSocket lifecycle, SaaS provisioning paths, config persistence regressions.
 3. PRIVACY / UX — privacy blur/safe-shot regressions, misleading operator-facing copy, breaking changes to env/config without docs.
+4. VISUAL / LAYOUT (when `public/app.css` or `frontend/` changes) — card-header gaps, tmux attach-command lines leaking into `.card-title`, `solo-summary` row order (summary left, rename controls right), shell-tip overlap with RUNNING/cwd, ultra-wide floating `shell-tools` collisions. Flag CSS removals that undo intentional `display:none` / flex `order` fixes.
 
 End with a single final line: `Verdict: <one sentence>`.
 
