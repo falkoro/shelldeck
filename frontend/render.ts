@@ -145,15 +145,25 @@ function updateShellCardTitle(card: HTMLElement, shell: ShellPreview): string {
   const displayLabel = shellDisplayLabel(shell.name, shell.label);
   const rawName = shellRawNameBadge(shell.name, displayLabel);
   const label = card.querySelector<HTMLElement>('[data-role="label"]');
-  renderCardTitleLabel(label, displayLabel, shellboxSummary(shell.name) || displayLabel);
+  const summary = shellboxSummary(shell.name);
+  renderCardTitleLabel(label, displayLabel, summary || displayLabel || shell.label || shell.name);
+  card.querySelector<HTMLElement>('.card-title')?.classList.toggle('solo-summary', !displayLabel);
   setText(card, '[data-role="rawname"]', rawName);
   card.querySelector<HTMLElement>('.shell-name-pill')?.classList.toggle('empty', !rawName);
   card.querySelector<HTMLButtonElement>('[data-reset-shell-label]')?.classList.toggle('show', shellHasCustomLabel(shell.name));
-  return displayLabel;
+  return displayLabel || summary || shell.label || shell.name;
 }
 
 function renderCardTitleLabel(label: HTMLElement | null, displayLabel: string, title: string): void {
   if (!label) return;
+  if (!displayLabel) {
+    label.hidden = true;
+    label.classList.remove('moving');
+    label.textContent = '';
+    delete label.dataset.renderedLabel;
+    return;
+  }
+  label.hidden = false;
   const moving = window.innerWidth <= 760 && displayLabel.length > 34;
   const signature = `${moving ? '1' : '0'}:${displayLabel}`;
   label.classList.toggle('moving', moving);
@@ -351,8 +361,14 @@ function shellbarSummary(session: string): string {
   return sessionWorkBrief(session, shellbarSummaryWords());
 }
 
+function sessionTabLabel(session: SessionItem): string {
+  const alias = shellLabelAliases()[session.name]?.trim();
+  if (alias) return alias;
+  return compactShellLabel(session.name, session.label || session.name);
+}
+
 function sessionTabFallback(session: SessionItem, state: { label: string }): string {
-  const label = compactShellLabel(session.name, session.label || session.name);
+  const label = sessionTabLabel(session);
   const status = `${state.label} · ${fmtTime(session.activity)}`;
   return label ? `${label} · ${status}` : status;
 }
@@ -379,8 +395,11 @@ function renderShellTabs(): void {
     const workBrief = shellbarSummary(session.name);
     const briefText = workBrief || sessionTabFallback(session, state);
     const moving = shellbarSummaryMoving(workBrief) ? ' moving' : '';
-    const labelText = session.label || session.name;
-    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || session.label || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line"><span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span><span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
+    const labelText = sessionTabLabel(session);
+    const labelBlock = labelText
+      ? `<span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span>`
+      : '';
+    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}${labelText ? '' : ' no-label'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line">${labelBlock}<span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
   }).join('') + restored;
   markSelectedShell();
   renderSelectedSessionActions();

@@ -398,11 +398,7 @@ fn parse_flag(value: &str) -> bool {
 fn known_sessions() -> Vec<KnownSession> {
     let default_start = zsh_start_in("~", "zsh -l");
     let agent_workdir = env::var("DASHBOARD_AGENT_WORKDIR").unwrap_or_else(|_| "~".to_string());
-    let mut sessions = default_sessions(
-        &default_start,
-        default_slot_count(),
-        !env_flag("DASHBOARD_HIDE_MAIN_SHELL"),
-    );
+    let mut sessions = default_sessions(&default_start, default_slot_count());
 
     for session in agent_presets_from_raw(
         &env::var("DASHBOARD_AGENT_PRESETS").unwrap_or_default(),
@@ -427,46 +423,19 @@ fn default_slot_count() -> usize {
         .unwrap_or(7)
 }
 
-fn default_sessions(
-    default_start: &str,
-    slot_count: usize,
-    include_main_shell: bool,
-) -> Vec<KnownSession> {
-    let mut sessions = Vec::new();
-    if include_main_shell {
-        sessions.push(known_session(
-            "main",
-            "Main Shell",
-            "shell",
-            "ta",
-            "sh",
-            default_start,
-        ));
-    }
-
-    for index in 1..=slot_count {
-        if include_main_shell {
-            sessions.push(known_session(
-                &format!("slot{index}"),
-                &format!("Shell Slot {index}"),
-                "slot",
-                &format!("ts{index}"),
+fn default_sessions(default_start: &str, slot_count: usize) -> Vec<KnownSession> {
+    (1..=slot_count)
+        .map(|index| {
+            known_session(
                 &index.to_string(),
-                default_start,
-            ));
-        } else {
-            sessions.push(known_session(
-                &index.to_string(),
-                &format!("Shell {index}"),
+                "",
                 "shell",
                 &index.to_string(),
                 &index.to_string(),
                 default_start,
-            ));
-        }
-    }
-
-    sessions
+            )
+        })
+        .collect()
 }
 
 fn known_session(
@@ -644,8 +613,8 @@ mod tests {
     }
 
     #[test]
-    fn default_sessions_can_use_numbered_shells_without_main() {
-        let sessions = default_sessions("zsh -l", 3, false);
+    fn default_sessions_use_numbered_shells() {
+        let sessions = default_sessions("zsh -l", 3);
         let names: Vec<&str> = sessions
             .iter()
             .map(|session| session.name.as_str())
@@ -655,20 +624,9 @@ mod tests {
             .map(|session| session.label.as_str())
             .collect();
         assert_eq!(names, vec!["1", "2", "3"]);
-        assert_eq!(labels, vec!["Shell 1", "Shell 2", "Shell 3"]);
+        assert_eq!(labels, vec!["", "", ""]);
         assert_eq!(sessions[1].alias, "2");
-    }
-
-    #[test]
-    fn default_sessions_keep_legacy_main_and_slots() {
-        let sessions = default_sessions("zsh -l", 2, true);
-        let names: Vec<&str> = sessions
-            .iter()
-            .map(|session| session.name.as_str())
-            .collect();
-        assert_eq!(names, vec!["main", "slot1", "slot2"]);
-        assert_eq!(sessions[0].badge, "sh");
-        assert_eq!(sessions[2].alias, "ts2");
+        assert_eq!(sessions[1].badge, "2");
     }
 
     #[test]

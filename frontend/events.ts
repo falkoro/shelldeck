@@ -299,6 +299,29 @@ if (topActions && !document.getElementById('sidebarToggle')) {
   applySidebar();
 }
 
+const sidebarHead = document.querySelector<HTMLElement>('.sidebar-head');
+if (sidebarHead && !document.getElementById('sidebarCollapseBtn')) {
+  const collapseBtn = document.createElement('button');
+  collapseBtn.id = 'sidebarCollapseBtn';
+  collapseBtn.type = 'button';
+  collapseBtn.className = 'ghost sidebar-collapse';
+  collapseBtn.innerHTML = icon('chevronLeft');
+  collapseBtn.addEventListener('click', toggleSidebar);
+  sidebarHead.insertAdjacentElement('afterbegin', collapseBtn);
+}
+
+const workspace = document.querySelector<HTMLElement>('.workspace');
+if (workspace && !document.getElementById('sidebarExpandBtn')) {
+  const expandBtn = document.createElement('button');
+  expandBtn.id = 'sidebarExpandBtn';
+  expandBtn.type = 'button';
+  expandBtn.className = 'sidebar-expand';
+  expandBtn.innerHTML = icon('chevronRight');
+  expandBtn.addEventListener('click', toggleSidebar);
+  workspace.insertAdjacentElement('afterbegin', expandBtn);
+  applySidebar();
+}
+
 // Restore all minimized shell previews button (injected)
 const shellTools = document.querySelector<HTMLElement>('.shell-tools');
 if (shellTools && !document.querySelector('#restoreAllPreviewsBtn')) {
