@@ -39,6 +39,7 @@ const TERMINAL_KEYBAR_HTML = `
       <button type="button" class="term-key" data-termkey="tab">Tab</button>
       <button type="button" class="term-key" data-termkey="ctrl" title="Ctrl — tap, then a letter (e.g. d → Ctrl-D), an arrow (word jump), or Home/End (jump to top/bottom)">Ctrl</button>
       <button type="button" class="term-key" data-termkey="ctrl-c" title="Ctrl-C (interrupt)">^C</button>
+      <button type="button" class="term-key term-key-upload" data-termkey="upload" title="Upload image and insert its path">Img</button>
       <button type="button" class="term-key" data-termkey="home" title="Home (start of line)">Home</button>
       <button type="button" class="term-key" data-termkey="end" title="End (end of line)">End</button>
       <button type="button" class="term-key" data-termkey="up" aria-label="Arrow up">↑</button>
@@ -221,6 +222,22 @@ async function insertTerminalImages(tw, files) {
     const message = paths.length === 1 ? `Inserted ${paths[0]}` : `Inserted ${paths.length} image paths`;
     tw.statusEl.textContent = message;
     toast('Image path inserted in Shell in');
+}
+function uploadTerminalImages(tw, files) {
+    const images = Array.from(files || []).filter((file) => String(file.type || '').startsWith('image/'));
+    if (!images.length)
+        return;
+    insertTerminalImages(tw, images).catch((error) => {
+        tw.statusEl.textContent = 'image upload failed';
+        toast(error.message);
+    }).finally(() => {
+        tw.imageInput.value = '';
+        tw.term?.focus?.();
+    });
+}
+function openTerminalImagePicker(tw) {
+    tw.imageInput.value = '';
+    tw.imageInput.click();
 }
 function handleTerminalPaste(tw, event) {
     const files = terminalClipboardImages(event);
@@ -418,12 +435,14 @@ function createTermWindow(name) {
       <div class="term-controls">
         <button type="button" class="term-btn" data-act="copy" title="Copy selected terminal text" aria-label="Copy selected terminal text">${icon('copy')}</button>
         <button type="button" class="term-btn" data-act="copyall" title="Copy all scrollback" aria-label="Copy all terminal scrollback">${icon('summary')}</button>
+        <button type="button" class="term-btn term-upload" data-act="upload" title="Upload image and insert its saved path" aria-label="Upload image into terminal">${icon('image')}<span class="term-upload-label">Image</span></button>
         <button type="button" class="term-btn" data-act="reset" title="Reset size &amp; position" aria-label="Reset size and position">↺</button>
         <button type="button" class="term-btn" data-act="min" title="Minimize to dock" aria-label="Minimize terminal">−</button>
         <button type="button" class="term-btn" data-act="max" title="Maximize / restore" aria-label="Maximize or restore terminal">□</button>
         <button type="button" class="term-btn term-detach" data-act="close" title="Detach this view and return to the dashboard — the tmux session keeps running" aria-label="Detach terminal view and return to the dashboard (session keeps running)"><span class="term-detach-label">Detach</span></button>
       </div>
     </div>${TERMINAL_KEYBAR_HTML}
+    <input class="term-image-input" type="file" accept="image/*" multiple hidden>
     <div class="term-host" data-host></div>
   `;
     const host = el.querySelector('[data-host]');
@@ -431,6 +450,7 @@ function createTermWindow(name) {
     const bar = el.querySelector('.term-titlebar');
     const controls = el.querySelector('.term-controls');
     const keybar = el.querySelector('[data-keybar]');
+    const imageInput = el.querySelector('.term-image-input');
     document.body.appendChild(el);
     const term = new Terminal({
         fontSize: 13,
@@ -444,7 +464,7 @@ function createTermWindow(name) {
     term.open(host);
     fit.fit();
     const tw = {
-        name, el, host, statusEl: status, term, fitAddon: fit,
+        name, el, host, statusEl: status, imageInput, term, fitAddon: fit,
         ws: null, ro: null, fitTimer: 0, lastCols: 0, lastRows: 0,
         x: baseX, y: baseY, w: baseW, h: baseH,
         minimized: false, maximized: false, preMax: null,
@@ -506,6 +526,7 @@ function createTermWindow(name) {
             event.preventDefault();
     });
     host.addEventListener('drop', (event) => handleTerminalDrop(tw, event));
+    imageInput.addEventListener('change', () => uploadTerminalImages(tw, imageInput.files));
     const ro = new ResizeObserver(() => doFit(tw));
     ro.observe(host);
     tw.ro = ro;
@@ -521,6 +542,8 @@ function createTermWindow(name) {
                 copyTerminalSelection(tw).catch(() => { });
             else if (act === 'copyall')
                 copyTerminalAll(tw).catch(() => { });
+            else if (act === 'upload')
+                openTerminalImagePicker(tw);
             else if (act === 'min')
                 minimizeWindow(tw);
             else if (act === 'max')
@@ -555,6 +578,10 @@ function createTermWindow(name) {
             if (key === 'paste') {
                 pasteTerminalClipboard(tw).catch(() => { });
                 tw.term?.focus?.();
+                return;
+            }
+            if (key === 'upload') {
+                openTerminalImagePicker(tw);
                 return;
             }
             const seq = (tw.ctrlArmed && TERMINAL_CTRL_SEQUENCES[key]) || TERMINAL_KEY_SEQUENCES[key];
