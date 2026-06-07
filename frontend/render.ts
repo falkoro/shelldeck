@@ -311,15 +311,12 @@ function renderSelectedSessionActions(): void {
   const state = sessionRuntime(selected);
   const createReason = !shellUnlocked
     ? 'Unlock shells before creating tmux sessions'
-    : selected.running
-      ? 'This tmux session is already running'
-      : selected.family === 'custom'
-        ? 'ShellDeck can only create configured tmux sessions'
+    : selected.family === 'custom'
+      ? 'ShellDeck can only create new tmux sessions from configured shell slots'
+      : selected.running
+        ? 'Create another tmux session using this shell slot as the template'
         : 'Create this tmux session';
-  const createDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-  const createLabel = selected.running ? 'Running' : 'New tmux';
-  const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-  const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
+  const createDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
   const removeButton = canRemoveClosedShell(selected)
     ? `<button class="warn remove-closed-action" type="button" data-remove-closed="${escapeHtml(selected.name)}" title="Remove this closed session from the dashboard">${icon('trash')}<span>Remove</span></button>`
     : '';
@@ -330,7 +327,7 @@ function renderSelectedSessionActions(): void {
     : '';
   el.hidden = false;
   el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button>${removeButton}<button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Terminate = kill this tmux session, stop everything inside it, and hide it from this dashboard">${icon('stop')}<span>Terminate</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}" title="Restart = kill and recreate this tmux session, keeping this dashboard slot visible">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 
 let shellTabsSignature = '';

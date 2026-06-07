@@ -152,7 +152,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
     }
     if (createButton && !createButton.disabled) {
       const baseName = createButton.dataset.create || '';
-      const requestedName = promptNewTmuxSessionName(baseName);
+      const requestedName = promptNewTmuxSessionName(baseName, Boolean(sessionByName(baseName)?.running));
       if (requestedName === null) return;
       const targetName = requestedName || baseName;
       unhideShell(targetName);

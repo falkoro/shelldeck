@@ -237,7 +237,10 @@ impl Config {
                 .ok()
                 .map(PathBuf::from)
                 .or_else(|| {
-                    let d = root_dir.join("share").join("models").join("ggml-base.en.bin");
+                    let d = root_dir
+                        .join("share")
+                        .join("models")
+                        .join("ggml-base.en.bin");
                     d.exists().then_some(d)
                 }),
             stt_language: env::var("DASHBOARD_STT_LANG").unwrap_or_else(|_| "en".to_string()),
@@ -395,16 +398,11 @@ fn parse_flag(value: &str) -> bool {
 fn known_sessions() -> Vec<KnownSession> {
     let default_start = zsh_start_in("~", "zsh -l");
     let agent_workdir = env::var("DASHBOARD_AGENT_WORKDIR").unwrap_or_else(|_| "~".to_string());
-    let mut sessions = vec![
-        known_session("main", "Main Shell", "shell", "ta", "sh", &default_start),
-        known_session("slot1", "Shell Slot 1", "slot", "ts1", "1", &default_start),
-        known_session("slot2", "Shell Slot 2", "slot", "ts2", "2", &default_start),
-        known_session("slot3", "Shell Slot 3", "slot", "ts3", "3", &default_start),
-        known_session("slot4", "Shell Slot 4", "slot", "ts4", "4", &default_start),
-        known_session("slot5", "Shell Slot 5", "slot", "ts5", "5", &default_start),
-        known_session("slot6", "Shell Slot 6", "slot", "ts6", "6", &default_start),
-        known_session("slot7", "Shell Slot 7", "slot", "ts7", "7", &default_start),
-    ];
+    let mut sessions = default_sessions(
+        &default_start,
+        default_slot_count(),
+        !env_flag("DASHBOARD_HIDE_MAIN_SHELL"),
+    );
 
     for session in agent_presets_from_raw(
         &env::var("DASHBOARD_AGENT_PRESETS").unwrap_or_default(),
@@ -418,6 +416,56 @@ fn known_sessions() -> Vec<KnownSession> {
     ) {
         push_unique_session(&mut sessions, session);
     }
+    sessions
+}
+
+fn default_slot_count() -> usize {
+    env::var("DASHBOARD_DEFAULT_SLOTS")
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .map(|value| value.clamp(0, 12))
+        .unwrap_or(7)
+}
+
+fn default_sessions(
+    default_start: &str,
+    slot_count: usize,
+    include_main_shell: bool,
+) -> Vec<KnownSession> {
+    let mut sessions = Vec::new();
+    if include_main_shell {
+        sessions.push(known_session(
+            "main",
+            "Main Shell",
+            "shell",
+            "ta",
+            "sh",
+            default_start,
+        ));
+    }
+
+    for index in 1..=slot_count {
+        if include_main_shell {
+            sessions.push(known_session(
+                &format!("slot{index}"),
+                &format!("Shell Slot {index}"),
+                "slot",
+                &format!("ts{index}"),
+                &index.to_string(),
+                default_start,
+            ));
+        } else {
+            sessions.push(known_session(
+                &index.to_string(),
+                &format!("Shell {index}"),
+                "shell",
+                &index.to_string(),
+                &index.to_string(),
+                default_start,
+            ));
+        }
+    }
+
     sessions
 }
 
@@ -596,6 +644,34 @@ mod tests {
     }
 
     #[test]
+    fn default_sessions_can_use_numbered_shells_without_main() {
+        let sessions = default_sessions("zsh -l", 3, false);
+        let names: Vec<&str> = sessions
+            .iter()
+            .map(|session| session.name.as_str())
+            .collect();
+        let labels: Vec<&str> = sessions
+            .iter()
+            .map(|session| session.label.as_str())
+            .collect();
+        assert_eq!(names, vec!["1", "2", "3"]);
+        assert_eq!(labels, vec!["Shell 1", "Shell 2", "Shell 3"]);
+        assert_eq!(sessions[1].alias, "2");
+    }
+
+    #[test]
+    fn default_sessions_keep_legacy_main_and_slots() {
+        let sessions = default_sessions("zsh -l", 2, true);
+        let names: Vec<&str> = sessions
+            .iter()
+            .map(|session| session.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["main", "slot1", "slot2"]);
+        assert_eq!(sessions[0].badge, "sh");
+        assert_eq!(sessions[2].alias, "ts2");
+    }
+
+    #[test]
     fn shell_word_escapes_single_quotes() {
         assert_eq!(shell_word("/tmp/falk's repo"), "'/tmp/falk'\"'\"'s repo'");
     }
@@ -628,7 +704,8 @@ mod tests {
 
     #[test]
     fn gh_repos_parse_owner_repo_pairs_and_dedupe() {
-        let repos = parse_gh_repos(" falkoro/shelldeck ;bad;FALKORO/shelldeck;spot-techno/spot_suite ");
+        let repos =
+            parse_gh_repos(" falkoro/shelldeck ;bad;FALKORO/shelldeck;spot-techno/spot_suite ");
         assert_eq!(repos, vec!["falkoro/shelldeck", "spot-techno/spot_suite"]);
     }
 

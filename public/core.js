@@ -302,14 +302,30 @@ function resetShellLabel(name) {
     localStorage.setItem(SHELL_LABEL_ALIASES_KEY, JSON.stringify(aliases));
     return true;
 }
-function promptNewTmuxSessionName(baseName) {
+function nextTmuxSessionName() {
+    const used = new Set();
+    sessions().forEach((session) => used.add(session.name));
+    latestShells.forEach((shell) => used.add(shell.name));
+    for (let i = 1; i <= 99; i += 1) {
+        const name = String(i);
+        if (!used.has(name))
+            return name;
+    }
+    return `shell-${Date.now().toString(36)}`;
+}
+function promptNewTmuxSessionName(baseName, requireName = false) {
     const session = sessionByName(baseName);
     const fallback = session?.label || baseName;
     const display = shellDisplayLabel(baseName, fallback);
-    const value = window.prompt(`Name for the new tmux session from ${display}\nLeave blank to use ${baseName}.`, '');
+    const suggestion = requireName ? nextTmuxSessionName() : '';
+    const value = window.prompt(requireName
+        ? `Name for the extra tmux session from ${display}.`
+        : `Name for the new tmux session from ${display}\nLeave blank to use ${baseName}.`, suggestion);
     if (value === null)
         return null;
     const clean = value.trim();
+    if (!clean && requireName)
+        throw new Error('Name the extra tmux session');
     if (!clean)
         return '';
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(clean)) {
