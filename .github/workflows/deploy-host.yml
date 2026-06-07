@@ -1,8 +1,8 @@
 name: Deploy host
 
-# Builds and restarts the live ShellDeck service on logan-laptop (CachyOS beefy).
-# Serves both code.falkinator.org and code.spotcloud.nl from the same host instance.
-# Runs on the dedicated shelldeck-host runner — not logan-gl502vs (personal) or spot-tech-ci (org).
+# Two live ShellDeck hosts:
+# - cachy-beefy  -> code.falkinator.org (personal)
+# - logan-laptop -> code.spotcloud.nl (Spot/work)
 
 on:
   push:
@@ -13,21 +13,34 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-host
+  group: deploy-host-${{ matrix.target }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy ShellDeck on logan-laptop
-    runs-on: [self-hosted, linux, x64, shelldeck-host]
+    name: Deploy ShellDeck (${{ matrix.target }})
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: falkinator
+            runs-on: [self-hosted, linux, x64, shelldeck-beefy]
+            deploy_hostname: cachy-beefy
+            public_urls: https://code.falkinator.org/
+          - target: spotcloud
+            runs-on: [self-hosted, linux, x64, shelldeck-host]
+            deploy_hostname: logan-laptop
+            public_urls: https://code.spotcloud.nl/
     steps:
       - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
 
-      - name: Build, install, restart, and verify public routes
+      - name: Build, install, restart, and verify public route
         env:
           GITHUB_SHA: ${{ github.sha }}
-          SHELLDECK_PUBLIC_URLS: https://code.falkinator.org/,https://code.spotcloud.nl/
+          SHELLDECK_DEPLOY_HOSTNAME: ${{ matrix.deploy_hostname }}
+          SHELLDECK_PUBLIC_URLS: ${{ matrix.public_urls }}
         run: ./scripts/deploy-host.sh

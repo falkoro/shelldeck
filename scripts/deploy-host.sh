@@ -8,7 +8,11 @@ LIVE_DIR="${SHELLDECK_LIVE_DIR:-/home/falk/repos/shelldeck}"
 SERVICE="${SHELLDECK_SERVICE:-shelldeck.service}"
 HOSTNAME_EXPECTED="${SHELLDECK_DEPLOY_HOSTNAME:-logan-laptop}"
 URL="${SHELLDECK_HEALTH_URL:-http://127.0.0.1:8787/}"
-PUBLIC_URLS="${SHELLDECK_PUBLIC_URLS:-https://code.falkinator.org/,https://code.spotcloud.nl/}"
+PUBLIC_URLS="${SHELLDECK_PUBLIC_URLS:-}"
+case "$HOSTNAME_EXPECTED" in
+  cachy-beefy) PUBLIC_URLS="${PUBLIC_URLS:-https://code.falkinator.org/}" ;;
+  logan-laptop) PUBLIC_URLS="${PUBLIC_URLS:-https://code.spotcloud.nl/}" ;;
+esac
 SHA="${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD)}"
 
 if [ "$(hostname)" != "$HOSTNAME_EXPECTED" ]; then
