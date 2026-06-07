@@ -178,11 +178,14 @@ bun run build:frontend
 
 ### Host deploy (logan-laptop)
 
-ShellDeck’s live service runs on **logan-laptop** (CachyOS beefy). After a squash
-merge to `master`, deploy happens two ways (either is enough):
+ShellDeck’s live service runs on **logan-laptop** (CachyOS beefy) and serves both
+**code.falkinator.org** (personal) and **code.spotcloud.nl** (Spot/work) from the
+same `127.0.0.1:8787` instance. After a squash merge to `master`, deploy happens
+two ways (either is enough):
 
 1. **GitHub Actions** — `.github/workflows/deploy-host.yml` on push to `master`,
-   using the dedicated `shelldeck-host` runner on logan-laptop.
+   using the dedicated `shelldeck-host` runner on logan-laptop. Post-deploy checks
+   hit both public hostnames.
 2. **systemd fallback** — `ops/systemd/shelldeck-auto-deploy.timer` polls
    `origin/master` and runs `scripts/watch-deploy-host.sh`.
 
@@ -201,9 +204,9 @@ active development checkout.
 
 | Machine | Labels | Repos |
 |---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude review |
-| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org deploys |
-| **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` host deploy only |
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude review (personal host) |
+| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product deploys |
+| **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` host deploy to `code.falkinator.org` + `code.spotcloud.nl` |
 
 Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
 

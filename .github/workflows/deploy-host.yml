@@ -1,7 +1,8 @@
 name: Deploy host
 
 # Builds and restarts the live ShellDeck service on logan-laptop (CachyOS beefy).
-# Runs on the dedicated shelldeck-host runner — not logan-gl502vs (review/CI) or spot-tech-ci (org).
+# Serves both code.falkinator.org and code.spotcloud.nl from the same host instance.
+# Runs on the dedicated shelldeck-host runner — not logan-gl502vs (personal) or spot-tech-ci (org).
 
 on:
   push:
@@ -25,7 +26,8 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - name: Build, install, and restart
+      - name: Build, install, restart, and verify public routes
         env:
           GITHUB_SHA: ${{ github.sha }}
+          SHELLDECK_PUBLIC_URLS: https://code.falkinator.org/,https://code.spotcloud.nl/
         run: ./scripts/deploy-host.sh

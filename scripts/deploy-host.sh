@@ -8,6 +8,7 @@ LIVE_DIR="${SHELLDECK_LIVE_DIR:-/home/falk/repos/shelldeck}"
 SERVICE="${SHELLDECK_SERVICE:-shelldeck.service}"
 HOSTNAME_EXPECTED="${SHELLDECK_DEPLOY_HOSTNAME:-logan-laptop}"
 URL="${SHELLDECK_HEALTH_URL:-http://127.0.0.1:8787/}"
+PUBLIC_URLS="${SHELLDECK_PUBLIC_URLS:-https://code.falkinator.org/,https://code.spotcloud.nl/}"
 SHA="${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD)}"
 
 if [ "$(hostname)" != "$HOSTNAME_EXPECTED" ]; then
@@ -33,5 +34,20 @@ systemctl --user restart "$SERVICE"
 sleep 2
 systemctl --user is-active --quiet "$SERVICE"
 curl -fsS "$URL" >/dev/null
+
+IFS=',' read -r -a public_urls <<< "$PUBLIC_URLS"
+for public_url in "${public_urls[@]}"; do
+  public_url="${public_url#"${public_url%%[![:space:]]*}"}"
+  public_url="${public_url%"${public_url##*[![:space:]]}"}"
+  [ -n "$public_url" ] || continue
+  code="$(curl -fsS -o /dev/null -w '%{http_code}' "$public_url" || true)"
+  case "$code" in
+    200|302|401|403) ;;
+    *)
+      echo "Public ShellDeck check failed for $public_url (HTTP $code)" >&2
+      exit 1
+      ;;
+  esac
+done
 
 echo "Deployed ShellDeck $SHA to $LIVE_DIR"
