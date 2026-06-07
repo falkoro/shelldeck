@@ -551,6 +551,7 @@ async function sessionAction(endpoint: string, name: string, extra: Record<strin
   toast(payload.message || 'Done');
   await refresh({ preserveUnlock: true });
   await loadShells(false);
+  if (endpoint === '/api/restart') restartShellStream();
   return payload;
 }
 

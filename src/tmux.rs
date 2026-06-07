@@ -5,6 +5,7 @@ use std::{
     path::PathBuf,
     process::Stdio,
     sync::Arc,
+    time::Duration,
 };
 use tokio::{io::AsyncWriteExt, process::Command};
 
@@ -71,6 +72,9 @@ pub struct CreateSessionResult {
     pub message: String,
     pub session_name: String,
 }
+
+const DETACHED_TMUX_COLS: &str = "240";
+const DETACHED_TMUX_ROWS: &str = "80";
 
 pub fn tmux_args(args: &[&str]) -> Vec<String> {
     let mut full = Vec::new();
@@ -448,7 +452,8 @@ pub async fn create_session(
             session_name: session_name.to_string(),
         });
     }
-    tmux_output(&["new-session", "-d", "-s", session_name, &spec.start]).await?;
+    let args = new_detached_session_args(session_name, &spec.start);
+    tmux_output(&args).await?;
     if session_name != name {
         let _ =
             tmux_status(&["set-option", "-t", session_name, "@shelldeck_created", "1"]).await;
@@ -476,8 +481,23 @@ async fn launch_known_session(
     {
         return Ok(format!("{name} is already running"));
     }
-    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
+    let args = new_detached_session_args(name, &spec.start);
+    tmux_output(&args).await?;
     Ok(format!("{name} {verb}"))
+}
+
+fn new_detached_session_args<'a>(name: &'a str, start: &'a str) -> Vec<&'a str> {
+    vec![
+        "new-session",
+        "-d",
+        "-x",
+        DETACHED_TMUX_COLS,
+        "-y",
+        DETACHED_TMUX_ROWS,
+        "-s",
+        name,
+        start,
+    ]
 }
 
 fn valid_session_name(value: &str) -> bool {
@@ -494,8 +514,11 @@ pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, 
         .iter()
         .find(|s| s.name == name)
         .ok_or("Unknown session")?;
+    let _ = tmux_status(&["detach-client", "-s", name]).await;
     let _ = tmux_status(&["kill-session", "-t", name]).await;
-    tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
+    tokio::time::sleep(Duration::from_millis(120)).await;
+    let args = new_detached_session_args(name, &spec.start);
+    tmux_output(&args).await?;
     Ok(format!("{name} restarted in ~"))
 }
 

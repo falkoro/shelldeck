@@ -135,10 +135,10 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .session-action-meta .dot{width:7px;height:7px;margin-right:5px;box-shadow:none}
 .session-action-buttons{display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 .session-chip{display:inline-flex;margin-left:6px;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:0 6px;color:#c9fff3;font-size:10.5px}
-.terminal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:10px}
+.terminal-grid{--shell-card-min-height:clamp(420px,58svh,860px);display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:10px;align-items:stretch;grid-auto-rows:minmax(var(--shell-card-min-height),auto)}
 .terminal-grid.focus-mode{grid-template-columns:minmax(0,1fr)}
 .terminal-grid.focus-mode .terminal-card:not(.selected){display:none}
-.terminal-card{border:1px solid rgba(139,246,255,.16);background:#050a0f;border-radius:8px;overflow:hidden;min-height:360px;min-width:0}
+.terminal-card{border:1px solid rgba(139,246,255,.16);background:#050a0f;border-radius:8px;overflow:hidden;min-height:var(--shell-card-min-height);min-width:0;display:flex;flex-direction:column}
 .terminal-card.running{border-color:rgba(114,247,200,.28)}
 .terminal-card.selected{border-color:rgba(139,246,255,.7)}
 .terminal-card.offline{opacity:.72}
@@ -166,7 +166,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .terminal-card b{display:block;font-size:14px;margin-bottom:2px}
 .terminal-card .card-title-row b{margin-bottom:0}
 .terminal-card span{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.terminal-card pre{margin:0;padding:13px;min-height:230px;max-height:390px;overflow:auto;overflow-wrap:anywhere;color:#c9fff3;background:#03070b;font:13px/1.38 "Cascadia Mono","JetBrains Mono",Consolas,monospace;white-space:pre-wrap}
+.terminal-card pre{margin:0;padding:13px;min-height:230px;max-height:none;flex:1 1 auto;overflow:auto;overflow-wrap:anywhere;color:#c9fff3;background:#03070b;font:13px/1.38 "Cascadia Mono","JetBrains Mono",Consolas,monospace;white-space:pre-wrap}
+.terminal-card pre a.shell-log-link{color:var(--cyan);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+.terminal-card pre a.shell-log-link:hover{color:#eaffff;text-decoration-style:solid}
 body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.preview-fullscreen{position:fixed;inset:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));z-index:80;width:auto!important;max-width:none!important;height:auto;min-height:0!important;display:flex!important;flex-direction:column;box-shadow:0 24px 90px rgba(0,0,0,.72);border-color:rgba(139,246,255,.9);background:#050a0f}
 .terminal-card.preview-fullscreen header{flex:0 0 auto}
@@ -177,7 +179,7 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-meta{display:flex;align-items:center;gap:8px;min-width:0}
 .terminal-meta .dot{flex:0 0 auto}
 .terminal-card.selected .shell-composer{position:sticky;top:0;z-index:3}
-.shell-composer{border-bottom:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px}
+.shell-composer{border-bottom:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px;flex:0 0 auto}
 .shell-composer textarea{width:100%;min-height:78px;max-height:180px;resize:vertical;background:#03070b;border:1px solid #263846;color:#eef9ff;border-radius:6px;padding:10px 11px;line-height:1.4;font:13px/1.4 "Cascadia Mono","JetBrains Mono",Consolas,monospace}
 .shell-actions{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .shell-actions button{min-height:28px;padding:4px 7px;font-size:12px}
@@ -199,8 +201,8 @@ body.preview-fullscreen-open{overflow:hidden}
 .attach-chip{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.1);background:#03070b;border-radius:6px;padding:5px;max-width:100%}
 .attach-chip img{width:32px;height:32px;object-fit:cover;border-radius:5px}.attach-chip code{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.attach-chip button{min-height:30px;padding:5px 7px;font-size:12px}
 .shell-status{color:var(--muted);font-size:12px;min-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.density-comfortable .terminal-grid.focus-mode .terminal-card.selected pre{max-height:58vh}
-.density-compact .terminal-card pre{max-height:300px}.density-compact .panel{padding:10px}.density-compact .shell-composer textarea{min-height:70px}
+.density-comfortable .terminal-grid.focus-mode .terminal-card.selected pre{max-height:none}
+.density-compact .terminal-card pre{max-height:none}.density-compact .panel{padding:10px}.density-compact .shell-composer textarea{min-height:70px}
 .locked-note{border:1px dashed rgba(139,246,255,.28);border-radius:8px;padding:16px;color:var(--muted);background:rgba(7,16,23,.5)}
 .unlock-cta{grid-column:1 / -1;border:1px solid rgba(139,246,255,.32);border-radius:10px;padding:28px 22px;background:#0b121a;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;min-height:220px;justify-content:center}
 .unlock-cta-lock{line-height:0;color:var(--cyan)}

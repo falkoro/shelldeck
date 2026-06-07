@@ -541,6 +541,8 @@ async function sessionAction(endpoint, name, extra = {}) {
     toast(payload.message || 'Done');
     await refresh({ preserveUnlock: true });
     await loadShells(false);
+    if (endpoint === '/api/restart')
+        restartShellStream();
     return payload;
 }
 async function sendInput(name, submit) {
