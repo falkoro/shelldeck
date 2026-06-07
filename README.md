@@ -176,13 +176,36 @@ If you edit files in `frontend/`, rebuild the served JavaScript before committin
 bun run build:frontend
 ```
 
-### Logan laptop deploy
+### Host deploy (logan-laptop)
 
-The Logan laptop can auto-deploy after a squash merge by polling `origin/master`
-with `ops/systemd/shelldeck-auto-deploy.timer`. The watcher uses a clean cache
-checkout, builds the app, installs the release binary and `public/` assets into
-`/home/falk/repos/shelldeck`, restarts `shelldeck.service`, and checks
-`http://127.0.0.1:8787/`. It does not reset the active development checkout.
+ShellDeck’s live service runs on **logan-laptop** (CachyOS beefy). After a squash
+merge to `master`, deploy happens two ways (either is enough):
+
+1. **GitHub Actions** — `.github/workflows/deploy-host.yml` on push to `master`,
+   using the dedicated `shelldeck-host` runner on logan-laptop.
+2. **systemd fallback** — `ops/systemd/shelldeck-auto-deploy.timer` polls
+   `origin/master` and runs `scripts/watch-deploy-host.sh`.
+
+Install the host runner once:
+
+```sh
+bash ops/scripts/install-shelldeck-host-runner.sh
+```
+
+The deploy scripts use a clean cache checkout, build the app, install the release
+binary and `public/` assets into `/home/falk/repos/shelldeck`, restart
+`shelldeck.service`, and check `http://127.0.0.1:8787/`. They do not reset the
+active development checkout.
+
+### CI runners (aligned)
+
+| Machine | Labels | Repos |
+|---|---|---|
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `falkoro/shelldeck` PR CI + Grok/Claude review |
+| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org deploys |
+| **logan-laptop** | `shelldeck-host` | `falkoro/shelldeck` host deploy only |
+
+Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
 
 ## Security notes
 

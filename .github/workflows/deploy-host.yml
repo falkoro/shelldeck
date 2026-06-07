@@ -1,0 +1,31 @@
+name: Deploy host
+
+# Builds and restarts the live ShellDeck service on logan-laptop (CachyOS beefy).
+# Runs on the dedicated shelldeck-host runner — not logan-gl502vs (review/CI) or spot-tech-ci (org).
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-host
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ShellDeck on logan-laptop
+    runs-on: [self-hosted, linux, x64, shelldeck-host]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Build, install, and restart
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: ./scripts/deploy-host.sh
