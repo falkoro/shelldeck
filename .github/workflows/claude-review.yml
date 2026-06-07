@@ -52,6 +52,7 @@ jobs:
         id: claude
         if: steps.dario.outputs.available == 'true'
         continue-on-error: true
+        timeout-minutes: 10
         uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ steps.dario.outputs.base_url }}
