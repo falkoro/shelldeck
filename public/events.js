@@ -155,8 +155,15 @@ document.addEventListener('click', async (event) => {
         if (restoreHiddenButton)
             return restoreHiddenClosedShells();
         if (tabButton) {
-            selectSession(tabButton.dataset.shellTab);
-            focusComposer(tabButton.dataset.shellTab || '');
+            const tabName = tabButton.dataset.shellTab || '';
+            selectSession(tabName);
+            // Mobile hides the inline composer — tab switches should shell-in to the live terminal.
+            if (tabName && window.compactTerminalViewport?.()) {
+                openTerminal(tabName);
+            }
+            else {
+                focusComposer(tabName);
+            }
             return;
         }
         if (imageButton && !imageButton.disabled) {
@@ -422,8 +429,11 @@ function cycleShell(direction) {
         return;
     const current = Math.max(0, tabs.indexOf(selectedSession));
     const next = tabs[(current + direction + tabs.length) % tabs.length];
-    if (next)
+    if (next) {
         selectSession(next);
+        if (window.compactTerminalViewport?.())
+            openTerminal(next);
+    }
 }
 // Single-key shortcuts, active only when focus isn't in a field, the terminal, or with a modifier.
 document.addEventListener('keydown', (event) => {

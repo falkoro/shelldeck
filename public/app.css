@@ -271,7 +271,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .boot-title{font-size:14px;font-weight:800;letter-spacing:0;color:#eaffff}
 @keyframes boot-spin{to{transform:rotate(360deg)}}
 @media (max-width:980px){.workspace{grid-template-columns:1fr}.main-stack{order:1}.sidebar{order:2;position:static}.shells-locked .sidebar{order:1}.shells-locked .main-stack{order:2}.sessions{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.target-row{grid-template-columns:1fr}.target-row .pill{justify-self:stretch}.image-row{grid-template-columns:1fr}.terminal-grid{grid-template-columns:1fr}}
-@media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 22px,1760px);padding-top:max(12px,env(safe-area-inset-top))}.topbar{display:block}.topbar-privacy{display:flex;flex-wrap:wrap;margin-top:10px}.topbar-privacy span{display:none}.top-actions{justify-content:flex-start;margin-top:10px}.top-actions .button,.top-actions button{flex:1;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:block}.shell-tools{justify-content:flex-start;margin-top:10px}.shell-tools>*{flex:1 1 auto}.quick-strip button,.panel-header button{margin-top:10px;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:grid;grid-template-columns:1fr;align-items:stretch}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
+@media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 16px,1760px);padding:max(10px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}.topbar{display:flex;flex-direction:column;gap:10px;align-items:stretch}.topbar-privacy{display:flex;flex-wrap:wrap;gap:6px;margin-top:0;align-self:stretch}.topbar-privacy span{display:none}.top-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:6px;margin-top:0;width:100%}.top-actions .button,.top-actions button{flex:1 1 calc(50% - 3px);min-width:0;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:flex;flex-direction:column;align-items:stretch;gap:8px}.quick-strip button,.panel-header button{margin-top:0;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
 /* Per-slot waiting/running badge */
 .dot.wait{background:var(--amber);box-shadow:0 0 12px var(--amber)}
 .agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none;align-items:center;line-height:1.2}
@@ -338,30 +338,36 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 
 /* Mobile: one shell at a time with a sticky tab switcher; easier inputs + smoother scroll */
 @media (max-width:760px){
-  .terminal-grid,.terminal-grid.focus-mode{grid-template-columns:1fr}
+  .terminal-grid,.terminal-grid.focus-mode{grid-template-columns:1fr;gap:8px}
   .terminal-grid .terminal-card:not(.selected){display:none}
-  .shell-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:stretch;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 -4px 6px;padding:4px;border-bottom:1px solid rgba(139,246,255,.16);gap:3px}
-  .shell-tabs button{flex:0 0 auto;width:auto;min-height:40px;font-size:12px;padding:0}
-  .shell-tabs button.session-tab{min-width:min(72vw,320px);max-width:none;grid-template-columns:24px 7px minmax(0,1fr) auto;column-gap:5px;padding:6px 8px 6px 5px}
+  .terminal-panel .panel-header{margin-bottom:6px;gap:6px}
+  .terminal-panel .panel-header>div:first-child{display:none}
+  .shell-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:stretch;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 0 8px;padding:4px 3px;border:1px solid rgba(139,246,255,.16);border-radius:8px;gap:4px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+  .shell-tabs button{flex:0 0 auto;width:auto;min-height:42px;font-size:12px;padding:0;scroll-snap-align:start}
+  .shell-tabs button.session-tab{min-width:min(68vw,300px);max-width:none;grid-template-columns:24px 7px minmax(0,1fr) auto;column-gap:5px;row-gap:1px;padding:6px 8px 6px 5px;align-items:center}
   .session-tab>.badge{width:24px;height:24px;min-width:24px;max-width:24px;font-size:11px}
-  .shell-tabs button.session-tab.no-summary{min-width:min(56vw,220px);max-width:none}
-  .session-tab-label{font-size:11.5px;max-width:none}
-  .session-tab-summary{font-size:11px}
-  .session-tab-time{font-size:10px}
+  .session-tab>.dot{align-self:center}
+  .shell-tabs button.session-tab.no-summary{min-width:min(52vw,200px);max-width:none}
+  .session-tab-label{font-size:11.5px;max-width:none;line-height:1.2}
+  .session-tab-summary{font-size:11px;line-height:1.2}
+  .session-tab-time{font-size:10px;padding-top:0}
   .shell-composer textarea,.unlock-form input,input,select{font-size:16px}
   .terminal-card pre,.shell-tabs,.shell-composer textarea{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   .terminal-card pre{max-height:46vh}
   .legend-grid{grid-template-columns:1fr}
   .settings-grid{grid-template-columns:1fr}
-  /* Compact the Shells toolbar: stop every control eating a full row; collapse the
-     icon actions (Grid/Follow/Compact/Summary/Refresh) to a tidy row of icon buttons. */
-  .shell-tools{justify-content:flex-start;gap:6px;align-items:center}
-  .shell-tools>*{flex:0 0 auto}
-  .shell-tools button{width:auto;margin-top:0}
-  .shell-tools #streamState{flex:1 1 100%}
-  .shell-tools #lineCount{width:auto}
-  #viewToggle,#followToggle,#densityToggle,#refreshSummaryBtn,#refreshShellsTopBtn{min-width:44px;min-height:40px;padding:8px;justify-content:center}
-  #viewToggle span,#followToggle span,#densityToggle span,#refreshSummaryBtn span,#refreshShellsTopBtn span{display:none}
+  /* Shells toolbar: stream pill on its own row, icon controls in one aligned row. */
+  .shell-tools{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:6px;align-items:center;width:100%;margin-top:0}
+  .shell-tools>*{flex:0 0 auto;width:auto;margin-top:0}
+  .shell-tools .toolbar-session-actions{flex:1 1 100%;order:-1;margin:0}
+  .shell-tools .session-actions{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;width:100%;margin:0;padding:6px 8px;border:1px solid rgba(139,246,255,.14);border-radius:8px;background:#071017}
+  .shell-tools .session-action-meta{flex:1 1 auto;min-width:0}
+  .shell-tools .session-action-buttons{display:flex;flex-wrap:wrap;gap:5px;flex:0 0 auto}
+  .shell-tools .session-action-buttons button{min-width:0;min-height:34px;padding:5px 8px}
+  .shell-tools #streamState{flex:1 1 100%;order:0;justify-content:center;min-height:30px;font-size:11px}
+  .shell-tools #lineCount{min-height:38px}
+  #viewToggle,#followToggle,#densityToggle,#refreshSummaryBtn,#refreshShellsTopBtn,#legendToggleBtn,#restoreAllPreviewsBtn{min-width:42px;min-height:38px;padding:7px;justify-content:center}
+  #viewToggle span,#followToggle span,#densityToggle span,#refreshSummaryBtn span,#refreshShellsTopBtn span,#legendToggleBtn span,#restoreAllPreviewsBtn{display:none}
 }
 /* Current Work summary pinned on top of the shells column */
 .summary-top .panel-header{margin-bottom:10px}
@@ -406,8 +412,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .term-key.armed{background:rgba(139,246,255,.34);border-color:#8bf6ff;color:#eaffff;box-shadow:0 0 0 1px rgba(139,246,255,.45)}
 .term-window.mobile .term-keybar{display:flex}
 @media (max-width:760px){
-  .term-keybar{display:flex}
-  .term-window,.term-window.mobile{
+  .term-window:not(.mobile){
     left:max(0px,env(safe-area-inset-left))!important;
     right:max(0px,env(safe-area-inset-right))!important;
     top:max(0px,env(safe-area-inset-top))!important;
@@ -416,20 +421,11 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
     height:auto!important;
     min-width:0;
     min-height:0;
-    max-width:none;
-    max-height:none;
     border-radius:0;
     border-left:0;
     border-right:0;
     z-index:95;
   }
-  .term-titlebar{cursor:default;padding:8px 8px 8px 10px;gap:6px}
-  .term-titlebar .term-status{display:none}
-  .term-controls{gap:4px}
-  .term-btn{min-width:36px;min-height:34px;padding:4px 9px;font-size:15px}
-  .term-btn.term-detach{min-width:70px}
-  .term-detach-label{display:inline}
-  .term-host{padding:4px}
   .term-resize-handle{display:none}
 }
 /* Bottom-right minimized shells dock */
@@ -792,69 +788,75 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
   /* Each preview card becomes a compact, tappable row -- tapping opens the full-screen
      live terminal (the real mobile interaction), so the inline composer / output /
      window controls are hidden and the card shrinks from ~300px to a single line. */
-  .terminal-card{min-height:0!important;cursor:pointer;padding:10px 12px!important}
-  .terminal-card>header{display:flex;align-items:center;gap:9px;margin:0!important;padding:0!important}
-  .terminal-card .card-title{min-width:0;flex:1 1 auto;display:flex;flex-direction:column;gap:1px}
-  .terminal-card .card-title-row{min-width:0}
+  .terminal-card{min-height:0!important;cursor:pointer;padding:10px 12px!important;border-radius:8px}
+  .terminal-card>header{
+    display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;
+    column-gap:8px;row-gap:6px;margin:0!important;padding:0!important}
+  .terminal-card .card-title{grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .terminal-card .card-title-row{min-width:0;align-items:center}
+  .terminal-card .card-title-row b{font-size:13px;line-height:1.25}
   .terminal-card .card-title [data-role="command"]{display:none!important}
-  .terminal-card .terminal-meta{flex:0 0 auto;gap:6px;margin:0!important}
+  .terminal-card .terminal-meta{grid-column:2;grid-row:1;flex:0 0 auto;gap:5px;margin:0!important;align-self:center}
   .terminal-card .terminal-meta [data-role="cwd"]{display:none!important}
+  .terminal-card .terminal-meta .agent-badge{font-size:9px;padding:1px 5px}
+  .terminal-card .card-window-controls{grid-column:3;grid-row:1;display:flex!important;gap:5px;opacity:1;margin:0;align-self:center}
+  .terminal-card>header::after{grid-column:4;grid-row:1;content:"\203A";flex:0 0 auto;color:var(--cyan,#8bf6ff);font-size:20px;line-height:1;opacity:.75;align-self:center}
+  .terminal-card .card-offline-actions{grid-column:1/-1;grid-row:2;display:flex;flex-wrap:wrap;gap:5px}
   .terminal-card .card-label-edit,
   .terminal-card .card-label-reset,
   .terminal-card .shell-composer,
   .terminal-card .work-title,
   .terminal-card pre[data-role="output"]{display:none!important}
-  /* Chevron makes "tap to open the live terminal" obvious. */
-  .terminal-card>header::after{content:"\203A";flex:0 0 auto;margin-left:2px;color:var(--cyan,#8bf6ff);font-size:22px;line-height:1;opacity:.7}
   .terminal-card.selected{border-color:rgba(139,246,255,.5)}
-  .terminal-card .card-window-controls{display:flex!important;gap:5px;opacity:1}
   .terminal-card .card-window-controls .win-min,
   .terminal-card .card-window-controls .win-full{display:none}
   .terminal-card .card-win-btn.win-close{width:18px;height:18px;min-height:18px;line-height:18px;font-size:0}
   .terminal-card .card-win-btn.win-close:hover,.terminal-card .card-win-btn.win-close:focus-visible{font-size:12px}
-  .card-offline-actions{gap:5px}
   .card-create-btn{min-height:30px;padding:5px 8px;font-size:11px}
   .card-create-btn span{display:none}
   .card-remove-btn{min-height:30px;padding:5px 8px}
   .card-remove-btn span{display:none}
 
-  /* Keybar to the bottom as a short rail. This keeps Esc/arrow helpers from eating
-     several rows on 390px-wide phones while still leaving every key reachable by swipe. */
-  .term-window.mobile .term-host{order:2}
-  .term-window.mobile .term-titlebar{min-height:38px;padding:5px 6px 5px 8px;gap:5px}
-  .term-window.mobile .term-title{font-size:11.5px;line-height:1.2}
-  .term-window.mobile .term-controls{gap:3px}
-  .term-window.mobile .term-btn{min-width:31px;min-height:30px;padding:3px 6px;font-size:12px}
+  /* Live terminal: title bar + xterm + key rail, pinned to the visual viewport. */
+  .term-window.mobile{
+    display:flex;flex-direction:column;
+    top:var(--svh-top,0px)!important;bottom:auto!important;left:0!important;right:auto!important;
+    width:100vw!important;height:var(--svh,100dvh)!important;max-height:none!important;
+    border-radius:0;border-left:0;border-right:0}
+  .term-window.mobile .term-titlebar{
+    order:1;flex:0 0 auto;min-height:40px;padding:6px 8px 6px 10px;gap:6px;
+    align-items:center;border-bottom:1px solid rgba(139,246,255,.18)}
+  .term-window.mobile .term-title{flex:1 1 auto;min-width:0;font-size:12px;line-height:1.2;font-weight:600}
+  .term-window.mobile .term-status{display:none}
+  .term-window.mobile .term-controls{flex:0 0 auto;gap:4px;margin-left:0;align-items:center}
+  .term-window.mobile .term-btn{min-width:34px;min-height:32px;padding:4px 7px;font-size:12px;line-height:1}
   .term-window.mobile .term-btn[data-act="reset"],
   .term-window.mobile .term-btn[data-act="min"],
   .term-window.mobile .term-btn[data-act="max"]{display:none}
-  .term-window.mobile .term-upload{min-width:48px}
-  .term-window.mobile .term-upload-label{font-size:11px}
-  .term-window.mobile .term-btn.term-detach{min-width:50px}
+  .term-window.mobile .term-btn[data-act="copy"],
+  .term-window.mobile .term-btn[data-act="copyall"]{min-width:32px;padding:4px 6px}
+  .term-window.mobile .term-upload{min-width:auto}
+  .term-window.mobile .term-upload-label{display:none}
+  .term-window.mobile .term-btn.term-detach{min-width:52px;padding:4px 8px}
   .term-window.mobile .term-detach-label{font-size:0}
-  .term-window.mobile .term-detach-label::after{content:"Close";font-size:12px}
+  .term-window.mobile .term-detach-label::after{content:"Close";font-size:12px;font-weight:600}
+  .term-window.mobile .term-host{order:2;flex:1 1 auto;min-height:0;padding:2px 4px 0}
   .term-window.mobile .term-keybar{
-    order:3;display:flex!important;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
-    border-bottom:none;border-top:1px solid rgba(139,246,255,.14);
-    padding:4px 6px;padding-bottom:max(4px,env(safe-area-inset-bottom));
-    -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+    order:3;flex:0 0 auto;display:flex!important;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+    border-bottom:none;border-top:1px solid rgba(139,246,255,.14);background:#0b121a;
+    padding:5px 6px;padding-bottom:max(5px,env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;align-items:center}
   .term-window.mobile .term-keybar::-webkit-scrollbar{display:none}
-  .term-window.mobile .term-key{flex:0 0 auto;min-width:34px;min-height:30px;padding:4px 7px;border-radius:5px;font-size:12px;scroll-snap-align:start}
+  .term-window.mobile .term-key{flex:0 0 auto;min-width:36px;min-height:32px;padding:4px 8px;border-radius:5px;font-size:12px;scroll-snap-align:start}
   .term-window.mobile .term-key-wide{min-width:44px}
-  .term-window.mobile .term-key-upload{min-width:42px;border-color:rgba(255,200,87,.38);color:#ffe2a0;background:rgba(255,200,87,.08)}
-
-  /* Pin the full-screen terminal to the visual viewport (JS sets --svh / --svh-top on the
-     element) so the on-screen keyboard shrinks the window instead of hiding the prompt. */
-  .term-window.mobile{
-    top:var(--svh-top,0px)!important;bottom:auto!important;left:0!important;right:auto!important;
-    width:100vw!important;height:var(--svh,100dvh)!important;max-height:none!important}
+  .term-window.mobile .term-key-upload{min-width:40px;border-color:rgba(255,200,87,.38);color:#ffe2a0;background:rgba(255,200,87,.08)}
 }
 /* Keep the selected-session action bar compact; it is the clearest place to create an
    offline tmux slot while per-card controls handle the running shell. */
 .session-actions{margin-bottom:8px;padding:6px 8px}
 .session-action-buttons button{min-height:28px;padding:4px 8px}
 @media (max-width:760px){.session-action-buttons{grid-template-columns:repeat(auto-fit,minmax(76px,1fr))}.session-action-meta b,.session-action-meta small{white-space:normal;overflow:visible;text-overflow:clip}}
-.terminal-panel .panel-header{margin-bottom:8px}
+.terminal-panel .panel-header{margin-bottom:8px;align-items:flex-start}
 .terminal-panel .panel-header p{display:none}
 /* Tickers ride inside the top bar next to the wordmark now (reclaims their own row). The bar
    scrolls horizontally so a long ticker list never grows the header's height. */

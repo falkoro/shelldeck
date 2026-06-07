@@ -64,6 +64,8 @@ function compactTerminalViewport() {
     const width = viewportSize().width;
     return width <= MOBILE_BREAKPOINT || (width <= 1024 && window.matchMedia('(pointer: coarse)').matches);
 }
+// Exposed for events.ts — mobile layout uses the live terminal, not the inline composer.
+window.compactTerminalViewport = compactTerminalViewport;
 // Pin a full-screen mobile terminal to the *visual* viewport. CSS reads these vars so the
 // on-screen keyboard shrinks the window (keybar rides just above the keyboard) instead of
 // covering the prompt. Falls back to 100dvh when the vars are unset (e.g. before first run).
@@ -601,7 +603,8 @@ function createTermWindow(name) {
     el.addEventListener('mousedown', () => bringToFront(tw));
     bar.addEventListener('dblclick', (e) => { if (!e.target.closest('button'))
         toggleMaximize(tw); });
-    makeDraggable(tw, bar);
+    if (!compact)
+        makeDraggable(tw, bar);
     const handle = document.createElement('div');
     handle.className = 'term-resize-handle';
     el.appendChild(handle);
@@ -617,6 +620,14 @@ function openTerminal(name) {
     if (typeof Terminal === 'undefined') {
         toast('Terminal failed to load');
         return;
+    }
+    const compact = compactTerminalViewport();
+    // One full-screen terminal at a time on phones — park the rest in the dock.
+    if (compact) {
+        termWindows.forEach((tw, other) => {
+            if (other !== name && !tw.minimized)
+                minimizeWindow(tw);
+        });
     }
     const existing = termWindows.get(name);
     if (existing) {
