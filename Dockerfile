@@ -53,8 +53,10 @@ RUN useradd --create-home --home-dir /home/shelldeck --shell /bin/bash shelldeck
     && chown -R shelldeck:shelldeck /home/shelldeck
 
 COPY --from=build --chown=shelldeck:shelldeck /app/target/release/shelldeck /usr/local/bin/shelldeck
-COPY --from=build --chown=shelldeck:shelldeck /app/public /home/shelldeck/data/public
+COPY --from=build --chown=shelldeck:shelldeck /app/public /home/shelldeck/baked/public
 COPY --chown=shelldeck:shelldeck .env.example /home/shelldeck/data/.env.example
+COPY --chown=shelldeck:shelldeck docker-entrypoint.sh /home/shelldeck/docker-entrypoint.sh
+RUN chmod 0755 /home/shelldeck/docker-entrypoint.sh
 
 USER shelldeck
 WORKDIR /home/shelldeck/data
@@ -67,4 +69,4 @@ ENV DASHBOARD_AGENT_WORKDIR=/home/shelldeck
 
 EXPOSE 8787
 
-ENTRYPOINT ["/usr/local/bin/shelldeck"]
+ENTRYPOINT ["/home/shelldeck/docker-entrypoint.sh"]
