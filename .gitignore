@@ -9,6 +9,7 @@
 /links.json
 /dashboard-config.json
 /remote-hosts.json
+/.deployed-sha
 
 # Whisper STT models (downloaded at setup, not committed)
 share/models/
