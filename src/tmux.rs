@@ -107,7 +107,10 @@ async fn tmux_status(args: &[&str]) -> Result<bool, String> {
 }
 
 async fn tmux_output(args: &[&str]) -> Result<String, String> {
-    let output = tmux_command(args).output().await.map_err(|e| e.to_string())?;
+    let output = tmux_command(args)
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
@@ -455,8 +458,7 @@ pub async fn create_session(
     let args = new_detached_session_args(session_name, &spec.start);
     tmux_output(&args).await?;
     if session_name != name {
-        let _ =
-            tmux_status(&["set-option", "-t", session_name, "@shelldeck_created", "1"]).await;
+        let _ = tmux_status(&["set-option", "-t", session_name, "@shelldeck_created", "1"]).await;
         let _ = tmux_status(&["set-option", "-t", session_name, "@shelldeck_source", name]).await;
     }
     Ok(CreateSessionResult {
@@ -635,7 +637,7 @@ fn chronoish() -> String {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-        .as_millis()
+            .as_millis()
     )
 }
 

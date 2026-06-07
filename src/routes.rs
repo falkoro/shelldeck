@@ -550,7 +550,10 @@ async fn api_tickers(
     }
     let key = state.config.finnhub_api_key.trim().to_string();
     if key.is_empty() {
-        return webutil::json_response(StatusCode::OK, &serde_json::json!({ "tickers": [], "unconfigured": true }));
+        return webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({ "tickers": [], "unconfigured": true }),
+        );
     }
     let fetches = settings.tickers.iter().take(16).cloned().map(|sym| {
         let client = state.client.clone();

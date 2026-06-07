@@ -47,7 +47,10 @@ fi
 // Returns (script, timeout_ms) for the action, or None for an unknown action.
 fn action_script(engine: &str, name: &str, action: &str) -> Option<(String, u64)> {
     match action {
-        "restart" => Some((format!("{engine} restart {name} && echo \"restarted {name}\"\n"), 30_000)),
+        "restart" => Some((
+            format!("{engine} restart {name} && echo \"restarted {name}\"\n"),
+            30_000,
+        )),
         "pull" => Some((
             PULL_TEMPLATE
                 .replace("__ENGINE__", engine)

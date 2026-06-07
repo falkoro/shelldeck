@@ -119,7 +119,10 @@ pub async fn fetch_all(
         .iter()
         .filter_map(|item| item.rate_limit_remaining)
         .min();
-    let rate_limit_reset = fetched.iter().filter_map(|item| item.rate_limit_reset).max();
+    let rate_limit_reset = fetched
+        .iter()
+        .filter_map(|item| item.rate_limit_reset)
+        .max();
     let statuses = fetched
         .into_iter()
         .map(|item| with_last_good(item.status, previous.as_ref()))
