@@ -17,7 +17,10 @@ pub struct Transcript {
     pub text: String,
 }
 
-pub async fn transcribe(config: Arc<Config>, payload: TranscribeRequest) -> Result<Transcript, String> {
+pub async fn transcribe(
+    config: Arc<Config>,
+    payload: TranscribeRequest,
+) -> Result<Transcript, String> {
     let model = config
         .stt_model
         .as_ref()
@@ -156,11 +159,11 @@ async fn run(cmd: &str, args: &[&str], friendly: &str) -> Result<String, String>
         Command::new(cmd).args(args).kill_on_drop(true).output(),
     )
     .await
-        .map_err(|_| format!("{friendly} (timed out)"))?
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => format!("{friendly} (`{cmd}` not found on PATH)"),
-            _ => format!("{friendly} ({e})"),
-        })?;
+    .map_err(|_| format!("{friendly} (timed out)"))?
+    .map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => format!("{friendly} (`{cmd}` not found on PATH)"),
+        _ => format!("{friendly} ({e})"),
+    })?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let tail: String = stderr.lines().rev().take(3).collect::<Vec<_>>().join("; ");
@@ -204,21 +207,37 @@ mod tests {
     fn clean_transcript_collapses_whitespace_and_strips_non_speech() {
         assert_eq!(clean_transcript("  hello   world \n"), "hello world");
         assert_eq!(clean_transcript("[BLANK_AUDIO]"), "");
-        assert_eq!(clean_transcript(" [ Silence ] really  there "), "really there");
+        assert_eq!(
+            clean_transcript(" [ Silence ] really  there "),
+            "really there"
+        );
         // parenthesized non-speech annotations (the real-world failure) are stripped,
         // including multi-word ones
         assert_eq!(clean_transcript("(dramatic music)"), "");
         assert_eq!(clean_transcript("(electronic beeping)"), "");
-        assert_eq!(clean_transcript("run the (silence) build now"), "run the build now");
+        assert_eq!(
+            clean_transcript("run the (silence) build now"),
+            "run the build now"
+        );
         // an UNBALANCED opener must not swallow the rest of a real sentence
-        assert_eq!(clean_transcript("build the (oops never closed"), "build the (oops never closed");
+        assert_eq!(
+            clean_transcript("build the (oops never closed"),
+            "build the (oops never closed"
+        );
     }
 
     #[tokio::test]
     async fn rejects_non_data_url() {
-        let err = decode_and_transcribe("ffmpeg", "whisper-cli", std::path::Path::new("/dev/null"), "en", 1024, "not-a-data-url")
-            .await
-            .unwrap_err();
+        let err = decode_and_transcribe(
+            "ffmpeg",
+            "whisper-cli",
+            std::path::Path::new("/dev/null"),
+            "en",
+            1024,
+            "not-a-data-url",
+        )
+        .await
+        .unwrap_err();
         assert!(err.contains("data URL"), "got: {err}");
     }
 
@@ -230,7 +249,9 @@ mod tests {
             std::env::var("SHELLDECK_TEST_WAV"),
             std::env::var("SHELLDECK_TEST_MODEL"),
         ) else {
-            eprintln!("skip: set SHELLDECK_TEST_WAV + SHELLDECK_TEST_MODEL to run the live STT test");
+            eprintln!(
+                "skip: set SHELLDECK_TEST_WAV + SHELLDECK_TEST_MODEL to run the live STT test"
+            );
             return;
         };
         let bytes = std::fs::read(&wav).expect("read test wav");

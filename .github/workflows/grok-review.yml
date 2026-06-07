@@ -1,5 +1,7 @@
 name: Grok Review
 
+# PR merge should wait on "Grok merge gate" (spot-tech pattern).
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -7,17 +9,34 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: read
 
 concurrency:
   group: grok-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  enabled:
+    name: Grok review enabled
+    runs-on: ubuntu-latest
+    outputs:
+      run_review: ${{ steps.check.outputs.run_review }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ vars.GROK_REVIEW_ENABLED }}" = "true" ]; then
+            echo "run_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
   review:
     name: Grok review (Hermes)
-    if: vars.GROK_REVIEW_ENABLED == 'true'
+    needs: enabled
+    if: needs.enabled.outputs.run_review == 'true'
     runs-on: [self-hosted, linux, x64, shelldeck-review]
     timeout-minutes: 20
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
         with:
@@ -49,7 +68,6 @@ jobs:
       - name: Grok review
         id: grok
         if: steps.proxy.outputs.available == 'true'
-        continue-on-error: true
         timeout-minutes: 10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,13 +76,31 @@ jobs:
           GROK_URL: ${{ steps.proxy.outputs.url }}
         run: python3 scripts/grok-review.py
 
-      - name: Report Grok review status
-        if: always()
+  merge-gate:
+    name: Grok merge gate
+    needs: enabled
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - name: Wait for Grok review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ steps.proxy.outputs.available }}" != "true" ]; then
-            echo "::warning::Grok review skipped because Hermes was unavailable."
-          elif [ "${{ steps.grok.outcome }}" = "failure" ]; then
-            echo "::warning::Grok review failed; leaving required check green so merge is not blocked by review infrastructure."
-          else
-            echo "Grok review completed with outcome: ${{ steps.grok.outcome }}"
+          if [ "${{ needs.enabled.outputs.run_review }}" != "true" ]; then
+            echo "Grok review disabled — merge allowed."
+            exit 0
           fi
+
+          DEADLINE=$(( $(date +%s) + 900 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            CONCLUSION="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+              --jq '.jobs[] | select(.name == "Grok review (Hermes)") | .conclusion' 2>/dev/null || true)"
+            if [ -n "$CONCLUSION" ] && [ "$CONCLUSION" != "null" ]; then
+              echo "Grok review finished ($CONCLUSION) — merge allowed."
+              exit 0
+            fi
+            sleep 20
+          done
+
+          echo "15-minute Grok review window elapsed — merge allowed."

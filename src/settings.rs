@@ -261,8 +261,8 @@ mod tests {
 
     #[test]
     fn dashboard_panels_env_parse_camel_kebab_and_aliases() {
-        let panels = parse_panels("machine,machineSensors,remote-hosts,ci-runs,expand-lists")
-            .unwrap();
+        let panels =
+            parse_panels("machine,machineSensors,remote-hosts,ci-runs,expand-lists").unwrap();
         assert!(panels.machine);
         assert!(panels.machine_sensors);
         assert!(panels.remote_hosts);

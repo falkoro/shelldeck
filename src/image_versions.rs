@@ -88,16 +88,23 @@ async fn version_for_image(image: String) -> Option<ContainerVersionInfo> {
 async fn resolve_version(image: &str) -> Option<ContainerVersionInfo> {
     let image_ref = supported_ref(image)?;
     let current = parse_version_tag(&image_ref.tag)?;
-    let tags = tokio::time::timeout(Duration::from_millis(3500), fetch_docker_hub_tags(&image_ref.repo))
-        .await
-        .ok()?
-        .ok()?;
+    let tags = tokio::time::timeout(
+        Duration::from_millis(3500),
+        fetch_docker_hub_tags(&image_ref.repo),
+    )
+    .await
+    .ok()?
+    .ok()?;
 
     let mut newer: Vec<(VersionTag, String)> = tags
         .into_iter()
         .filter_map(|tag| parse_version_tag(&tag).map(|v| (v, tag)))
-        .filter(|(candidate, _)| candidate.prefix == current.prefix && candidate.suffix == current.suffix)
-        .filter(|(candidate, _)| compare_versions(&candidate.nums, &current.nums) == Ordering::Greater)
+        .filter(|(candidate, _)| {
+            candidate.prefix == current.prefix && candidate.suffix == current.suffix
+        })
+        .filter(|(candidate, _)| {
+            compare_versions(&candidate.nums, &current.nums) == Ordering::Greater
+        })
         .collect();
     newer.sort_by(|(a, _), (b, _)| compare_versions(&a.nums, &b.nums));
 
@@ -108,7 +115,10 @@ async fn resolve_version(image: &str) -> Option<ContainerVersionInfo> {
             latest: latest.clone(),
             behind,
             state: "behind".to_string(),
-            detail: format!("{behind} newer Docker Hub tag{} found", if behind == 1 { "" } else { "s" }),
+            detail: format!(
+                "{behind} newer Docker Hub tag{} found",
+                if behind == 1 { "" } else { "s" }
+            ),
         })
     } else {
         Some(ContainerVersionInfo {
@@ -131,7 +141,13 @@ async fn fetch_docker_hub_tags(repo: &str) -> Result<Vec<String>, reqwest::Error
     ));
     for _ in 0..MAX_TAG_PAGES {
         let Some(url) = next.take() else { break };
-        let page = client.get(url).send().await?.error_for_status()?.json::<HubTagPage>().await?;
+        let page = client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<HubTagPage>()
+            .await?;
         tags.extend(page.results.into_iter().map(|tag| tag.name));
         next = page.next;
         if next.is_none() {
@@ -152,20 +168,22 @@ fn supported_ref(image: &str) -> Option<ImageRef> {
     }
     let mut parts = name.split('/');
     let first = parts.next()?;
-    let repo = if first == "docker.io" || first == "registry.hub.docker.com" || first == "index.docker.io" {
-        let rest = parts.collect::<Vec<_>>().join("/");
-        if rest.split('/').count() == 1 {
-            format!("library/{rest}")
+    let repo =
+        if first == "docker.io" || first == "registry.hub.docker.com" || first == "index.docker.io"
+        {
+            let rest = parts.collect::<Vec<_>>().join("/");
+            if rest.split('/').count() == 1 {
+                format!("library/{rest}")
+            } else {
+                rest
+            }
+        } else if first.contains('.') || first.contains(':') {
+            return None;
+        } else if name.contains('/') {
+            name.to_string()
         } else {
-            rest
-        }
-    } else if first.contains('.') || first.contains(':') {
-        return None;
-    } else if name.contains('/') {
-        name.to_string()
-    } else {
-        format!("library/{name}")
-    };
+            format!("library/{name}")
+        };
     parse_version_tag(tag)?;
     Some(ImageRef {
         repo,
@@ -231,7 +249,12 @@ mod tests {
     #[test]
     fn supports_docker_hub_semver_refs_only() {
         assert_eq!(supported_ref("nginx:1.27.3").unwrap().repo, "library/nginx");
-        assert_eq!(supported_ref("docker.io/grafana/grafana:11.2.0").unwrap().repo, "grafana/grafana");
+        assert_eq!(
+            supported_ref("docker.io/grafana/grafana:11.2.0")
+                .unwrap()
+                .repo,
+            "grafana/grafana"
+        );
         assert!(supported_ref("nginx:latest").is_none());
         assert!(supported_ref("ghcr.io/acme/app:1.2.3").is_none());
         assert!(supported_ref("local-app:dev").is_none());
@@ -245,7 +268,10 @@ mod tests {
         let other_suffix = parse_version_tag("v1.3.0-bookworm").unwrap();
         assert_eq!(current.prefix, "v");
         assert_eq!(current.suffix, "-alpine");
-        assert_eq!(compare_versions(&next.nums, &current.nums), Ordering::Greater);
+        assert_eq!(
+            compare_versions(&next.nums, &current.nums),
+            Ordering::Greater
+        );
         assert_ne!(next.suffix, other_suffix.suffix);
         assert!(parse_version_tag("22-bookworm-slim").is_none());
     }

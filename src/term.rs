@@ -95,14 +95,15 @@ fn blocked_origin(config: &Config, headers: &HeaderMap) -> Option<String> {
     if !host.is_empty() && origin_host.eq_ignore_ascii_case(host) {
         return None;
     }
-    if config
-        .allowed_origins
-        .iter()
-        .any(|allowed| allowed.eq_ignore_ascii_case(origin_host) || allowed.eq_ignore_ascii_case(origin))
-    {
+    if config.allowed_origins.iter().any(|allowed| {
+        allowed.eq_ignore_ascii_case(origin_host) || allowed.eq_ignore_ascii_case(origin)
+    }) {
         return None;
     }
-    Some("Cross-origin WebSocket blocked (set DASHBOARD_ALLOWED_ORIGINS to the public host)".to_string())
+    Some(
+        "Cross-origin WebSocket blocked (set DASHBOARD_ALLOWED_ORIGINS to the public host)"
+            .to_string(),
+    )
 }
 
 async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
