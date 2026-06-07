@@ -210,7 +210,7 @@ active development checkout.
 
 | Machine | Labels | Repos |
 |---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude review (personal host) |
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude/Codex review (personal host) |
 | **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product deploys |
 | **cachy-beefy** | `shelldeck-beefy` | `spot-techno/shelldeck` deploy to `code.falkinator.org` |
 | **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` deploy to `code.spotcloud.nl` |
