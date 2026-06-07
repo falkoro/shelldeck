@@ -38,7 +38,11 @@ pub struct ContainerInfo {
 
 // "sha256:abcdef0123..." (or bare hex) -> first 12 hex chars; short ids pass through unchanged.
 pub(crate) fn short_image_id(raw: &str) -> String {
-    raw.trim().trim_start_matches("sha256:").chars().take(12).collect()
+    raw.trim()
+        .trim_start_matches("sha256:")
+        .chars()
+        .take(12)
+        .collect()
 }
 
 // `name\tStartedAt\timageId\tdescription` rows from `inspect` -> name -> (started, desc, image_id).
@@ -202,6 +206,38 @@ pub(crate) fn attach_stats(list: &mut [ContainerInfo], stats: &HashMap<String, (
     }
 }
 
+fn engine_preference(engine: &str) -> u8 {
+    match engine {
+        // On Arch/CachyOS, docker can be a Podman compatibility CLI. Prefer the native name when
+        // both commands report the same container.
+        "podman" => 0,
+        "docker" => 1,
+        _ => 2,
+    }
+}
+
+fn dedupe_key(
+    container: &ContainerInfo,
+) -> (String, String, String, Option<String>, Option<String>) {
+    (
+        container.name.clone(),
+        container.image.clone(),
+        container.status.clone(),
+        container.started.clone(),
+        container.image_id.clone(),
+    )
+}
+
+pub(crate) fn dedupe_engine_aliases(containers: &mut Vec<ContainerInfo>) {
+    containers.sort_by(|a, b| {
+        dedupe_key(a)
+            .cmp(&dedupe_key(b))
+            .then(engine_preference(&a.engine).cmp(&engine_preference(&b.engine)))
+    });
+    let mut seen = HashSet::new();
+    containers.retain(|container| seen.insert(dedupe_key(container)));
+}
+
 async fn engine_containers(engine: &str) -> Vec<ContainerInfo> {
     let Some(ps) = run_engine(
         engine,
@@ -273,9 +309,8 @@ pub async fn running() -> ContainerList {
     let (mut docker, mut podman) =
         tokio::join!(engine_containers("docker"), engine_containers("podman"));
     docker.append(&mut podman);
+    dedupe_engine_aliases(&mut docker);
     docker.sort_by(|a, b| a.engine.cmp(&b.engine).then(a.name.cmp(&b.name)));
-    let mut seen = HashSet::new();
-    docker.retain(|container| seen.insert((container.engine.clone(), container.name.clone())));
     docker.truncate(64);
     image_versions::annotate(&mut docker).await;
     ContainerList { containers: docker }
@@ -303,12 +338,51 @@ mod tests {
 
     #[test]
     fn parses_image_built_and_inspect_with_image_id() {
-        let inspect = parse_inspect("/web\t2026-06-01T10:00:00Z\tsha256:abc123def4567890\tThe web app\n");
+        let inspect =
+            parse_inspect("/web\t2026-06-01T10:00:00Z\tsha256:abc123def4567890\tThe web app\n");
         let row = inspect.get("web").unwrap();
         assert_eq!(row.0.as_deref(), Some("2026-06-01T10:00:00Z"));
         assert_eq!(row.1.as_deref(), Some("The web app"));
         assert_eq!(row.2.as_deref(), Some("abc123def456"));
         let built = parse_image_built("sha256:abc123def4567890\t2026-05-30T08:00:00Z\n");
-        assert_eq!(built.get("abc123def456").map(String::as_str), Some("2026-05-30T08:00:00Z"));
+        assert_eq!(
+            built.get("abc123def456").map(String::as_str),
+            Some("2026-05-30T08:00:00Z")
+        );
+    }
+
+    #[test]
+    fn dedupes_podman_docker_alias_rows() {
+        let mut list = vec![
+            ContainerInfo {
+                engine: "docker".to_string(),
+                name: "web".to_string(),
+                image: "nginx:alpine".to_string(),
+                status: "Up 2 hours".to_string(),
+                cpu: Some("1%".to_string()),
+                mem: Some("10MiB / 1GiB".to_string()),
+                started: Some("2026-06-01T10:00:00Z".to_string()),
+                desc: None,
+                version: None,
+                image_id: Some("abc123def456".to_string()),
+                built: None,
+            },
+            ContainerInfo {
+                engine: "podman".to_string(),
+                name: "web".to_string(),
+                image: "nginx:alpine".to_string(),
+                status: "Up 2 hours".to_string(),
+                cpu: Some("1%".to_string()),
+                mem: Some("10MiB / 1GiB".to_string()),
+                started: Some("2026-06-01T10:00:00Z".to_string()),
+                desc: None,
+                version: None,
+                image_id: Some("abc123def456".to_string()),
+                built: None,
+            },
+        ];
+        dedupe_engine_aliases(&mut list);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].engine, "podman");
     }
 }
