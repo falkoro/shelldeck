@@ -162,7 +162,7 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
   .terminal-panel .shell-tip-bar{padding-right:min(58vw,900px)}
   .terminal-panel .shell-tabs{padding-right:min(58vw,900px);min-height:42px;align-items:flex-end}
 }
-.terminal-grid{--shell-card-min-height:clamp(560px,72svh,1200px);display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:10px;align-items:stretch;align-content:start;grid-auto-rows:minmax(var(--shell-card-min-height),var(--shell-card-min-height))}
+.terminal-grid{--shell-card-min-height:clamp(680px,78svh,1400px);display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:10px;align-items:stretch;align-content:start;grid-auto-rows:minmax(var(--shell-card-min-height),var(--shell-card-min-height))}
 .terminal-grid.focus-mode{grid-template-columns:minmax(0,1fr)}
 .terminal-grid.focus-mode .terminal-card:not(.selected){display:none}
 .terminal-card{border:1px solid rgba(139,246,255,.16);background:#050a0f;border-radius:8px;overflow:hidden;min-height:var(--shell-card-min-height);min-width:0;display:flex;flex-direction:column}
@@ -207,7 +207,7 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
   .terminal-card .card-title.solo-summary{column-gap:0;align-items:center}
   .terminal-card .card-title.solo-summary .card-title-row{flex:0 0 auto;max-width:none;margin-left:auto;order:2;gap:4px}
   .terminal-card .card-title.solo-summary .card-title-row b{display:none}
-  .terminal-card .card-title.solo-summary .work-title.show{order:1;flex:1 1 auto;min-width:0;border-left:0;padding:0;margin:0;font-size:13px;line-height:1.45;font-style:normal}
+  .terminal-card .card-title.solo-summary .work-title.show{order:1;flex:1 1 auto;min-width:0;border-left:0;padding:0;margin:0;font-size:14px;line-height:1.5;font-style:normal;white-space:normal;overflow:visible;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3}
   .terminal-card .card-title.solo-summary .work-title.show::before{margin-right:4px}
 }
 body.preview-fullscreen-open{overflow:hidden}
@@ -219,9 +219,8 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.preview-fullscreen .card-resize-handle{display:none}
 .terminal-meta{display:flex;align-items:center;gap:8px;min-width:0}
 .terminal-meta .dot{flex:0 0 auto}
-.terminal-grid:not(.focus-mode) .terminal-card:not(.selected) .shell-composer{display:none!important}
-.terminal-card.selected .shell-composer{position:sticky;bottom:0;z-index:3}
-.shell-composer{border-top:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px;flex:0 0 auto}
+.terminal-card .shell-composer{position:sticky;top:0;z-index:3}
+.shell-composer{border-bottom:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px;flex:0 0 auto}
 .shell-composer textarea{width:100%;min-height:78px;max-height:180px;resize:vertical;background:#03070b;border:1px solid #263846;color:#eef9ff;border-radius:6px;padding:10px 11px;line-height:1.4;font:13px/1.4 "Cascadia Mono","JetBrains Mono",Consolas,monospace}
 .shell-actions{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .shell-actions button{min-height:28px;padding:4px 7px;font-size:12px}
