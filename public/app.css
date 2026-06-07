@@ -112,13 +112,15 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .image-chip code{font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .image-chip span{color:var(--muted);font-size:11px}
 .terminal-panel{border-color:rgba(139,246,255,.32);position:relative;overflow:hidden}
-.shell-tabs{display:flex;flex-wrap:nowrap;gap:7px;overflow-x:auto;overflow-y:hidden;padding:0 0 8px;margin-top:-2px;align-items:stretch;scrollbar-width:none;scroll-snap-type:x proximity}
+.shell-tabs{display:flex;flex-wrap:nowrap;gap:2px;overflow-x:auto;overflow-y:hidden;margin-top:-2px;margin-bottom:8px;align-items:stretch;scrollbar-width:none;scroll-snap-type:x proximity;border:1px solid rgba(139,246,255,.18);border-radius:8px;background:#071017;padding:3px}
 .shell-tabs::-webkit-scrollbar{display:none}
-.shell-tabs button{flex:0 0 clamp(240px,22vw,420px);width:auto;min-height:34px;padding:5px 10px;font-size:13px;scroll-snap-align:start}
+.shell-tabs button{flex:1 1 0;min-width:0;width:auto;min-height:34px;padding:5px 8px;font-size:13px;scroll-snap-align:start;border-radius:6px}
 /* One-line session tab: [badge] [dot] [label · work-title (truncated)] [time]. */
-.shell-tabs button.session-tab{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;max-width:none;text-align:left}
+.shell-tabs button.session-tab{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0;max-width:none;text-align:left}
 .shell-tabs button.session-tab.no-summary{min-width:0;max-width:none}
-.shell-tabs button.selected{border-color:rgba(139,246,255,.7);background:#10202b}
+.shell-tabs button.selected{border-color:rgba(139,246,255,.55);background:#10202b;box-shadow:inset 0 0 0 1px rgba(139,246,255,.22)}
+.shell-tabs button.session-tab{border-color:transparent;background:transparent}
+.shell-tabs button.session-tab:hover{background:rgba(139,246,255,.06)}
 .session-tab .dot{width:7px;height:7px;border-radius:50%;box-shadow:none;flex:0 0 auto}
 .session-tab-line{min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden;white-space:nowrap}
 .session-tab-label{flex:0 0 auto;max-width:46%;overflow:hidden;text-overflow:ellipsis;color:#eaf6ff;font-weight:700;font-size:12.5px;line-height:1.2}
@@ -170,7 +172,11 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .terminal-card.selected{border-color:rgba(139,246,255,.7)}
 .terminal-card.offline{opacity:.72}
 .terminal-card.dragging{border-color:#72f7c8;box-shadow:0 0 0 2px rgba(114,247,200,.16)}
-.terminal-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#071017}
+.terminal-card header{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#071017}
+.terminal-card .card-title{grid-column:1;min-width:0}
+.terminal-card .terminal-meta{grid-column:2}
+.terminal-card .card-window-controls{grid-column:3}
+.terminal-card .card-offline-actions{grid-column:1/-1;grid-row:2}
 .card-title{min-width:0;flex:1 1 auto;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:4px}
 .card-title-row{display:flex;align-items:center;gap:6px;min-width:0;flex:1 1 auto}
 .card-title-row b{flex:1 1 auto;min-width:0;max-width:100%;overflow:visible;white-space:normal;overflow-wrap:anywhere;line-height:1.2}
@@ -201,13 +207,13 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
   .terminal-grid{height:var(--shell-grid-viewport-height,auto);overflow-y:auto;overflow-x:hidden;padding-right:4px;overscroll-behavior:contain}
   .terminal-grid .terminal-card{height:var(--shell-card-min-height);min-height:0}
   .terminal-grid .terminal-card pre{min-height:0}
-  .terminal-card .card-title{flex-wrap:nowrap;align-items:flex-start}
-  .terminal-card .card-title-row{flex:0 1 auto;min-width:0;max-width:58%}
-  .terminal-card .work-title.show{flex:1 1 0;min-width:0}
-  .terminal-card .card-title.solo-summary{column-gap:0;align-items:center}
+  .terminal-card .card-title{flex-wrap:nowrap;align-items:center;overflow:hidden}
+  .terminal-card .card-title-row{flex:0 1 auto;min-width:0;max-width:42%}
+  .terminal-card .work-title.show{flex:1 1 0;min-width:0;max-width:100%}
+  .terminal-card .card-title.solo-summary{column-gap:0;align-items:center;padding-right:4px}
   .terminal-card .card-title.solo-summary .card-title-row{flex:0 0 auto;max-width:none;margin-left:auto;order:2;gap:4px}
   .terminal-card .card-title.solo-summary .card-title-row b{display:none}
-  .terminal-card .card-title.solo-summary .work-title.show{order:1;flex:1 1 auto;min-width:0;border-left:0;padding:0;margin:0;font-size:14px;line-height:1.5;font-style:normal;white-space:normal;overflow:visible;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3}
+  .terminal-card .card-title.solo-summary .work-title.show{order:1;flex:1 1 auto;min-width:0;max-width:100%;border-left:0;padding:0;margin:0;font-size:14px;line-height:1.35;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;-webkit-line-clamp:unset;line-clamp:unset}
   .terminal-card .card-title.solo-summary .work-title.show::before{margin-right:4px}
 }
 body.preview-fullscreen-open{overflow:hidden}
@@ -217,8 +223,9 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.preview-fullscreen .shell-composer{position:static;flex:0 0 auto}
 .terminal-card.preview-fullscreen pre{flex:1 1 auto;min-height:0;max-height:none!important}
 .terminal-card.preview-fullscreen .card-resize-handle{display:none}
-.terminal-meta{display:flex;align-items:center;gap:8px;min-width:0}
+.terminal-meta{display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:0;position:relative;z-index:2;padding-left:4px;background:inherit}
 .terminal-meta .dot{flex:0 0 auto}
+.terminal-meta .agent-badge{position:relative;z-index:1;background:#0a1119}
 .terminal-card .shell-composer{position:sticky;top:0;z-index:3}
 .shell-composer{border-bottom:1px solid rgba(139,246,255,.14);background:#071017;padding:10px;display:grid;gap:8px;flex:0 0 auto}
 .shell-composer textarea{width:100%;min-height:78px;max-height:180px;resize:vertical;background:#03070b;border:1px solid #263846;color:#eef9ff;border-radius:6px;padding:10px 11px;line-height:1.4;font:13px/1.4 "Cascadia Mono","JetBrains Mono",Consolas,monospace}
@@ -268,22 +275,21 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 @media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 22px,1760px);padding-top:max(12px,env(safe-area-inset-top))}.topbar{display:block}.topbar-privacy{display:flex;flex-wrap:wrap;margin-top:10px}.topbar-privacy span{display:none}.top-actions{justify-content:flex-start;margin-top:10px}.top-actions .button,.top-actions button{flex:1;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:block}.shell-tools{justify-content:flex-start;margin-top:10px}.shell-tools>*{flex:1 1 auto}.quick-strip button,.panel-header button{margin-top:10px;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:grid;grid-template-columns:1fr;align-items:stretch}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
 /* Per-slot waiting/running badge */
 .dot.wait{background:var(--amber);box-shadow:0 0 12px var(--amber)}
-.agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none}
-.agent-badge.active{border-color:rgba(114,247,200,.42);color:#bfffe6}
-.agent-badge.waiting{border-color:rgba(255,200,87,.45);color:#ffe2a0;background:rgba(255,200,87,.08)}
+.agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none;align-items:center;line-height:1.2}
+.agent-badge.active{border-color:rgba(114,247,200,.42);color:#bfffe6;background:rgba(114,247,200,.1)}
+.agent-badge.waiting{border-color:rgba(255,200,87,.45);color:#ffe2a0;background:rgba(255,200,87,.14)}
 .agent-badge.active,.agent-badge.waiting{display:inline-flex}
 .terminal-card.agent-waiting{border-color:rgba(255,200,87,.5)}
 @media (min-width:1700px){
   .workspace{grid-template-columns:360px minmax(0,1fr)}
-  .shell-tabs button{flex-basis:214px}
 }
 @media (min-width:2400px){
   .workspace{grid-template-columns:380px minmax(0,1fr)}
-  .shell-tabs button{flex-basis:232px;min-height:36px}
+  .shell-tabs button.session-tab{min-height:36px}
 }
 @media (min-width:3200px){
   .workspace{grid-template-columns:400px minmax(0,1fr)}
-  .shell-tabs button{flex-basis:260px;min-height:38px}
+  .shell-tabs button.session-tab{min-height:38px}
 }
 /* Quick links panel (sidebar, under Sessions) */
 .links-panel .panel-header{margin-bottom:10px}
@@ -366,7 +372,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .summary-inline .panel-header{margin-bottom:8px}
 .summary-inline .summary-body{max-height:200px;overflow:auto;-webkit-overflow-scrolling:touch}
 /* Per-slot work title (the shell's own summary line, sits beside the card title on wide screens) */
-.terminal-card .work-title{display:none;flex:0 1 auto;min-width:0;padding:0 8px;border-left:1px solid rgba(139,246,255,.18);background:transparent;color:#cfeaff;font-size:12.5px;line-height:1.48;font-style:italic;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;hyphens:auto}
+.terminal-card .work-title{display:none;flex:1 1 auto;min-width:0;padding:0 8px;border-left:1px solid rgba(139,246,255,.18);background:transparent;color:#cfeaff;font-size:12.5px;line-height:1.48;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;hyphens:none}
 .terminal-card .card-title-row b[hidden]{display:none!important}
 .terminal-card .work-title.show{display:block}
 .terminal-card .work-title::before{content:"› ";color:var(--cyan);font-style:normal}
