@@ -80,13 +80,21 @@ def upsert_comment(repo, pr, token, text):
     return "created"
 
 
+def warning(message):
+    print(f"::warning::{message}", file=sys.stderr)
+
+
 def main():
     token = os.environ["GITHUB_TOKEN"]
     repo = os.environ["REPO"]
     pr = os.environ["PR_NUMBER"]
     url = os.environ["GROK_URL"]
 
-    diff = get_diff(repo, pr, token)
+    try:
+        diff = get_diff(repo, pr, token)
+    except Exception as e:
+        warning(f"Grok review skipped: failed to fetch PR diff: {e}")
+        return
     if not diff.strip():
         print("empty diff; nothing to review")
         return
@@ -97,15 +105,22 @@ def main():
     try:
         review = call_grok(url, diff)
     except urllib.error.HTTPError as e:
-        print(f"grok proxy error {e.code}: {e.read()[:300]!r}", file=sys.stderr)
-        sys.exit(1)
+        warning(f"Grok review skipped: proxy returned HTTP {e.code}")
+        return
+    except Exception as e:
+        warning(f"Grok review skipped: {e}")
+        return
     if not review:
-        print("model returned no text", file=sys.stderr)
-        sys.exit(1)
+        warning("Grok review skipped: model returned no text")
+        return
     if truncated:
         review += "\n\n_Note: the diff was truncated; review covers the first part only._"
 
-    action = upsert_comment(repo, pr, token, review)
+    try:
+        action = upsert_comment(repo, pr, token, review)
+    except Exception as e:
+        warning(f"Grok review completed but failed to post comment: {e}")
+        return
     print(f"comment {action}")
 
 
