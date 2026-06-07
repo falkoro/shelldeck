@@ -12,15 +12,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: deploy-host-${{ matrix.target }}
-  cancel-in-progress: false
-
 jobs:
   deploy:
     name: Deploy ShellDeck (${{ matrix.target }})
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
+    concurrency:
+      group: deploy-host-${{ matrix.target }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
