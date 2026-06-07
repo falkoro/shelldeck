@@ -16,6 +16,7 @@ document.addEventListener('click', async (event) => {
     const historyButton = target.closest('[data-history]');
     const copyOutputButton = target.closest('[data-copy-output]');
     const privacyButton = target.closest('[data-privacy-shell]');
+    const containerPrivacyButton = target.closest('[data-container-privacy]');
     const renameShellButton = target.closest('[data-rename-shell]');
     const resetShellLabelButton = target.closest('[data-reset-shell-label]');
     const renameSensorButton = target.closest('[data-rename-sensor]');
@@ -45,6 +46,8 @@ document.addEventListener('click', async (event) => {
             return copyShellOutput(copyOutputButton.dataset.copyOutput || '');
         if (privacyButton)
             return toggleShellPrivacy(privacyButton.dataset.privacyShell || '');
+        if (containerPrivacyButton)
+            return toggleContainerPrivacy(containerPrivacyButton.dataset.containerPrivacy || '');
         if (renameShellButton) {
             const name = renameShellButton.dataset.renameShell || '';
             if (name && renameShellLabel(name)) {
