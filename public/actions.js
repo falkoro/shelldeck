@@ -534,13 +534,14 @@ async function saveRemoteHosts(hosts) {
     toast('Remote hosts saved');
 }
 window.openRemoteHostsEditor = openRemoteHostsEditor;
-async function sessionAction(endpoint, name) {
+async function sessionAction(endpoint, name, extra = {}) {
     if (!shellUnlocked)
         throw new Error('Unlock shells first');
-    const payload = await postJson(endpoint, { name });
+    const payload = await postJson(endpoint, { name, ...extra });
     toast(payload.message || 'Done');
     await refresh({ preserveUnlock: true });
     await loadShells(false);
+    return payload;
 }
 async function sendInput(name, submit) {
     if (!targetReady(name))

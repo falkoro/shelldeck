@@ -57,6 +57,7 @@ interface ApiPayload {
   ok?: boolean;
   error?: string;
   message?: string;
+  sessionName?: string;
   model?: DashboardModel;
   shells?: ShellPreview[];
   summary?: string;
@@ -394,6 +395,23 @@ function resetShellLabel(name: string): boolean {
   delete aliases[name];
   localStorage.setItem(SHELL_LABEL_ALIASES_KEY, JSON.stringify(aliases));
   return true;
+}
+
+function promptNewTmuxSessionName(baseName: string): string | null {
+  const session = sessionByName(baseName);
+  const fallback = session?.label || baseName;
+  const display = shellDisplayLabel(baseName, fallback);
+  const value = window.prompt(
+    `Name for the new tmux session from ${display}\nLeave blank to use ${baseName}.`,
+    '',
+  );
+  if (value === null) return null;
+  const clean = value.trim();
+  if (!clean) return '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(clean)) {
+    throw new Error('Use 1-64 letters, numbers, dash, or underscore for tmux session names');
+  }
+  return clean;
 }
 
 function stripTerminalDecor(value: string): string {

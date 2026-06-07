@@ -100,9 +100,14 @@ document.addEventListener('click', async (event) => {
             return;
         }
         if (createButton && !createButton.disabled) {
-            unhideShell(createButton.dataset.create || '');
-            await sessionAction('/api/create', createButton.dataset.create || '');
-            return selectSession(createButton.dataset.create);
+            const baseName = createButton.dataset.create || '';
+            const requestedName = promptNewTmuxSessionName(baseName);
+            if (requestedName === null)
+                return;
+            const targetName = requestedName || baseName;
+            unhideShell(targetName);
+            const payload = await sessionAction('/api/create', baseName, { sessionName: requestedName });
+            return selectSession(payload.sessionName || targetName);
         }
         if (startButton && !startButton.disabled) {
             unhideShell(startButton.dataset.start || '');

@@ -545,12 +545,13 @@ async function saveRemoteHosts(hosts: RemoteHostEntry[]): Promise<void> {
 
 (window as any).openRemoteHostsEditor = openRemoteHostsEditor;
 
-async function sessionAction(endpoint: string, name: string): Promise<void> {
+async function sessionAction(endpoint: string, name: string, extra: Record<string, unknown> = {}): Promise<ApiPayload> {
   if (!shellUnlocked) throw new Error('Unlock shells first');
-  const payload = await postJson(endpoint, { name });
+  const payload = await postJson(endpoint, { name, ...extra });
   toast(payload.message || 'Done');
   await refresh({ preserveUnlock: true });
   await loadShells(false);
+  return payload;
 }
 
 async function sendInput(name: string, submit: boolean): Promise<void> {
