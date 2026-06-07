@@ -167,6 +167,7 @@ The repository default branch is `master`.
 
 ```sh
 bun run check
+bun run slop:check   # extensive anti-AI-slop linter (scripts/ai-slop-rules.mjs)
 cargo test
 ```
 

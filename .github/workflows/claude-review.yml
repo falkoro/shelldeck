@@ -93,7 +93,7 @@ jobs:
           2. CORRECTNESS - tmux attach/capture edge cases, SSE/WebSocket lifecycle, SaaS provisioning paths, config persistence regressions.
           3. PRIVACY / UX - privacy blur/safe-shot regressions, misleading operator-facing copy, breaking changes to env/config without docs.
           4. VISUAL / LAYOUT (when public/app.css or frontend/ changes) - card-header gaps, composer hidden below output, solo-summary order regressions.
-          5. ANTI-AI-SLOP (when frontend/ or operator copy changes) - decorative pill/chip/badge chrome (rounded-full filled uppercase labels) that are not functional session/run/ticker indicators; marketing-template copy (delve/leverage/streamline/seamless/cutting-edge/elevate, whether-you-are-X-or-Y, empty trust claims). Functional .badge/.agent-badge/.run-status-badge for tmux/CI are OK.
+          5. ANTI-AI-SLOP (when frontend/, public/app.css, or operator copy changes) - use scripts/ai-slop-rules.mjs checklist. Flag: LLM vocabulary (delve/leverage/seamless/robust/game-changer/synergy/holistic/frictionless/revolutionary/elevate/streamline/paradigm/reimagine/turnkey/etc), opener cliches (in today's fast-paced, whether you're, picture this, let's dive in, trusted by industry leaders, the future of, join 10k+ users), decorative UI (NEW/BETA/FEATURED pills, hero-badge/feature-badge classes, emoji section headers, fake metric/trust-score cards, tailwind gradient blobs), CSS gradient meshes and Inter-only stacks. Allow functional session/run/ticker/unlock UI only.
 
           End with a single final line: `Verdict: <one sentence>`."""
           DIFF_SUFFIX = """
