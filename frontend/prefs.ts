@@ -10,7 +10,7 @@ let followOutput = localStorage.getItem('sdFollowOutput') !== '0';
 // this instance; productized tenants can default it hidden. Persisted per browser as sdSidebar.
 let sidebarVisible = localStorage.getItem('sdSidebar') !== 'hidden';
 let shellImages: Record<string, UploadedImage[]> = {};
-let clearedOutputs: Record<string, string> = {};
+let privateShells = new Set<string>(storageJson<string[]>('sdPrivateShells', []));
 let historyCursor: Record<string, number> = {};
 let historyDrafts: Record<string, string> = {};
 
@@ -146,6 +146,28 @@ function removeShellImage(name: string, path: string): void {
 function clearShellImages(name: string): void {
   delete shellImages[name];
   renderShellImages(name);
+}
+
+function shellPrivate(name: string): boolean {
+  return privateShells.has(name);
+}
+
+function setShellPrivate(name: string, on: boolean): void {
+  if (on) privateShells.add(name);
+  else privateShells.delete(name);
+  localStorage.setItem('sdPrivateShells', JSON.stringify(Array.from(privateShells)));
+  const card = document.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(name)}"]`);
+  if (card) applyShellPrivacy(card, name);
+}
+
+function applyShellPrivacy(card: HTMLElement, name: string): void {
+  const on = shellPrivate(name);
+  card.classList.toggle('privacy-blur', on);
+  const button = card.querySelector<HTMLButtonElement>('[data-privacy-shell]');
+  if (!button) return;
+  button.classList.toggle('active', on);
+  button.title = on ? 'Show this shell text' : 'Blur this shell text';
+  button.setAttribute('aria-label', on ? 'Show shell text' : 'Blur shell text');
 }
 
 // --- Shell card order persistence ---

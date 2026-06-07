@@ -425,9 +425,23 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .card-win-btn{position:relative;flex:0 0 auto;box-sizing:border-box;width:13px;height:13px;min-height:13px;padding:0;border:none;border-radius:50%;cursor:pointer;background:var(--muted);box-shadow:inset 0 0 0 1px rgba(0,0,0,.28);font-size:0;line-height:13px;text-align:center;color:transparent;transition:filter .14s}
 .card-win-btn.win-min{background:var(--amber)}
 .card-win-btn.win-full{background:var(--green)}
-.card-win-btn.win-reset{background:var(--red)}
+.card-win-btn.win-close{background:var(--red);font-size:9px;color:rgba(0,0,0,.74);font-weight:900}
 .card-win-btn:hover{filter:brightness(1.18)}
-.card-window-controls:hover .card-win-btn{font-size:8px;color:rgba(0,0,0,.72)}
+.card-window-controls:hover .card-win-btn:not(.win-close){font-size:8px;color:rgba(0,0,0,.72)}
+.card-create-btn{display:none;align-self:center;flex:0 0 auto;min-height:26px;padding:4px 8px;font-size:11px;border-color:rgba(114,247,200,.34);color:#bfffe6;background:rgba(114,247,200,.07);white-space:nowrap}
+.card-create-btn .ic{width:12px;height:12px}
+.terminal-card.offline .card-create-btn{display:inline-flex}
+.terminal-card.privacy-blur .card-title-row b,
+.terminal-card.privacy-blur .shell-name-pill,
+.terminal-card.privacy-blur [data-role="command"],
+.terminal-card.privacy-blur .terminal-meta [data-role="cwd"],
+.terminal-card.privacy-blur .work-title,
+.terminal-card.privacy-blur .shell-composer textarea,
+.terminal-card.privacy-blur .shell-status,
+.terminal-card.privacy-blur .attach-list,
+.terminal-card.privacy-blur pre[data-role="output"]{filter:blur(7px);opacity:.62;user-select:none}
+.terminal-card.privacy-blur pre[data-role="output"]{pointer-events:none}
+.privacy-btn.active{border-color:rgba(114,247,200,.6);color:#bfffe6;background:rgba(114,247,200,.12)}
 /* Drag-to-reorder visual states */
 .terminal-card.reorder-dragging{opacity:.38;border-style:dashed}
 .terminal-card.reorder-target{border-color:rgba(114,247,200,.6);box-shadow:0 0 0 2px rgba(114,247,200,.25);transform:scale(1.015)}
@@ -715,7 +729,6 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
   .terminal-card .card-title [data-role="command"]{display:none!important}
   .terminal-card .terminal-meta{flex:0 0 auto;gap:6px;margin:0!important}
   .terminal-card .terminal-meta [data-role="cwd"]{display:none!important}
-  .terminal-card .card-window-controls,
   .terminal-card .card-label-edit,
   .terminal-card .card-label-reset,
   .terminal-card .shell-composer,
@@ -724,6 +737,12 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
   /* Chevron makes "tap to open the live terminal" obvious. */
   .terminal-card>header::after{content:"\203A";flex:0 0 auto;margin-left:2px;color:var(--cyan,#8bf6ff);font-size:22px;line-height:1;opacity:.7}
   .terminal-card.selected{border-color:rgba(139,246,255,.5)}
+  .terminal-card .card-window-controls{display:flex!important;gap:5px;opacity:1}
+  .terminal-card .card-window-controls .win-min,
+  .terminal-card .card-window-controls .win-full{display:none}
+  .terminal-card .card-win-btn.win-close{width:18px;height:18px;min-height:18px;line-height:18px;font-size:12px}
+  .card-create-btn{min-height:30px;padding:5px 8px;font-size:11px}
+  .card-create-btn span{display:none}
 
   /* Keybar to the bottom as a short rail. This keeps Esc/arrow helpers from eating
      several rows on 390px-wide phones while still leaving every key reachable by swipe. */
@@ -756,10 +775,11 @@ button.rm-temp:hover,button.rm-temp:focus-visible{background:rgba(139,246,255,.1
     top:var(--svh-top,0px)!important;bottom:auto!important;left:0!important;right:auto!important;
     width:100vw!important;height:var(--svh,100dvh)!important;max-height:none!important}
 }
-/* Drop the selected-session action bar entirely — Stop + Restart now live on each shell card
-   (⋯ menu), so it was pure duplication and ate a whole row. Reclaim that space, and slim the
-   Shells panel header (no subtitle, tighter) so the controls + grid sit higher up. */
-.session-actions{display:none!important}
+/* Keep the selected-session action bar compact; it is the clearest place to create an
+   offline tmux slot while per-card controls handle the running shell. */
+.session-actions{margin-bottom:8px;padding:6px 8px}
+.session-action-buttons button{min-height:28px;padding:4px 8px}
+@media (max-width:760px){.session-action-buttons{grid-template-columns:repeat(auto-fit,minmax(76px,1fr))}.session-action-meta b,.session-action-meta small{white-space:normal;overflow:visible;text-overflow:clip}}
 .terminal-panel .panel-header{margin-bottom:8px}
 .terminal-panel .panel-header p{display:none}
 /* Tickers ride inside the top bar next to the wordmark now (reclaims their own row). The bar

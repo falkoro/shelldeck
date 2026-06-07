@@ -15,7 +15,7 @@ document.addEventListener('click', async (event) => {
     const dictateButton = target.closest('[data-dictate-shell]');
     const historyButton = target.closest('[data-history]');
     const copyOutputButton = target.closest('[data-copy-output]');
-    const clearPreviewButton = target.closest('[data-clear-preview]');
+    const privacyButton = target.closest('[data-privacy-shell]');
     const renameShellButton = target.closest('[data-rename-shell]');
     const resetShellLabelButton = target.closest('[data-reset-shell-label]');
     const renameSensorButton = target.closest('[data-rename-sensor]');
@@ -42,8 +42,8 @@ document.addEventListener('click', async (event) => {
             return cycleHistory(historyButton.dataset.history || '', 1);
         if (copyOutputButton)
             return copyShellOutput(copyOutputButton.dataset.copyOutput || '');
-        if (clearPreviewButton)
-            return clearShellPreview(clearPreviewButton.dataset.clearPreview || '');
+        if (privacyButton)
+            return toggleShellPrivacy(privacyButton.dataset.privacyShell || '');
         if (renameShellButton) {
             const name = renameShellButton.dataset.renameShell || '';
             if (name && renameShellLabel(name)) {

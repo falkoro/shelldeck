@@ -1130,10 +1130,9 @@ function copyShellOutput(name: string): Promise<void> {
   return copyText(text);
 }
 
-function clearShellPreview(name: string): void {
-  const shell = shellPreviewByName(name);
-  if (!shell) return;
-  clearedOutputs[name] = shell.output;
-  const pre = document.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(name)}"] [data-role="output"]`);
-  if (pre) pre.textContent = '';
+function toggleShellPrivacy(name: string): void {
+  if (!name) return;
+  const next = !shellPrivate(name);
+  setShellPrivate(name, next);
+  toast(next ? 'Shell text blurred' : 'Shell text visible');
 }

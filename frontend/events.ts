@@ -13,7 +13,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
   const dictateButton = target.closest<HTMLButtonElement>('[data-dictate-shell]');
   const historyButton = target.closest<HTMLButtonElement>('[data-history]');
   const copyOutputButton = target.closest<HTMLButtonElement>('[data-copy-output]');
-  const clearPreviewButton = target.closest<HTMLButtonElement>('[data-clear-preview]');
+  const privacyButton = target.closest<HTMLButtonElement>('[data-privacy-shell]');
   const renameShellButton = target.closest<HTMLButtonElement>('[data-rename-shell]');
   const resetShellLabelButton = target.closest<HTMLButtonElement>('[data-reset-shell-label]');
   const renameSensorButton = target.closest<HTMLButtonElement>('[data-rename-sensor]');
@@ -35,7 +35,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
     }
     if (historyButton) return cycleHistory(historyButton.dataset.history || '', 1);
     if (copyOutputButton) return copyShellOutput(copyOutputButton.dataset.copyOutput || '');
-    if (clearPreviewButton) return clearShellPreview(clearPreviewButton.dataset.clearPreview || '');
+    if (privacyButton) return toggleShellPrivacy(privacyButton.dataset.privacyShell || '');
     if (renameShellButton) {
       const name = renameShellButton.dataset.renameShell || '';
       if (name && renameShellLabel(name)) {

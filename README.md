@@ -13,7 +13,7 @@ It was built to babysit a fleet of long-running agent sessions from a phone or a
 - **Per-shell work titles** — an AI summary names *what each session is working on* (the running/waiting state is the badge's job).
 - **Real in-browser terminal** — "Shell in" opens an [xterm.js](https://xtermjs.org/) terminal bridged over a WebSocket to a PTY running `tmux attach`. Type, run, Ctrl-C — like actually being in the shell.
 - **Resume button** — when a pane prints a recovery command (e.g. `codex resume <id>`), a one-click button runs it.
-- **Copy / Send / Paste / keys** — copy attach commands or pane output, send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, browser-native microphone dictation, image paste/upload, and command history. Image paste/drop/upload works in both the composer cards and **Shell in** terminals.
+- **Copy / Send / Paste / keys** — copy attach commands or pane output, send input to a pane (with or without Enter), plus Enter / Ctrl-C / Clear, browser-native microphone dictation, image paste/upload, privacy blur, and command history. Image paste/drop/upload works in both the composer cards and **Shell in** terminals.
 - **Browser memory** — remembers the selected shell, command history, view/density/line preferences, shell order/sizes, onboarding dismissal, and floating terminal window positions in local browser storage.
 - **Mobile-friendly** — one shell at a time with a sticky tab switcher; Enter sends.
 - **Agent presets** — optional Create/Stop/Restart entries for iFlow/Flow, Gemini CLI, Qwen Code, goose, Aider, OpenCode, Codex, Grok, Claude Code, and custom commands.
@@ -153,9 +153,9 @@ Put it behind a reverse proxy / Cloudflare Tunnel for remote access, and ideally
 
 1. Sign in, then enter `DASHBOARD_UNLOCK_PASSWORD` in **Shell Unlock**. Until unlocked, pane previews, input, summaries, and live terminals stay gated.
 2. Use **Send** to paste text and press Enter in a pane. Use **Paste** to insert text without pressing Enter. On mobile, plain Enter in the textarea sends; Shift+Enter inserts a newline.
-3. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
+3. Use **New tmux** on an offline slot to create it. Use **Copy** in the session detail to copy the configured attach command, or **Copy** on a shell card to copy that pane's captured output.
 4. Use **Mic** to dictate into a shell input: click to start recording, click again to stop and transcribe (server-side whisper.cpp; needs a model configured).
-5. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box. Attachment chips clear after a successful send/paste into tmux.
+5. Use **Image** or paste/drop an image onto a shell card to upload it, optimize large images for agent use, and insert the saved local path into the input box. Use **Privacy** to blur shell text without clearing it. Attachment chips clear after a successful send/paste into tmux.
 6. Use **Shell in** to open a real interactive terminal. Paste/drop an image there, or use **Image**, to upload it and insert the saved file path into the live terminal input. On mobile, the terminal opens full-screen with a visible **Close x** button in the title bar.
 7. Use **Configure** to edit widget visibility and stock/crypto tickers without changing env files. The **Edit tickers** button jumps straight to the same ticker config.
 8. Use **Safe shot** to copy a redacted PNG to the clipboard and save the same image in the repo `share/` folder.

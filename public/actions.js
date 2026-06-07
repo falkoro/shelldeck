@@ -1135,12 +1135,10 @@ function copyShellOutput(name) {
         throw new Error('No output to copy');
     return copyText(text);
 }
-function clearShellPreview(name) {
-    const shell = shellPreviewByName(name);
-    if (!shell)
+function toggleShellPrivacy(name) {
+    if (!name)
         return;
-    clearedOutputs[name] = shell.output;
-    const pre = document.querySelector(`[data-shell-card="${selectorEscape(name)}"] [data-role="output"]`);
-    if (pre)
-        pre.textContent = '';
+    const next = !shellPrivate(name);
+    setShellPrivate(name, next);
+    toast(next ? 'Shell text blurred' : 'Shell text visible');
 }
