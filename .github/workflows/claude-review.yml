@@ -7,19 +7,14 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  id-token: write
 
 jobs:
   review:
     name: Claude review
     if: vars.CLAUDE_REVIEW_ENABLED == 'true' && vars.CLAUDE_REVIEW_CONFIGURED == 'true'
-    runs-on: [self-hosted, logan-gl502vs]
-    timeout-minutes: 20
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
+    timeout-minutes: 6
     steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
       - name: Resolve Dario proxy
         id: dario
         run: |
@@ -52,22 +47,164 @@ jobs:
         id: claude
         if: steps.dario.outputs.available == 'true'
         continue-on-error: true
-        timeout-minutes: 10
-        uses: anthropics/claude-code-action@v1
+        timeout-minutes: 4
         env:
-          ANTHROPIC_BASE_URL: ${{ steps.dario.outputs.base_url }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          anthropic_api_key: dario
-          claude_args: "--max-turns 25"
-          prompt: |
-            Review this pull request for ShellDeck and post concise inline review comments. Approve only if it is clean. Focus on, in priority order:
+          DARIO_BASE_URL: ${{ steps.dario.outputs.base_url }}
+          DARIO_API_KEY: dario
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CLAUDE_REVIEW_MODEL: claude-haiku-4-5
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
 
-            1. SECURITY - auth bypass, unlock-password handling, IP allowlist mistakes, secret leakage in logs/env examples, unsafe WebSocket/PTY bridging.
-            2. CORRECTNESS - tmux attach/capture edge cases, SSE/WebSocket lifecycle, SaaS provisioning paths, config persistence regressions.
-            3. PRIVACY / UX - privacy blur/safe-shot regressions, misleading operator-facing copy, breaking changes to env/config without docs.
+          API = "https://api.github.com"
+          MARKER = "<!-- claude-review -->"
+          MODEL = os.environ.get("CLAUDE_REVIEW_MODEL", "claude-haiku-4-5")
+          DIFF_LIMIT = 50_000
+          PROMPT = """You are reviewing a pull request for ShellDeck. Write ONE concise review comment in Markdown. Use `file:line` references. Do not nitpick formatting. If it is clean, say so plainly.
 
-            Be specific with file:line. Do not nitpick style.
+          Check, in priority order:
+          1. SECURITY - auth bypass, unlock-password handling, IP allowlist mistakes, secret leakage in logs/env examples, unsafe WebSocket/PTY bridging.
+          2. CORRECTNESS - tmux attach/capture edge cases, SSE/WebSocket lifecycle, SaaS provisioning paths, config persistence regressions.
+          3. PRIVACY / UX - privacy blur/safe-shot regressions, misleading operator-facing copy, breaking changes to env/config without docs.
+
+          End with a single final line: `Verdict: <one sentence>`."""
+          DIFF_SUFFIX = """
+
+          Here is the unified diff:
+
+          ```diff
+          {diff}
+          ```"""
+
+
+          def warning(message):
+              print(f"::warning::{message}", file=sys.stderr)
+
+
+          def req(method, url, token, body=None, accept="application/vnd.github+json", timeout=120):
+              headers = {
+                  "Authorization": f"Bearer {token}",
+                  "Accept": accept,
+                  "User-Agent": "claude-dario-review",
+              }
+              data = None
+              if body is not None:
+                  data = json.dumps(body).encode()
+                  headers["Content-Type"] = "application/json"
+              request = urllib.request.Request(url, data=data, headers=headers, method=method)
+              with urllib.request.urlopen(request, timeout=timeout) as resp:
+                  return resp.status, resp.read()
+
+
+          def get_diff(repo, pr, token):
+              _, raw = req(
+                  "GET",
+                  f"{API}/repos/{repo}/pulls/{pr}",
+                  token,
+                  accept="application/vnd.github.v3.diff",
+              )
+              return raw.decode("utf-8", "replace")
+
+
+          def call_claude(base_url, api_key, prompt, diff):
+              body = {
+                  "model": MODEL,
+                  "max_tokens": 1800,
+                  "temperature": 0,
+                  "stream": False,
+                  "messages": [{"role": "user", "content": prompt + DIFF_SUFFIX.format(diff=diff)}],
+              }
+              request = urllib.request.Request(
+                  f"{base_url.rstrip('/')}/v1/chat/completions",
+                  data=json.dumps(body).encode(),
+                  headers={
+                      "Content-Type": "application/json",
+                      "Authorization": f"Bearer {api_key}",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(request, timeout=180) as resp:
+                  payload = json.loads(resp.read())
+              choice = (payload.get("choices") or [{}])[0]
+              message = choice.get("message") or {}
+              content = message.get("content") or choice.get("text") or ""
+              if isinstance(content, list):
+                  content = "".join(
+                      part.get("text", "") if isinstance(part, dict) else str(part)
+                      for part in content
+                  )
+              return str(content).strip()
+
+
+          def upsert_comment(repo, pr, token, text):
+              body_md = f"{MARKER}\n## Claude review (Dario - {MODEL})\n\n{text}"
+              _, raw = req("GET", f"{API}/repos/{repo}/issues/{pr}/comments?per_page=100", token)
+              for comment in json.loads(raw):
+                  if MARKER in (comment.get("body") or ""):
+                      req(
+                          "PATCH",
+                          f"{API}/repos/{repo}/issues/comments/{comment['id']}",
+                          token,
+                          body={"body": body_md},
+                      )
+                      return "updated"
+              req("POST", f"{API}/repos/{repo}/issues/{pr}/comments", token, body={"body": body_md})
+              return "created"
+
+
+          def main():
+              token = os.environ["GITHUB_TOKEN"]
+              repo = os.environ["REPO"]
+              pr = os.environ["PR_NUMBER"]
+              base_url = os.environ["DARIO_BASE_URL"]
+              api_key = os.environ["DARIO_API_KEY"]
+
+              try:
+                  diff = get_diff(repo, pr, token)
+              except Exception as exc:
+                  warning(f"Claude review skipped: failed to fetch PR diff: {exc}")
+                  return
+              if not diff.strip():
+                  print("empty diff; nothing to review")
+                  return
+
+              truncated = len(diff) > DIFF_LIMIT
+              if truncated:
+                  diff = diff[:DIFF_LIMIT] + "\n\n[... diff truncated for length ...]"
+
+              try:
+                  review = call_claude(base_url, api_key, PROMPT, diff)
+              except urllib.error.HTTPError as exc:
+                  warning(f"Claude review skipped: Dario returned HTTP {exc.code}")
+                  return
+              except Exception as exc:
+                  warning(f"Claude review skipped: {exc}")
+                  return
+
+              if not review:
+                  warning("Claude review skipped: model returned no text")
+                  return
+              if truncated:
+                  review += "\n\n_Note: the diff was truncated; review covers the first part only._"
+
+              try:
+                  action = upsert_comment(repo, pr, token, review)
+              except Exception as exc:
+                  warning(f"Claude review completed but failed to post comment: {exc}")
+                  return
+              print(f"comment {action}")
+
+
+          if __name__ == "__main__":
+              main()
+          PY
 
       - name: Report Claude review status
         if: always()

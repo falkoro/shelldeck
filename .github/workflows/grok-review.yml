@@ -16,7 +16,7 @@ jobs:
   review:
     name: Grok review (Hermes)
     if: vars.GROK_REVIEW_ENABLED == 'true'
-    runs-on: [self-hosted, logan-gl502vs]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
