@@ -55,8 +55,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .panel-header p{margin-top:4px;font-size:13px}
 .panel-actions{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 .shell-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-.shell-tip{margin-right:auto;font-size:11px;color:var(--muted);opacity:.85;transition:opacity .25s ease;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42ch}
-@media (max-width:900px){.shell-tip{display:none}}
+.shell-tip{margin-right:auto;font-size:11px;color:var(--muted);opacity:.85;transition:opacity .25s ease;line-height:1.35}
+@media (max-width:520px){.shell-tip{display:none}}
 .stream-pill.on{border-color:rgba(114,247,200,.42);color:#bfffe6}
 .quick-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:rgba(255,200,87,.24);background:#10151a}
 .quick-strip code{display:block;margin-top:6px;white-space:normal;word-break:break-word;font-size:12px}
@@ -152,8 +152,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .terminal-card.offline{opacity:.72}
 .terminal-card.dragging{border-color:#72f7c8;box-shadow:0 0 0 2px rgba(114,247,200,.16)}
 .terminal-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#071017}
-.card-title{min-width:0;flex:1 1 auto}
-.card-title-row{display:flex;align-items:center;gap:6px;min-width:0}
+.card-title{min-width:0;flex:1 1 auto;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:4px}
+.card-title-row{display:flex;align-items:center;gap:6px;min-width:0;flex:1 1 auto}
 .card-title-row b{flex:1 1 auto;min-width:0;max-width:100%;overflow:visible;white-space:normal;overflow-wrap:anywhere;line-height:1.2}
 .card-title-row b.moving{overflow:hidden;white-space:nowrap;mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 18px),transparent)}
 .card-title-row b .marquee-track{display:inline-flex;gap:22px;min-width:max-content;animation:card-title-marquee 16s linear infinite}
@@ -337,18 +337,19 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .summary-inline{border:1px solid rgba(139,246,255,.2);border-radius:8px;background:#091119;padding:10px 12px;margin:0 0 10px}
 .summary-inline .panel-header{margin-bottom:8px}
 .summary-inline .summary-body{max-height:200px;overflow:auto;-webkit-overflow-scrolling:touch}
-/* Per-slot work title (the shell's own summary line, shown above its box) */
-.work-title{display:none;padding:9px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#070f16;color:#cfeaff;font-size:12.5px;line-height:1.48;font-style:italic}
-.work-title.show{display:block}
-.work-title::before{content:"› ";color:var(--cyan);font-style:normal}
-.work-title.moving{white-space:nowrap;overflow:hidden;mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
-.work-title.moving .marquee-track{display:inline-flex;gap:24px;min-width:max-content;vertical-align:bottom;animation:work-title-marquee 14s linear infinite}
-.work-title.moving .marquee-track span{display:inline;white-space:nowrap}
+/* Per-slot work title (the shell's own summary line, sits beside the card title on wide screens) */
+.terminal-card .work-title{display:none;flex:0 1 auto;min-width:0;padding:0 8px;border-left:1px solid rgba(139,246,255,.18);background:transparent;color:#cfeaff;font-size:12.5px;line-height:1.48;font-style:italic;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.terminal-card .work-title.show{display:block}
+.terminal-card .work-title::before{content:"› ";color:var(--cyan);font-style:normal}
+.terminal-card .work-title.moving{white-space:nowrap;overflow:hidden;flex:1 1 auto;text-overflow:clip;mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 22px),transparent)}
+.terminal-card .work-title.moving .marquee-track{display:inline-flex;gap:24px;min-width:max-content;vertical-align:bottom;animation:work-title-marquee 14s linear infinite}
+.terminal-card .work-title.moving .marquee-track span{display:inline;white-space:nowrap}
 @keyframes work-title-marquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 12px))}}
-@media (prefers-reduced-motion:reduce){.work-title.moving .marquee-track{animation:none}}
+@media (prefers-reduced-motion:reduce){.terminal-card .work-title.moving .marquee-track{animation:none}}
 @media (max-width:760px){
-  .work-title{padding:7px 10px;font-size:11.5px;line-height:1.35}
-  .work-title.show{white-space:nowrap;overflow:hidden}
+  .terminal-card .card-title{flex-direction:column;align-items:stretch;row-gap:4px}
+  .terminal-card .work-title{padding:0;border-left:0;flex:0 0 auto;font-size:11.5px;line-height:1.35}
+  .terminal-card .work-title.show{white-space:nowrap;overflow:hidden}
 }
 /* Recovery: Resume button only appears when a pane prints a resume command */
 .resume-btn{display:none}

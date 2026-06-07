@@ -32,7 +32,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.dataset.shellCard = shell.name;
   article.dataset.selectSession = shell.name;
   article.innerHTML = `<header>
-    <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span></div>
+    <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span><div class="work-title" data-role="worktitle"></div></div>
     <div class="card-offline-actions">
       <button type="button" class="card-create-btn" data-create title="Create this tmux session" aria-label="Create this tmux session">${icon('plus')}<span>New tmux</span></button>
       <button type="button" class="card-remove-btn" data-remove-closed title="Remove this closed session from the dashboard" aria-label="Remove closed session from dashboard">${icon('trash')}<span>Remove</span></button>
@@ -44,7 +44,6 @@ function createShellCard(shell: ShellPreview): HTMLElement {
       <button type="button" class="card-win-btn win-close" data-stop title="Kill this tmux session" aria-label="Kill tmux session">×</button>
     </div>
   </header>
-  <div class="work-title" data-role="worktitle"></div>
   <div class="shell-composer">
     <textarea spellcheck="false" data-command placeholder="Type for this shell. Enter sends on mobile; Ctrl+Enter on desktop."></textarea>
     <div class="shell-actions">
