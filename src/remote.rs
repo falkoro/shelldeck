@@ -1,6 +1,9 @@
 use crate::{
     config::RemoteHostConfig,
-    containers::{attach_built, attach_inspect, attach_stats, parse_image_built, parse_inspect, ContainerInfo},
+    containers::{
+        attach_built, attach_inspect, attach_stats, dedupe_engine_aliases, parse_image_built,
+        parse_inspect, ContainerInfo,
+    },
     image_versions,
     remote_metrics::{self, RemoteMetrics, REMOTE_METRICS_SCRIPT},
 };
@@ -204,6 +207,8 @@ async fn ssh_probe(target: &str, cap: usize, with_metrics: bool) -> ProbeResult 
     if let Some(images) = secs.get("IMAGES") {
         attach_built(&mut containers, &parse_image_built(images));
     }
+    dedupe_engine_aliases(&mut containers);
+    containers.sort_by(|a, b| a.engine.cmp(&b.engine).then(a.name.cmp(&b.name)));
     let total = containers.len();
     containers.truncate(cap.max(1));
     image_versions::annotate(&mut containers).await;
