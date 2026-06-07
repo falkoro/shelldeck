@@ -1,6 +1,11 @@
 use crate::config::Config;
 use serde::Serialize;
-use std::{collections::HashMap, path::PathBuf, process::Stdio, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    process::Stdio,
+    sync::Arc,
+};
 use tokio::{io::AsyncWriteExt, process::Command};
 
 #[derive(Clone, Serialize)]
@@ -50,6 +55,7 @@ struct LiveSession {
     attached: u32,
     created: u64,
     activity: u64,
+    shelldeck_created: bool,
 }
 
 #[derive(Clone)]
@@ -59,6 +65,11 @@ pub struct Pane {
     pub index: String,
     pub cwd: String,
     pub command: String,
+}
+
+pub struct CreateSessionResult {
+    pub message: String,
+    pub session_name: String,
 }
 
 pub fn tmux_args(args: &[&str]) -> Vec<String> {
@@ -105,7 +116,7 @@ pub async fn set_window_size_latest() {
 }
 
 async fn list_tmux_sessions() -> Vec<LiveSession> {
-    let Ok(stdout) = tmux_output(&["list-sessions", "-F", "#{session_name}|#{session_windows}|#{session_attached}|#{session_created}|#{session_activity}"]).await else {
+    let Ok(stdout) = tmux_output(&["list-sessions", "-F", "#{session_name}|#{session_windows}|#{session_attached}|#{session_created}|#{session_activity}|#{@shelldeck_created}"]).await else {
         return Vec::new();
     };
     stdout
@@ -118,6 +129,7 @@ async fn list_tmux_sessions() -> Vec<LiveSession> {
                 attached: parts.get(2)?.parse().ok()?,
                 created: parts.get(3)?.parse().ok()?,
                 activity: parts.get(4)?.parse().ok()?,
+                shelldeck_created: parts.get(5).is_some_and(|v| *v == "1"),
             })
         })
         .collect()
@@ -154,13 +166,16 @@ pub async fn session_model(config: Arc<Config>, unlocked: bool) -> SessionModel 
             activity: found.map(|s| s.activity),
         });
     }
-    if config.show_unknown_sessions {
+    if config.show_unknown_sessions || live.iter().any(|item| item.shelldeck_created) {
         for item in live {
             if config
                 .known_sessions
                 .iter()
                 .any(|s| s.name == item.name.as_str())
             {
+                continue;
+            }
+            if !config.show_unknown_sessions && !item.shelldeck_created {
                 continue;
             }
             let label = custom_label(&item.name);
@@ -253,6 +268,12 @@ pub async fn capture_pane(pane: &Pane, lines: u32) -> String {
 }
 
 pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Value {
+    let live = list_tmux_sessions().await;
+    let shelldeck_created: HashSet<String> = live
+        .iter()
+        .filter(|session| session.shelldeck_created)
+        .map(|session| session.name.clone())
+        .collect();
     let panes = list_panes().await;
     let by_session: HashMap<String, Pane> =
         panes.into_iter().map(|p| (p.session.clone(), p)).collect();
@@ -288,10 +309,13 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
             });
         }
     }
-    if config.show_unknown_sessions {
+    if config.show_unknown_sessions || !shelldeck_created.is_empty() {
         let mut unknown: Vec<&Pane> = by_session
             .values()
-            .filter(|pane| !known_names.iter().any(|known| *known == pane.session))
+            .filter(|pane| {
+                !known_names.iter().any(|known| *known == pane.session)
+                    && (config.show_unknown_sessions || shelldeck_created.contains(&pane.session))
+            })
             .collect();
         unknown.sort_by(|a, b| a.session.cmp(&b.session));
         for pane in unknown {
@@ -363,6 +387,16 @@ mod tests {
     }
 
     #[test]
+    fn tmux_session_name_validation_keeps_names_safe() {
+        assert!(valid_session_name("feature_1"));
+        assert!(valid_session_name("review-test"));
+        assert!(!valid_session_name(""));
+        assert!(!valid_session_name("bad name"));
+        assert!(!valid_session_name("bad:target"));
+        assert!(!valid_session_name(&"x".repeat(65)));
+    }
+
+    #[test]
     fn paste_submit_delay_scales_for_codex_multiline_pastes() {
         assert_eq!(paste_submit_delay_ms(200, "short prompt"), 200);
         assert!(paste_submit_delay_ms(200, &"x".repeat(800)) > 200);
@@ -375,8 +409,55 @@ pub async fn start_session(config: Arc<Config>, name: &str) -> Result<String, St
     launch_known_session(config, name, "started").await
 }
 
-pub async fn create_session(config: Arc<Config>, name: &str) -> Result<String, String> {
-    launch_known_session(config, name, "created").await
+pub async fn create_session(
+    config: Arc<Config>,
+    name: &str,
+    requested_name: Option<&str>,
+) -> Result<CreateSessionResult, String> {
+    let spec = config
+        .known_sessions
+        .iter()
+        .find(|s| s.name == name)
+        .ok_or("Unknown session")?;
+    let session_name = requested_name
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(name);
+    if !valid_session_name(session_name) {
+        return Err(
+            "Session name must be 1-64 characters: letters, numbers, dash, or underscore"
+                .to_string(),
+        );
+    }
+    if session_name != name
+        && config
+            .known_sessions
+            .iter()
+            .any(|session| session.name == session_name)
+    {
+        return Err(format!(
+            "{session_name} is a configured session; use its own New tmux button"
+        ));
+    }
+    if tmux_status(&["has-session", "-t", session_name])
+        .await
+        .unwrap_or(false)
+    {
+        return Ok(CreateSessionResult {
+            message: format!("{session_name} is already running"),
+            session_name: session_name.to_string(),
+        });
+    }
+    tmux_output(&["new-session", "-d", "-s", session_name, &spec.start]).await?;
+    if session_name != name {
+        let _ =
+            tmux_status(&["set-option", "-t", session_name, "@shelldeck_created", "1"]).await;
+        let _ = tmux_status(&["set-option", "-t", session_name, "@shelldeck_source", name]).await;
+    }
+    Ok(CreateSessionResult {
+        message: format!("{session_name} created"),
+        session_name: session_name.to_string(),
+    })
 }
 
 async fn launch_known_session(
@@ -397,6 +478,14 @@ async fn launch_known_session(
     }
     tmux_output(&["new-session", "-d", "-s", name, &spec.start]).await?;
     Ok(format!("{name} {verb}"))
+}
+
+fn valid_session_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
 }
 
 pub async fn restart_session(config: Arc<Config>, name: &str) -> Result<String, String> {

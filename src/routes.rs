@@ -40,6 +40,13 @@ struct NameBody {
 }
 
 #[derive(Deserialize)]
+struct CreateBody {
+    name: String,
+    #[serde(rename = "sessionName")]
+    session_name: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct ContainerActionBody {
     // Remote host id (from remote-hosts config) for a remote container; omitted/empty = local.
     host: Option<String>,
@@ -700,7 +707,7 @@ async fn api_create(
     State(state): State<AppState>,
     headers: HeaderMap,
     connect: ConnectInfo<SocketAddr>,
-    axum::Json(body): axum::Json<NameBody>,
+    axum::Json(body): axum::Json<CreateBody>,
 ) -> Response {
     if let Some(response) = guard(&state, &headers, &connect) {
         return response;
@@ -708,7 +715,26 @@ async fn api_create(
     if let Err(response) = require_unlock(&state, &headers).and_then(|_| require_action(&headers)) {
         return response;
     }
-    session_result(tmux::create_session(state.config.clone(), &body.name).await)
+    match tmux::create_session(
+        state.config.clone(),
+        &body.name,
+        body.session_name.as_deref(),
+    )
+    .await
+    {
+        Ok(result) => webutil::json_response(
+            StatusCode::OK,
+            &serde_json::json!({
+                "ok": true,
+                "message": result.message,
+                "sessionName": result.session_name
+            }),
+        ),
+        Err(error) => webutil::json_response(
+            StatusCode::BAD_REQUEST,
+            &serde_json::json!({ "error": error }),
+        ),
+    }
 }
 
 async fn api_restart(

@@ -8,11 +8,15 @@ function createShellCard(shell) {
     article.dataset.selectSession = shell.name;
     article.innerHTML = `<header>
     <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span></div>
+    <div class="card-offline-actions">
+      <button type="button" class="card-create-btn" data-create title="Create this tmux session" aria-label="Create this tmux session">${icon('plus')}<span>New tmux</span></button>
+      <button type="button" class="card-remove-btn" data-remove-closed title="Remove this closed session from the dashboard" aria-label="Remove closed session from dashboard">${icon('trash')}<span>Remove</span></button>
+    </div>
     <div class="terminal-meta"><span class="agent-badge" data-role="agent"></span><span class="dot" data-role="dot"></span><span data-role="cwd"></span></div>
     <div class="card-window-controls">
       <button type="button" class="card-win-btn win-min" data-minimize-shell title="Minimize this preview to dock" aria-label="Minimize preview to dock">−</button>
       <button type="button" class="card-win-btn win-full" data-maximize-preview title="Fullscreen this preview" aria-label="Fullscreen preview">⛶</button>
-      <button type="button" class="card-win-btn win-reset" data-reset-preview title="Reset this preview size and layout" aria-label="Reset preview">↺</button>
+      <button type="button" class="card-win-btn win-close" data-stop title="Kill this tmux session" aria-label="Kill tmux session">×</button>
     </div>
   </header>
   <div class="work-title" data-role="worktitle"></div>
@@ -29,7 +33,7 @@ function createShellCard(shell) {
       <button class="iconly" type="button" data-key="clear" title="Clear the shell screen" aria-label="Clear screen">${icon('eraser')}</button>
       <button class="iconly" type="button" data-copy-output title="Copy the pane output" aria-label="Copy output">${icon('copy')}</button>
       <button class="iconly" type="button" data-shellin title="Open a live interactive terminal in this session" aria-label="Shell in">${icon('terminal')}</button>
-      <button class="iconly" type="button" data-clear-preview title="Clear this preview locally (not the shell)" aria-label="Clear preview">${icon('eyeoff')}</button>
+      <button class="iconly privacy-btn" type="button" data-privacy-shell title="Blur this shell text" aria-label="Blur shell text">${icon('eyeoff')}</button>
       <button class="iconly" type="button" data-restart title="Restart this tmux session (recreate it)" aria-label="Restart tmux session">${icon('restart')}</button>
       <button class="warn iconly" type="button" data-stop title="Kill this tmux session (destructive)" aria-label="Kill tmux session">${icon('power')}</button>
       <button class="warn resume-btn iconly" type="button" data-resume title="Re-run the agent's resume command shown in the pane" aria-label="Resume agent">${icon('restart')}</button>
@@ -42,18 +46,19 @@ function createShellCard(shell) {
     article.querySelector('[data-send-shell]').dataset.sendShell = shell.name;
     article.querySelector('[data-paste-shell]').dataset.pasteShell = shell.name;
     article.querySelector('[data-add-image]').dataset.addImage = shell.name;
+    article.querySelector('[data-create]').dataset.create = shell.name;
     article.querySelector('[data-dictate-shell]').dataset.dictateShell = shell.name;
     article.querySelector('[data-history]').dataset.history = shell.name;
     article.querySelector('[data-copy-output]').dataset.copyOutput = shell.name;
-    article.querySelector('[data-clear-preview]').dataset.clearPreview = shell.name;
+    article.querySelector('[data-privacy-shell]').dataset.privacyShell = shell.name;
+    article.querySelector('[data-remove-closed]').dataset.removeClosed = shell.name;
     article.querySelector('[data-rename-shell]').dataset.renameShell = shell.name;
     article.querySelector('[data-reset-shell-label]').dataset.resetShellLabel = shell.name;
     article.querySelector('[data-minimize-shell]').dataset.minimizeShell = shell.name;
     article.querySelector('[data-maximize-preview]').dataset.maximizePreview = shell.name;
-    article.querySelector('[data-reset-preview]').dataset.resetPreview = shell.name;
     article.querySelector('[data-shellin]').dataset.shellin = shell.name;
     article.querySelector('[data-resume]').dataset.resume = shell.name;
-    article.querySelector('[data-stop]').dataset.stop = shell.name;
+    article.querySelectorAll('[data-stop]').forEach((button) => { button.dataset.stop = shell.name; });
     article.querySelector('[data-restart]').dataset.restart = shell.name;
     article.querySelectorAll('[data-key]').forEach((button) => {
         button.dataset.shell = shell.name;
@@ -74,6 +79,8 @@ function updateShellCard(card, shell) {
     card.classList.toggle('preview-enlarged', keepEnlarged);
     card.classList.toggle('resizing', keepResizing);
     card.classList.toggle('shell-refreshing', shellsLoading);
+    card.classList.toggle('removable-closed', canRemoveClosedShell(sessionByName(shell.name)));
+    applyShellPrivacy(card, shell.name);
     const displayLabel = updateShellCardTitle(card, shell);
     setText(card, '[data-role="command"]', shell.command || 'offline');
     setText(card, '[data-role="cwd"]', shell.cwd || '');
@@ -95,11 +102,7 @@ function updateShellCard(card, shell) {
             resumeBtn.classList.remove('show');
         }
     }
-    let output = shell.output || (shell.running ? 'No output captured yet.' : 'Session is offline.');
-    if (clearedOutputs[shell.name] && clearedOutputs[shell.name] === shell.output)
-        output = '';
-    if (clearedOutputs[shell.name] && clearedOutputs[shell.name] !== shell.output)
-        delete clearedOutputs[shell.name];
+    const output = shell.output || (shell.running ? 'No output captured yet.' : 'Session is offline.');
     const pre = card.querySelector('[data-role="output"]');
     // Only auto-follow when the viewer is already at the bottom, so scrolling up to read
     // older output isn't yanked back down on every 1.2s stream tick.
@@ -172,7 +175,8 @@ function renderShells(payload) {
     grid.querySelectorAll(':scope > .locked-note, :scope > .unlock-cta').forEach((note) => note.remove());
     const seen = new Set();
     // Use ordered list so drag-reorder persists across refreshes.
-    const ordered = orderedShellList(latestShells);
+    const visibleShells = visibleShellPreviews(latestShells);
+    const ordered = orderedShellList(visibleShells);
     ordered.forEach((shell, idx) => {
         seen.add(shell.name);
         let card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
@@ -197,7 +201,7 @@ function renderShells(payload) {
     }
     // Respect minimized previews (they live in the dock instead of the grid)
     const minPreviews = window.minimizedPreviews || new Set();
-    latestShells.forEach((shell) => {
+    visibleShells.forEach((shell) => {
         const card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
         if (card)
             card.style.display = minPreviews.has(shell.name) ? 'none' : '';
@@ -255,16 +259,19 @@ function renderSelectedSessionActions() {
                 ? 'ShellDeck can only create configured tmux sessions'
                 : 'Create this tmux session';
     const createDisabled = selected.running || selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-    const createLabel = selected.running ? 'Running' : 'Create';
+    const createLabel = selected.running ? 'Running' : 'New tmux';
     const restartDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
     const stopDisabled = !selected.running || !shellUnlocked ? 'disabled' : '';
+    const removeButton = canRemoveClosedShell(selected)
+        ? `<button class="warn remove-closed-action" type="button" data-remove-closed="${escapeHtml(selected.name)}" title="Remove this closed session from the dashboard">${icon('trash')}<span>Remove</span></button>`
+        : '';
     const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
     const displayLabel = shellDisplayLabel(selected.name, selected.label);
     const sshButton = selected.sshCommand
         ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
         : '';
     el.hidden = false;
-    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button><button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+    el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>${createLabel}</span></button>${removeButton}<button class="warn" type="button" ${stopDisabled} data-stop="${escapeHtml(selected.name)}" title="Kill this tmux session">${icon('stop')}<span>Stop</span></button><button class="warn" type="button" ${restartDisabled} data-restart="${escapeHtml(selected.name)}">${icon('restart')}<span>Restart</span></button><button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
 }
 let shellTabsSignature = '';
 function shellbarSummaryMoving(text) {
@@ -395,7 +402,7 @@ function buildLegend() {
         ['clock', 'History', 'Cycle previous inputs (or up / down in the box)'],
         ['eraser', 'Clear', 'Clear the shell screen'],
         ['copy', 'Copy', 'Copy the pane output'],
-        ['eyeoff', 'Clear view', 'Clear this preview locally (not the shell)'],
+        ['eyeoff', 'Privacy', 'Blur this shell text until you show it again'],
         ['terminal', 'Shell in', 'Open a live interactive terminal in this session'],
         ['restart', 'Resume', "Re-run the agent's resume command shown in the pane"],
     ];

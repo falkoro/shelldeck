@@ -7,7 +7,8 @@ let followOutput = localStorage.getItem('sdFollowOutput') !== '0';
 // this instance; productized tenants can default it hidden. Persisted per browser as sdSidebar.
 let sidebarVisible = localStorage.getItem('sdSidebar') !== 'hidden';
 let shellImages = {};
-let clearedOutputs = {};
+let privateShells = new Set(storageJson('sdPrivateShells', []));
+let hiddenClosedShells = new Set(storageJson(HIDDEN_CLOSED_SHELLS_KEY, []));
 let historyCursor = {};
 let historyDrafts = {};
 function storageJson(key, fallback) {
@@ -135,6 +136,82 @@ function removeShellImage(name, path) {
 function clearShellImages(name) {
     delete shellImages[name];
     renderShellImages(name);
+}
+function shellPrivate(name) {
+    return privateShells.has(name);
+}
+function setShellPrivate(name, on) {
+    if (on)
+        privateShells.add(name);
+    else
+        privateShells.delete(name);
+    localStorage.setItem('sdPrivateShells', JSON.stringify(Array.from(privateShells)));
+    const card = document.querySelector(`[data-shell-card="${selectorEscape(name)}"]`);
+    if (card)
+        applyShellPrivacy(card, name);
+}
+function applyShellPrivacy(card, name) {
+    const on = shellPrivate(name);
+    card.classList.toggle('privacy-blur', on);
+    const button = card.querySelector('[data-privacy-shell]');
+    if (!button)
+        return;
+    button.classList.toggle('active', on);
+    button.title = on ? 'Show this shell text' : 'Blur this shell text';
+    button.setAttribute('aria-label', on ? 'Show shell text' : 'Blur shell text');
+}
+function saveHiddenClosedShells() {
+    localStorage.setItem(HIDDEN_CLOSED_SHELLS_KEY, JSON.stringify(Array.from(hiddenClosedShells)));
+}
+function coreShellName(name) {
+    return name === 'main' || /^slot\d+$/.test(name);
+}
+function canRemoveClosedShell(session) {
+    return Boolean(session && !session.running && !coreShellName(session.name));
+}
+function removeClosedShell(name) {
+    const session = sessionByName(name);
+    if (!canRemoveClosedShell(session))
+        throw new Error('Only closed non-core sessions can be removed from the dashboard');
+    hiddenClosedShells.add(name);
+    saveHiddenClosedShells();
+    if (selectedSession === name)
+        chooseSession(false);
+    renderShells({ shells: latestShells });
+    toast('Removed closed session');
+}
+function unhideShell(name) {
+    if (!hiddenClosedShells.delete(name))
+        return;
+    saveHiddenClosedShells();
+}
+function visibleSessions(modelSessions) {
+    let changed = false;
+    const visible = modelSessions.filter((session) => {
+        if (session.running && hiddenClosedShells.has(session.name)) {
+            hiddenClosedShells.delete(session.name);
+            changed = true;
+            return true;
+        }
+        return !hiddenClosedShells.has(session.name);
+    });
+    if (changed)
+        saveHiddenClosedShells();
+    return visible;
+}
+function visibleShellPreviews(shells) {
+    let changed = false;
+    const visible = shells.filter((shell) => {
+        if (shell.running && hiddenClosedShells.has(shell.name)) {
+            hiddenClosedShells.delete(shell.name);
+            changed = true;
+            return true;
+        }
+        return !hiddenClosedShells.has(shell.name);
+    });
+    if (changed)
+        saveHiddenClosedShells();
+    return visible;
 }
 // --- Shell card order persistence ---
 // Persist the preferred sort order of shell cards so drag-to-reorder survives refresh.

@@ -57,6 +57,7 @@ interface ApiPayload {
   ok?: boolean;
   error?: string;
   message?: string;
+  sessionName?: string;
   model?: DashboardModel;
   shells?: ShellPreview[];
   summary?: string;
@@ -97,6 +98,7 @@ let dashboardSettings: DashboardSettings = {
 const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
 const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';
 const SHELL_PREVIEW_CACHE_KEY = 'sdShellPreviewCache';
+const HIDDEN_CLOSED_SHELLS_KEY = 'sdHiddenClosedShells';
 const SHELL_PREVIEW_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const SHELL_AUTO_TITLE_TTL_MS = 2 * 60 * 60 * 1000;
 const SHELLBOX_TITLE_WORDS = 3;
@@ -182,6 +184,7 @@ const ICONS: Record<string, string> = {
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   unlock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',
   external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>',
   camera: '<path d="M14.5 4 13 2H7L5.5 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-6.5Z"/><circle cx="12" cy="12" r="3.5"/><path d="M20 8h.01"/>',
@@ -258,7 +261,7 @@ async function copyText(text: string): Promise<void> {
 }
 
 function sessions(): SessionItem[] {
-  return currentModel.sessions || [];
+  return visibleSessions(currentModel.sessions || []);
 }
 
 function shellLabelAliases(): Record<string, string> {
@@ -392,6 +395,23 @@ function resetShellLabel(name: string): boolean {
   delete aliases[name];
   localStorage.setItem(SHELL_LABEL_ALIASES_KEY, JSON.stringify(aliases));
   return true;
+}
+
+function promptNewTmuxSessionName(baseName: string): string | null {
+  const session = sessionByName(baseName);
+  const fallback = session?.label || baseName;
+  const display = shellDisplayLabel(baseName, fallback);
+  const value = window.prompt(
+    `Name for the new tmux session from ${display}\nLeave blank to use ${baseName}.`,
+    '',
+  );
+  if (value === null) return null;
+  const clean = value.trim();
+  if (!clean) return '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(clean)) {
+    throw new Error('Use 1-64 letters, numbers, dash, or underscore for tmux session names');
+  }
+  return clean;
 }
 
 function stripTerminalDecor(value: string): string {

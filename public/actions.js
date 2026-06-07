@@ -534,13 +534,14 @@ async function saveRemoteHosts(hosts) {
     toast('Remote hosts saved');
 }
 window.openRemoteHostsEditor = openRemoteHostsEditor;
-async function sessionAction(endpoint, name) {
+async function sessionAction(endpoint, name, extra = {}) {
     if (!shellUnlocked)
         throw new Error('Unlock shells first');
-    const payload = await postJson(endpoint, { name });
+    const payload = await postJson(endpoint, { name, ...extra });
     toast(payload.message || 'Done');
     await refresh({ preserveUnlock: true });
     await loadShells(false);
+    return payload;
 }
 async function sendInput(name, submit) {
     if (!targetReady(name))
@@ -1135,12 +1136,10 @@ function copyShellOutput(name) {
         throw new Error('No output to copy');
     return copyText(text);
 }
-function clearShellPreview(name) {
-    const shell = shellPreviewByName(name);
-    if (!shell)
+function toggleShellPrivacy(name) {
+    if (!name)
         return;
-    clearedOutputs[name] = shell.output;
-    const pre = document.querySelector(`[data-shell-card="${selectorEscape(name)}"] [data-role="output"]`);
-    if (pre)
-        pre.textContent = '';
+    const next = !shellPrivate(name);
+    setShellPrivate(name, next);
+    toast(next ? 'Shell text blurred' : 'Shell text visible');
 }

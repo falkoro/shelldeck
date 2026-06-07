@@ -545,12 +545,13 @@ async function saveRemoteHosts(hosts: RemoteHostEntry[]): Promise<void> {
 
 (window as any).openRemoteHostsEditor = openRemoteHostsEditor;
 
-async function sessionAction(endpoint: string, name: string): Promise<void> {
+async function sessionAction(endpoint: string, name: string, extra: Record<string, unknown> = {}): Promise<ApiPayload> {
   if (!shellUnlocked) throw new Error('Unlock shells first');
-  const payload = await postJson(endpoint, { name });
+  const payload = await postJson(endpoint, { name, ...extra });
   toast(payload.message || 'Done');
   await refresh({ preserveUnlock: true });
   await loadShells(false);
+  return payload;
 }
 
 async function sendInput(name: string, submit: boolean): Promise<void> {
@@ -1130,10 +1131,9 @@ function copyShellOutput(name: string): Promise<void> {
   return copyText(text);
 }
 
-function clearShellPreview(name: string): void {
-  const shell = shellPreviewByName(name);
-  if (!shell) return;
-  clearedOutputs[name] = shell.output;
-  const pre = document.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(name)}"] [data-role="output"]`);
-  if (pre) pre.textContent = '';
+function toggleShellPrivacy(name: string): void {
+  if (!name) return;
+  const next = !shellPrivate(name);
+  setShellPrivate(name, next);
+  toast(next ? 'Shell text blurred' : 'Shell text visible');
 }
