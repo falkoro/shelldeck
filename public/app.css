@@ -113,6 +113,10 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .image-chip span{color:var(--muted);font-size:11px}
 .terminal-panel{border-color:rgba(139,246,255,.32);position:relative;overflow:hidden}
 .shell-tabs{display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;overflow-y:hidden;margin:0 0 10px;align-items:stretch;scrollbar-width:none;scroll-snap-type:x proximity;border:0;border-radius:0;background:transparent;padding:0}
+/* Grid/desktop: cards are the switcher — hide the duplicate tab strip (keep on compact-shell). */
+body:not(.compact-shell) .shell-tabs .session-tab:not(.restore-hidden-tab){display:none!important}
+body:not(.compact-shell) .shell-tabs:not(:has(.restore-hidden-tab)){display:none!important}
+body:not(.compact-shell) .shell-tip-bar{display:none}
 .shell-tabs::-webkit-scrollbar{display:none}
 .shell-tabs button{flex:1 1 auto;min-width:min(240px,100%);width:auto;min-height:36px;padding:0;font-size:13px;scroll-snap-align:start;border-radius:8px}
 /* Session tab: [badge] [dot] [label · work-title (full text, wraps)] [time]. */
@@ -175,7 +179,7 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .terminal-card.selected{border-color:rgba(139,246,255,.7)}
 .terminal-card.offline{opacity:.72}
 .terminal-card.dragging{border-color:#72f7c8;box-shadow:0 0 0 2px rgba(114,247,200,.16)}
-.terminal-card header{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:start;gap:10px;column-gap:12px;padding:10px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#071017}
+.terminal-card header{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;column-gap:12px;padding:10px 12px;border-bottom:1px solid rgba(139,246,255,.14);background:#071017}
 .terminal-card .card-title{grid-column:1;min-width:0}
 .terminal-card .terminal-meta{grid-column:2}
 .terminal-card .card-window-controls{grid-column:3}
@@ -227,7 +231,7 @@ body.preview-fullscreen-open{overflow:hidden}
 .terminal-card.preview-fullscreen .shell-composer{position:static;flex:0 0 auto}
 .terminal-card.preview-fullscreen pre{flex:1 1 auto;min-height:0;max-height:none!important}
 .terminal-card.preview-fullscreen .card-resize-handle{display:none}
-.terminal-meta{display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:0;position:relative;z-index:2;padding-left:6px;background:inherit;align-self:center;margin-top:2px}
+.terminal-meta{display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:0;position:relative;z-index:2;padding-left:6px;background:inherit;align-self:center;margin:0;justify-self:end}
 .terminal-meta .dot{flex:0 0 auto}
 .terminal-meta .agent-badge{position:relative;z-index:1;background:#0a1119}
 .terminal-card .shell-composer{position:sticky;top:0;z-index:3}
