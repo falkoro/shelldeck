@@ -469,7 +469,8 @@ function targetReady(name) {
 }
 function createReady(name) {
     const session = sessionByName(name);
-    return Boolean(shellUnlocked && session && !session.running && session.family !== 'custom');
+    // Running slots can spawn an extra named tmux session (prompted in events.ts).
+    return Boolean(shellUnlocked && session && session.family !== 'custom');
 }
 function setAccessState(unlocked) {
     const el = q('#accessState');
