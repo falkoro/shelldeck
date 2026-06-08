@@ -246,7 +246,7 @@ body.preview-fullscreen-open{overflow:hidden}
 .shell-actions .mic-btn:hover{border-color:var(--cyan);background:#102d33}
 .shell-actions .mic-btn.active{background:#e0566a;border-color:#ff97a4;color:#fff;animation:mic-pulse 1.15s ease-in-out infinite}
 @keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,86,106,.55)}50%{box-shadow:0 0 0 6px rgba(224,86,106,0)}}
-@media (max-width:760px){.shell-actions{gap:6px}.shell-actions .iconly,.shell-actions .mic-btn,.shell-actions .compact-action{width:auto;min-width:0;min-height:38px;padding:7px 8px}}
+@media (max-width:768px){.shell-actions{gap:6px}.shell-actions .iconly,.shell-actions .mic-btn,.shell-actions .compact-action{width:auto;min-width:0;min-height:38px;padding:7px 8px}}
 .segmented{display:inline-flex;border:1px solid rgba(139,246,255,.24);border-radius:6px;overflow:hidden;background:#071017}
 .segmented button{border:0;border-radius:0;min-width:44px}
 .segmented button+button{border-left:1px solid rgba(139,246,255,.18)}
@@ -277,7 +277,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .boot-title{font-size:14px;font-weight:800;letter-spacing:0;color:#eaffff}
 @keyframes boot-spin{to{transform:rotate(360deg)}}
 @media (max-width:980px){.workspace{grid-template-columns:1fr}.main-stack{order:1}.sidebar{order:2;position:static}.shells-locked .sidebar{order:1}.shells-locked .main-stack{order:2}.sessions{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.target-row{grid-template-columns:1fr}.target-row .pill{justify-self:stretch}.image-row{grid-template-columns:1fr}.terminal-grid{grid-template-columns:1fr}}
-@media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 16px,1760px);padding:max(10px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}.topbar{display:flex;flex-direction:column;gap:10px;align-items:stretch}.topbar-privacy{display:flex;flex-wrap:wrap;gap:6px;margin-top:0;align-self:stretch}.topbar-privacy span{display:none}.top-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:6px;margin-top:0;width:100%}.top-actions .button,.top-actions button{flex:1 1 calc(50% - 3px);min-width:0;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:flex;flex-direction:column;align-items:stretch;gap:8px}.quick-strip button,.panel-header button{margin-top:0;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
+@media (max-width:768px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 16px,1760px);padding:max(10px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}.topbar{display:flex;flex-direction:column;gap:10px;align-items:stretch}.topbar-privacy{display:flex;flex-wrap:wrap;gap:6px;margin-top:0;align-self:stretch}.topbar-privacy span{display:none}.top-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:6px;margin-top:0;width:100%}.top-actions .button,.top-actions button{flex:1 1 calc(50% - 3px);min-width:0;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:flex;flex-direction:column;align-items:stretch;gap:8px}.quick-strip>button,.panel-header>button{margin-top:0;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
 /* Per-slot waiting/running badge */
 .dot.wait{background:var(--amber);box-shadow:0 0 12px var(--amber)}
 .agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none;align-items:center;line-height:1.2}
@@ -343,7 +343,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .legend-row span{color:var(--muted);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis}
 
 /* Mobile: one shell at a time with a sticky tab switcher; easier inputs + smoother scroll */
-@media (max-width:760px),((max-width:1024px) and (pointer:coarse)){
+@media (max-width:768px),((max-width:1024px) and (pointer:coarse)){
   .terminal-grid,.terminal-grid.focus-mode{grid-template-columns:1fr;gap:8px}
   .terminal-grid .terminal-card:not(.selected){display:none}
   .terminal-panel .panel-header{margin-bottom:6px;gap:6px}
@@ -362,17 +362,16 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
   .terminal-card pre{max-height:46vh}
   .legend-grid{grid-template-columns:1fr}
   .settings-grid{grid-template-columns:1fr}
-  /* Shells toolbar: stream pill on its own row, icon controls in one aligned row. */
-  .shell-tools{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:6px;align-items:center;width:100%;margin-top:0}
-  .shell-tools>*{flex:0 0 auto;width:auto;margin-top:0}
-  .shell-tools .toolbar-session-actions{flex:1 1 100%;order:-1;margin:0}
-  .shell-tools .session-actions{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;width:100%;margin:0;padding:6px 8px;border:1px solid rgba(139,246,255,.14);border-radius:8px;background:#071017}
-  .shell-tools .session-action-meta{flex:1 1 auto;min-width:0}
-  .shell-tools .session-action-buttons{display:flex;flex-wrap:wrap;gap:5px;flex:0 0 auto}
-  .shell-tools .session-action-buttons button{min-width:0;min-height:34px;padding:5px 8px}
-  .shell-tools #streamState{flex:1 1 100%;order:0;justify-content:center;min-height:30px;font-size:11px}
-  .shell-tools #lineCount{min-height:38px}
-  #viewToggle,#followToggle,#densityToggle,#refreshSummaryBtn,#refreshShellsTopBtn,#legendToggleBtn,#restoreAllPreviewsBtn{min-width:42px;min-height:38px;padding:7px;justify-content:center}
+  /* Shells toolbar: session actions full width, then stream pill, then icon grid. */
+  .shell-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;align-items:center;width:100%;margin-top:0}
+  .shell-tools .toolbar-session-actions{grid-column:1/-1;margin:0}
+  .shell-tools .session-actions{display:flex;flex-direction:column;align-items:stretch;gap:8px;width:100%;margin:0;padding:6px 8px;border:1px solid rgba(139,246,255,.14);border-radius:8px;background:#071017}
+  .shell-tools .session-action-meta{min-width:0}
+  .shell-tools .session-action-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}
+  .shell-tools .session-action-buttons button{min-width:0;min-height:34px;padding:5px 8px;width:100%}
+  .shell-tools #streamState{grid-column:1/-1;justify-content:center;min-height:30px;font-size:11px;width:100%}
+  .shell-tools #lineCount{grid-column:1/-1;min-height:38px;width:100%}
+  #viewToggle,#followToggle,#densityToggle,#refreshSummaryBtn,#refreshShellsTopBtn,#legendToggleBtn,#restoreAllPreviewsBtn{min-width:0;min-height:38px;padding:7px;justify-content:center;width:100%}
   #viewToggle span,#followToggle span,#densityToggle span,#refreshSummaryBtn span,#refreshShellsTopBtn span,#legendToggleBtn span,#restoreAllPreviewsBtn{display:none}
 }
 /* Current Work summary pinned on top of the shells column */
@@ -387,7 +386,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .terminal-card .card-title-row b[hidden]{display:none!important}
 .terminal-card .work-title.show{display:block}
 .terminal-card .work-title::before{content:"› ";color:var(--cyan);font-style:normal}
-@media (max-width:760px),((max-width:1024px) and (pointer:coarse)){
+@media (max-width:768px),((max-width:1024px) and (pointer:coarse)){
   .terminal-card .card-title{flex-direction:column;align-items:stretch;row-gap:4px}
   .terminal-card .work-title{padding:0;border-left:0;flex:0 0 auto;font-size:11.5px;line-height:1.35}
   .terminal-card .work-title.show{white-space:normal;overflow:visible}
@@ -417,7 +416,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .term-key:active{background:rgba(139,246,255,.22);border-color:rgba(139,246,255,.5)}
 .term-key.armed{background:rgba(139,246,255,.34);border-color:#8bf6ff;color:#eaffff;box-shadow:0 0 0 1px rgba(139,246,255,.45)}
 .term-window.mobile .term-keybar{display:flex}
-@media (max-width:760px){
+@media (max-width:768px){
   .term-window:not(.mobile){
     left:max(0px,env(safe-area-inset-left))!important;
     right:max(0px,env(safe-area-inset-right))!important;
@@ -441,7 +440,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .term-min-item .tm-btn{padding:0 5px;font-size:12px;background:transparent;border:none;color:#8ad4ff;cursor:pointer}
 .term-min-item .tm-btn.tm-close{color:#ff8a8a}
 .term-min-item:hover{border-color:rgba(139,246,255,.45)}
-@media (max-width:760px){
+@media (max-width:768px){
   #term-dock{left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));align-items:stretch}
   .term-min-item{justify-content:space-between}
   .term-min-item .tm-name{max-width:none}
@@ -463,7 +462,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .ticker-empty code{font-size:11.5px;padding:1px 4px;border-radius:4px;background:rgba(139,246,255,.1)}
 .ticker-link{color:var(--accent,#8bf6ff);text-decoration:underline}
 /* On phones the ticker strip is noise above the shells — hide it entirely. */
-@media (max-width:760px){.ticker-strip{display:none}}
+@media (max-width:768px){.ticker-strip{display:none}}
 /* Quick-links dropdown */
 .links-dd{position:relative}
 .links-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;max-height:60vh;overflow:auto;background:#0b121a;border:1px solid rgba(139,246,255,.3);border-radius:8px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:2px}
@@ -574,7 +573,7 @@ button:hover,.button:hover{border-color:var(--cyan);background:#10202b}
 .terminal-card.preview-enlarged pre{max-height:560px}
 .terminal-card.preview-enlarged{min-height:620px}
 /* Remove resize handle on mobile (touch has its own resize) */
-@media (max-width:760px){.card-resize-handle{display:none}}
+@media (max-width:768px){.card-resize-handle{display:none}}
 .links-menu .ic{color:var(--cyan);flex:0 0 auto}
 /* Machine metrics widget (CPU / RAM / temps) — CachyOS-monitor style */
 .metrics-panel .panel-header h2{margin-bottom:2px}
@@ -802,7 +801,7 @@ body.compact-shell .terminal-panel .panel-header{margin-bottom:6px;gap:6px}
    Collapse the heavy preview cards into a one-tap launcher and
    make the live terminal keyboard-aware. Desktop is untouched.
    ============================================================ */
-@media (max-width:760px),((max-width:1024px) and (pointer:coarse)){
+@media (max-width:768px),((max-width:1024px) and (pointer:coarse)){
   /* Each preview card becomes a compact, tappable row -- tapping opens the full-screen
      live terminal (the real mobile interaction), so the inline composer / output /
      window controls are hidden and the card shrinks from ~300px to a single line. */
@@ -873,7 +872,7 @@ body.compact-shell .terminal-panel .panel-header{margin-bottom:6px;gap:6px}
    offline tmux slot while per-card controls handle the running shell. */
 .session-actions{margin-bottom:8px;padding:6px 8px}
 .session-action-buttons button{min-height:28px;padding:4px 8px}
-@media (max-width:760px){.session-action-buttons{grid-template-columns:repeat(auto-fit,minmax(76px,1fr))}.session-action-meta b,.session-action-meta small{white-space:normal;overflow:visible;text-overflow:clip}}
+@media (max-width:768px){.session-action-buttons{grid-template-columns:repeat(auto-fit,minmax(76px,1fr))}.session-action-meta b,.session-action-meta small{white-space:normal;overflow:visible;text-overflow:clip}}
 .terminal-panel .panel-header{margin-bottom:8px;align-items:flex-start}
 .terminal-panel .panel-header p{display:none}
 /* Tickers ride inside the top bar next to the wordmark now (reclaims their own row). The bar

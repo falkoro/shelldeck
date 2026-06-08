@@ -240,7 +240,7 @@ document.addEventListener('keydown', (event) => {
         return;
     // Ctrl/Cmd+Enter sends on desktop; on touch/mobile-layout plain Enter sends (Shift+Enter =
     // newline) so phone users don't have to reach the Run button hidden behind the soft keyboard.
-    const mobileSend = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 || window.matchMedia('(max-width: 760px)').matches;
+    const mobileSend = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 || window.matchMedia('(max-width: 768px)').matches;
     if (event.key === 'Enter' && !event.shiftKey && (event.ctrlKey || event.metaKey || mobileSend)) {
         event.preventDefault();
         sendInput(input.dataset.command || '', true).catch((error) => toast(error.message));

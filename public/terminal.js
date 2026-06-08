@@ -5,7 +5,7 @@ let nextZ = 75;
 let cascade = 0;
 const DEFAULT_W = 880;
 const DEFAULT_H = 540;
-const MOBILE_BREAKPOINT = 760;
+const MOBILE_BREAKPOINT = 768;
 const TERMINAL_PASTE_CHUNK_BYTES = 4096;
 // On-screen keys for the mobile terminal — a phone soft-keyboard can't send these,
 // yet they're essential for driving tmux / vim / coding agents. Shown only on mobile.

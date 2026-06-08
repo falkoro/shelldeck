@@ -164,7 +164,7 @@ function renderCardTitleLabel(label: HTMLElement | null, displayLabel: string, t
     return;
   }
   label.hidden = false;
-  const moving = window.innerWidth <= 760 && displayLabel.length > 34;
+  const moving = window.innerWidth <= 768 && displayLabel.length > 34;
   const signature = `${moving ? '1' : '0'}:${displayLabel}`;
   label.classList.toggle('moving', moving);
   label.title = title;
