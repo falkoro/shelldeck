@@ -410,7 +410,14 @@ function setShellAgentBadge(card: HTMLElement, name: string): void {
     // by default and shown only when an .active/.waiting status class is present.
     badge.className = `agent-badge${status ? ` ${status}` : ''}`;
     badge.textContent = status === 'active' ? 'running' : status === 'waiting' ? 'waiting' : '';
+    badge.title = status === 'active'
+      ? 'Running: output changed recently'
+      : status === 'waiting'
+        ? 'Waiting: session is alive but idle'
+        : '';
+    badge.setAttribute('aria-label', badge.title || 'Session status');
   }
+  card.classList.toggle('agent-active', status === 'active');
   card.classList.toggle('agent-waiting', status === 'waiting');
 }
 
@@ -485,7 +492,7 @@ function buildLegend(): void {
     `<div class="legend-row">${icon(ic)}<b>${name}</b><span>${escapeHtml(desc)}</span></div>`;
   const rows = items.map(toRow).join('');
   const toolbarRows = toolbar.map(toRow).join('');
-  const status = `<div class="legend-row"><span class="dot on"></span><b>running</b><span>agent is working</span></div><div class="legend-row"><span class="dot wait"></span><b>waiting</b><span>agent is waiting for your input</span></div>`;
+  const status = `<div class="legend-row"><span class="dot on"></span><b>running</b><span>output changed recently</span></div><div class="legend-row"><span class="dot wait"></span><b>waiting</b><span>session is alive but idle</span></div>`;
   const details = document.createElement('details');
   details.id = 'legend';
   details.className = 'legend';

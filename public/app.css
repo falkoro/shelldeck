@@ -187,7 +187,8 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .shell-name-pill.empty{display:none!important}
 .shell-name-pill [data-role="rawname"]{display:inline!important;color:inherit!important;font-size:inherit!important;line-height:inherit}
 .name-spinner{display:none;width:7px;height:7px;border-radius:999px;background:var(--cyan);box-shadow:0 0 0 0 rgba(139,246,255,.48);opacity:.8;animation:name-pulse 1.2s ease-in-out infinite}
-.terminal-card.shell-refreshing .name-spinner{display:inline-block}
+.terminal-card.shell-refreshing .name-spinner,.terminal-card.agent-active .name-spinner{display:inline-block}
+.terminal-card.agent-active .shell-name-pill{border-color:rgba(114,247,200,.38);background:rgba(114,247,200,.08)}
 .terminal-card.shell-refreshing .shell-name-pill{border-color:rgba(139,246,255,.36);background:rgba(139,246,255,.1)}
 @keyframes name-pulse{0%,100%{opacity:.42;box-shadow:0 0 0 0 rgba(139,246,255,.38)}50%{opacity:1;box-shadow:0 0 0 5px rgba(139,246,255,0)}}
 .card-label-edit,.card-label-reset{flex:0 0 auto;min-height:22px;width:24px;padding:2px;border-color:rgba(139,246,255,.16);background:transparent;color:var(--muted);opacity:.62}
@@ -274,11 +275,23 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 @media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 22px,1760px);padding-top:max(12px,env(safe-area-inset-top))}.topbar{display:block}.topbar-privacy{display:flex;flex-wrap:wrap;margin-top:10px}.topbar-privacy span{display:none}.top-actions{justify-content:flex-start;margin-top:10px}.top-actions .button,.top-actions button{flex:1;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:block}.shell-tools{justify-content:flex-start;margin-top:10px}.shell-tools>*{flex:1 1 auto}.quick-strip button,.panel-header button{margin-top:10px;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:grid;grid-template-columns:1fr;align-items:stretch}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
 /* Per-slot waiting/running badge */
 .dot.wait{background:var(--amber);box-shadow:0 0 12px var(--amber)}
-.agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none;align-items:center;line-height:1.2}
-.agent-badge.active{border-color:rgba(114,247,200,.42);color:#bfffe6;background:rgba(114,247,200,.1)}
+.session-tab.running .dot.on{animation:sd-status-pulse 1.15s ease-in-out infinite}
+.session-tab.waiting .dot.wait{animation:sd-wait-pulse 1.45s ease-in-out infinite}
+.agent-badge{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;flex:0 0 auto;display:none;align-items:center;gap:5px;line-height:1.2}
+.agent-badge::before{content:"";display:inline-block;flex:0 0 auto}
+.agent-badge.active{border-color:rgba(114,247,200,.5);color:#bfffe6;background:rgba(114,247,200,.12);box-shadow:0 0 0 1px rgba(114,247,200,.08),0 0 18px rgba(114,247,200,.12)}
+.agent-badge.active::before{width:8px;height:8px;border-radius:999px;border:2px solid rgba(114,247,200,.22);border-top-color:var(--green);animation:sd-status-spin .72s linear infinite}
 .agent-badge.waiting{border-color:rgba(255,200,87,.45);color:#ffe2a0;background:rgba(255,200,87,.14)}
+.agent-badge.waiting::before{width:7px;height:7px;border-radius:999px;background:var(--amber);box-shadow:0 0 0 0 rgba(255,200,87,.42);animation:sd-wait-pulse 1.45s ease-in-out infinite}
 .agent-badge.active,.agent-badge.waiting{display:inline-flex}
+.terminal-card.agent-active{border-color:rgba(114,247,200,.52);box-shadow:inset 0 1px 0 rgba(114,247,200,.2)}
 .terminal-card.agent-waiting{border-color:rgba(255,200,87,.5)}
+@keyframes sd-status-spin{to{transform:rotate(360deg)}}
+@keyframes sd-status-pulse{0%,100%{box-shadow:0 0 8px rgba(114,247,200,.35)}50%{box-shadow:0 0 16px rgba(114,247,200,.7)}}
+@keyframes sd-wait-pulse{0%,100%{opacity:.62;box-shadow:0 0 0 0 rgba(255,200,87,.34)}50%{opacity:1;box-shadow:0 0 0 5px rgba(255,200,87,0)}}
+@media (prefers-reduced-motion:reduce){
+  .agent-badge.active::before,.agent-badge.waiting::before,.session-tab.running .dot.on,.session-tab.waiting .dot.wait{animation:none}
+}
 @media (min-width:1700px){
   .workspace{grid-template-columns:360px minmax(0,1fr)}
 }
