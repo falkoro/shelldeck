@@ -74,8 +74,12 @@ function applyMobileViewportVars(el) {
     el.style.setProperty('--svh', `${Math.round(vv ? vv.height : window.innerHeight)}px`);
     el.style.setProperty('--svh-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
 }
+function applyCompactShellClass() {
+    document.body.classList.toggle('compact-shell', compactTerminalViewport());
+}
 function refreshTerminalViewportMode() {
     const compact = compactTerminalViewport();
+    applyCompactShellClass();
     termWindows.forEach((tw) => {
         tw.el.classList.toggle('mobile', compact);
         if (compact) {
@@ -487,8 +491,15 @@ function createTermWindow(name) {
     ws.binaryType = 'arraybuffer';
     const enc = new TextEncoder();
     tw.ws = ws;
-    ws.onopen = () => { status.textContent = 'connected'; term.focus(); };
-    ws.onclose = () => { status.textContent = 'disconnected'; };
+    let wsConnected = false;
+    ws.onopen = () => { wsConnected = true; status.textContent = 'connected'; term.focus(); };
+    ws.onclose = () => {
+        status.textContent = 'disconnected';
+        if (!wsConnected) {
+            toast('Could not attach to tmux — unlock shells, then start or create the session');
+            window.setTimeout(() => closeWindow(tw), 1200);
+        }
+    };
     ws.onerror = () => { status.textContent = 'conn error'; };
     ws.onmessage = (ev) => {
         if (typeof ev.data === 'string')
@@ -614,11 +625,24 @@ function createTermWindow(name) {
     setTimeout(() => doFit(tw), 70);
     return tw;
 }
+function sessionRunning(name) {
+    const session = sessions().find((s) => s.name === name);
+    const shell = shellPreviewByName(name);
+    return Boolean(session?.running || shell?.running);
+}
 function openTerminal(name) {
     if (!name)
         return;
     if (typeof Terminal === 'undefined') {
         toast('Terminal failed to load');
+        return;
+    }
+    if (!shellUnlocked) {
+        toast('Unlock shells first to shell in');
+        return;
+    }
+    if (!sessionRunning(name)) {
+        toast('This tmux session is offline — use New tmux to create it');
         return;
     }
     const compact = compactTerminalViewport();
@@ -876,6 +900,7 @@ function maybeAutoOpenMobileShell() {
     openTerminal(target.name);
 }
 window.maybeAutoOpenMobileShell = maybeAutoOpenMobileShell;
+applyCompactShellClass();
 window.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('scroll', refreshTerminalViewportMode);

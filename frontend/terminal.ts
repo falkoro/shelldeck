@@ -113,8 +113,13 @@ function applyMobileViewportVars(el: HTMLElement): void {
   el.style.setProperty('--svh-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
 }
 
+function applyCompactShellClass(): void {
+  document.body.classList.toggle('compact-shell', compactTerminalViewport());
+}
+
 function refreshTerminalViewportMode(): void {
   const compact = compactTerminalViewport();
+  applyCompactShellClass();
   termWindows.forEach((tw) => {
     tw.el.classList.toggle('mobile', compact);
     if (compact) {
@@ -524,8 +529,15 @@ function createTermWindow(name: string): TermWindow {
   const enc = new TextEncoder();
   tw.ws = ws;
 
-  ws.onopen = () => { status.textContent = 'connected'; term.focus(); };
-  ws.onclose = () => { status.textContent = 'disconnected'; };
+  let wsConnected = false;
+  ws.onopen = () => { wsConnected = true; status.textContent = 'connected'; term.focus(); };
+  ws.onclose = () => {
+    status.textContent = 'disconnected';
+    if (!wsConnected) {
+      toast('Could not attach to tmux — unlock shells, then start or create the session');
+      window.setTimeout(() => closeWindow(tw), 1200);
+    }
+  };
   ws.onerror = () => { status.textContent = 'conn error'; };
   ws.onmessage = (ev: MessageEvent) => {
     if (typeof ev.data === 'string') term.write(ev.data);
@@ -622,10 +634,24 @@ function createTermWindow(name: string): TermWindow {
   return tw;
 }
 
+function sessionRunning(name: string): boolean {
+  const session = sessions().find((s) => s.name === name);
+  const shell = shellPreviewByName(name);
+  return Boolean(session?.running || shell?.running);
+}
+
 function openTerminal(name: string): void {
   if (!name) return;
   if (typeof Terminal === 'undefined') {
     toast('Terminal failed to load');
+    return;
+  }
+  if (!shellUnlocked) {
+    toast('Unlock shells first to shell in');
+    return;
+  }
+  if (!sessionRunning(name)) {
+    toast('This tmux session is offline — use New tmux to create it');
     return;
   }
   const compact = compactTerminalViewport();
@@ -859,6 +885,7 @@ function maybeAutoOpenMobileShell(): void {
 }
 (window as any).maybeAutoOpenMobileShell = maybeAutoOpenMobileShell;
 
+applyCompactShellClass();
 window.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('resize', refreshTerminalViewportMode);
 window.visualViewport?.addEventListener('scroll', refreshTerminalViewportMode);

@@ -1057,6 +1057,7 @@ async function unlockShells(password) {
     (document.getElementById('currentWork') || q('#shellSection')).scrollIntoView({ block: 'start', behavior: 'smooth' });
     toast(payload.message || 'Unlocked');
     await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);
+    window.maybeAutoOpenMobileShell?.();
 }
 async function loadShells(showLoading = true) {
     const grid = q('#shells');

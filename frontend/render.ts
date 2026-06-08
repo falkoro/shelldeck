@@ -255,7 +255,7 @@ function scheduleShellGridFit(): void {
 function updateShellGridViewportFit(): void {
   const grid = document.getElementById('shells');
   if (!grid) return;
-  if (window.innerWidth <= 760) {
+  if ((window as any).compactTerminalViewport?.()) {
     grid.style.removeProperty('--shell-card-min-height');
     grid.style.removeProperty('--shell-grid-viewport-height');
     return;
@@ -346,7 +346,7 @@ function shellbarSummaryWords(): number {
   // Tabs now fill the bar (flex-wrap), so each tab is narrower than the old wide grid; the
   // brief is clamped to 2 lines per tab. Keep word counts modest so it reads cleanly — the
   // full work title still shows on the shell card and in the tab's title= tooltip.
-  if (window.innerWidth <= 760) return 4;
+  if ((window as any).compactTerminalViewport?.()) return 4;
   if (window.innerWidth >= 3200) return 12;
   if (window.innerWidth >= 2400) return 10;
   if (window.innerWidth >= 1700) return 8;
