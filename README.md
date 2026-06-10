@@ -197,7 +197,7 @@ Install the host runners once:
 # logan-laptop (code.spotcloud.nl)
 bash ops/scripts/install-shelldeck-host-runner.sh
 
-# cachy-beefy (code.falkinator.org)
+# logan-gl502vs (deploys into beefy for code.falkinator.org)
 bash ops/scripts/install-shelldeck-beefy-runner.sh
 ```
 
@@ -210,9 +210,9 @@ active development checkout.
 
 | Machine | Labels | Repos |
 |---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review` | `spot-techno/shelldeck` PR CI + Grok/Claude/Codex review (personal host) |
-| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product deploys |
-| **cachy-beefy** | `shelldeck-beefy` | `spot-techno/shelldeck` deploy to `code.falkinator.org` |
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review`, `shelldeck-beefy` | Personal `falkoro/*` CI + `spot-techno/shelldeck` PR CI; deploys ShellDeck into beefy (`code.falkinator.org`) |
+| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product CI/deploys |
+| **cachy-beefy / beefy-personal** | — | ShellDeck runtime target only (no GitHub runner inside the container) |
 | **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` deploy to `code.spotcloud.nl` |
 
 Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
