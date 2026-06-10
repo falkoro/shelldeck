@@ -2,7 +2,7 @@ name: Deploy host
 
 # Personal ShellDeck (code.falkinator.org) deploys from logan-gl502vs into beefy.
 # Spot/work ShellDeck (code.spotcloud.nl) deploys on logan-laptop where the service runs.
-# Other spot-techno/* CI uses the spot-tech-ci runner pool.
+# Split jobs so the beefy leg never resolves org-private composite actions at setup time.
 
 on:
   push:
@@ -11,40 +11,40 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
-  deploy:
-    name: Deploy ShellDeck (${{ matrix.target }})
-    runs-on: ${{ matrix.runs-on }}
+  deploy-falkinator:
+    name: Deploy ShellDeck (falkinator)
+    runs-on: [self-hosted, linux, x64, shelldeck-beefy]
     timeout-minutes: 30
     concurrency:
-      group: deploy-host-${{ matrix.target }}
+      group: deploy-host-falkinator
       cancel-in-progress: false
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: falkinator
-            runs-on: [self-hosted, linux, x64, shelldeck-beefy]
-            deploy_target: cachy-beefy
-            public_urls: https://code.falkinator.org/
-          - target: spotcloud
-            runs-on: [self-hosted, linux, x64, shelldeck-host]
-            deploy_target: logan-laptop
-            public_urls: https://code.spotcloud.nl/
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build, install, restart, and verify public route
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          SHELLDECK_DEPLOY_TARGET: cachy-beefy
+          SHELLDECK_PUBLIC_URLS: https://code.falkinator.org/
+        run: ./scripts/deploy-host.sh
+
+  deploy-spotcloud:
+    name: Deploy ShellDeck (spotcloud)
+    runs-on: [self-hosted, linux, x64, shelldeck-host]
+    timeout-minutes: 30
+    concurrency:
+      group: deploy-host-spotcloud
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
-        if: matrix.deploy_target == 'logan-laptop'
 
-      - uses: spot-techno/.github/actions/bun-deps-cache@master
-        if: matrix.deploy_target == 'logan-laptop'
-        # Managed by spot-techno/.github sync-bun-cache-workflows
       - name: Build, install, restart, and verify public route
         env:
           GITHUB_SHA: ${{ github.sha }}
-          SHELLDECK_DEPLOY_TARGET: ${{ matrix.deploy_target }}
-          SHELLDECK_PUBLIC_URLS: ${{ matrix.public_urls }}
+          SHELLDECK_DEPLOY_TARGET: logan-laptop
+          SHELLDECK_PUBLIC_URLS: https://code.spotcloud.nl/
         run: ./scripts/deploy-host.sh
