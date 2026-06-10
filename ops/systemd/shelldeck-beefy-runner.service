@@ -1,5 +1,5 @@
 [Unit]
-Description=GitHub Actions runner for ShellDeck beefy deploy (shelldeck-beefy)
+Description=GitHub Actions runner on logan-gl502vs for ShellDeck beefy deploy (shelldeck-beefy)
 After=network-online.target
 Wants=network-online.target
 

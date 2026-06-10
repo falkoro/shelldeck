@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Register a persistent host runner for spot-techno/shelldeck deploy jobs on cachy-beefy.
+# Register a persistent host runner on logan-gl502vs that deploys ShellDeck into beefy.
 set -euo pipefail
 
 RUNNER_ROOT="${SHELLDECK_BEEFY_RUNNER_ROOT:-$HOME/actions-runners/shelldeck-beefy}"
 RUNNER_VERSION="${RUNNER_VERSION:-2.334.0}"
 REPO="${SHELLDECK_BEEFY_RUNNER_REPO:-spot-techno/shelldeck}"
-RUNNER_NAME="${SHELLDECK_BEEFY_RUNNER_NAME:-cachy-beefy-shelldeck-beefy}"
+RUNNER_NAME="${SHELLDECK_BEEFY_RUNNER_NAME:-logan-gl502vs-shelldeck-beefy}"
 LABELS="${SHELLDECK_BEEFY_RUNNER_LABELS:-shelldeck-beefy}"
 TOKEN_FILE="${GITHUB_TOKEN_FILE:-$HOME/.config/mcp/secrets/github-mcp-token}"
 
@@ -32,10 +32,13 @@ read_github_token() {
   exit 1
 }
 
-if [ "$(hostname)" != "${SHELLDECK_DEPLOY_HOSTNAME:-cachy-beefy}" ]; then
-  echo "Refusing install on unexpected host: $(hostname)" >&2
-  exit 1
-fi
+case "$(hostname)" in
+  logan-GL502VS|logan-gl502vs|logan-GL502VS.localdomain|logan-gl502vs.localdomain) ;;
+  *)
+    echo "Refusing install on unexpected host: $(hostname)" >&2
+    exit 1
+    ;;
+esac
 
 GH_TOKEN="$(read_github_token)"
 export GH_TOKEN

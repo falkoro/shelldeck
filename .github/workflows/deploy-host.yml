@@ -1,8 +1,8 @@
 name: Deploy host
 
-# Two live ShellDeck hosts:
-# - cachy-beefy  -> code.falkinator.org (personal)
-# - logan-laptop -> code.spotcloud.nl (Spot/work)
+# Personal ShellDeck (code.falkinator.org) deploys from logan-gl502vs into beefy.
+# Spot/work ShellDeck (code.spotcloud.nl) deploys on logan-laptop where the service runs.
+# Other spot-techno/* CI uses the spot-tech-ci runner pool.
 
 on:
   push:
@@ -26,22 +26,23 @@ jobs:
         include:
           - target: falkinator
             runs-on: [self-hosted, linux, x64, shelldeck-beefy]
-            deploy_hostname: cachy-beefy
+            deploy_target: cachy-beefy
             public_urls: https://code.falkinator.org/
           - target: spotcloud
             runs-on: [self-hosted, linux, x64, shelldeck-host]
-            deploy_hostname: logan-laptop
+            deploy_target: logan-laptop
             public_urls: https://code.spotcloud.nl/
     steps:
       - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
+        if: matrix.deploy_target == 'logan-laptop'
 
       - uses: spot-techno/.github/actions/bun-deps-cache@master
         # Managed by spot-techno/.github sync-bun-cache-workflows
       - name: Build, install, restart, and verify public route
         env:
           GITHUB_SHA: ${{ github.sha }}
-          SHELLDECK_DEPLOY_HOSTNAME: ${{ matrix.deploy_hostname }}
+          SHELLDECK_DEPLOY_TARGET: ${{ matrix.deploy_target }}
           SHELLDECK_PUBLIC_URLS: ${{ matrix.public_urls }}
         run: ./scripts/deploy-host.sh
