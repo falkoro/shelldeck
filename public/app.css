@@ -33,8 +33,10 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .shell{width:min(3840px,calc(100% - 32px));margin:0 auto;padding:22px 0 max(34px,env(safe-area-inset-bottom))}
 .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
 .topbar-start{display:flex;align-items:center;gap:12px;flex:0 0 auto;min-width:0}
-.topbar-clock{flex:0 0 auto;font-variant-numeric:tabular-nums;letter-spacing:.02em;color:var(--text);min-width:7.5ch;justify-content:center}
+.topbar-clock{flex:0 0 auto;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.04em;color:#eaffff;min-width:8.5ch;justify-content:center;padding:5px 10px}
 .brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
+.brand-icon-btn{border:0;background:transparent;padding:0;cursor:pointer;border-radius:6px;line-height:0}
+.brand-icon-btn:hover .brand-logo{box-shadow:0 0 0 1px rgba(139,246,255,.55)}
 .brand-status{margin-top:0;align-items:center}
 .host-label-btn{cursor:pointer;border-color:var(--line);background:transparent;color:var(--text);font:inherit;font-size:12px;padding:5px 9px;min-height:29px}
 .host-label-btn:hover{border-color:var(--cyan);color:#eaffff}
@@ -121,29 +123,23 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .shell-tabs{display:flex;flex-wrap:nowrap;gap:3px;overflow-x:auto;overflow-y:hidden;margin-top:-2px;margin-bottom:8px;align-items:stretch;scrollbar-width:none;scroll-snap-type:x proximity;border:1px solid rgba(139,246,255,.18);border-radius:8px;background:#071017;padding:3px 4px}
 .shell-tabs::-webkit-scrollbar{display:none}
 .shell-tabs button{flex:1 1 auto;min-width:min(240px,100%);width:auto;min-height:36px;padding:0;font-size:13px;scroll-snap-align:start;border-radius:5px}
-/* Session tab: [badge] [dot] [label · work-title (full text, wraps)] [time]. */
-.shell-tabs button.session-tab{display:grid;grid-template-columns:26px 8px minmax(0,1fr) auto;align-items:start;column-gap:6px;row-gap:2px;min-width:min(280px,100%);max-width:none;text-align:left;padding:5px 8px 5px 5px}
-.session-tab>.badge{grid-column:1;width:26px;height:26px;min-width:26px;max-width:26px;font-size:12px;line-height:1;text-transform:none;justify-self:center;align-self:center}
-.session-tab>.dot{grid-column:2;justify-self:center;align-self:center}
-.session-tab>.session-tab-line{grid-column:3;align-self:center}
-.session-tab>.session-tab-time{grid-column:4;align-self:center}
+/* Session tab: [badge][dot] | title + time / summary */
+.shell-tabs button.session-tab{display:grid;grid-template-columns:26px 8px minmax(0,1fr);align-items:center;column-gap:6px;row-gap:0;min-width:min(220px,100%);max-width:none;text-align:left;padding:6px 8px 6px 5px;min-height:42px}
+.session-tab>.badge{grid-column:1;grid-row:1;width:26px;height:26px;min-width:26px;max-width:26px;font-size:12px;line-height:1;text-transform:none;justify-self:center;align-self:center}
+.session-tab>.dot{grid-column:2;grid-row:1;justify-self:center;align-self:center}
+.session-tab>.session-tab-body{grid-column:3;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.session-tab-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
 /* Floor, not 0: overflow-wrap:anywhere makes the min-content of these tabs a single
    character, so without a floor they crush into 1-char-wide vertical letter columns.
    The tab bar scrolls horizontally, so a floor never overflows the row. */
-.shell-tabs button.session-tab.no-summary{min-width:min(130px,100%);max-width:none}
+.shell-tabs button.session-tab.no-summary{min-width:min(150px,100%);max-width:none;min-height:36px}
 .shell-tabs button.selected{border-color:rgba(139,246,255,.55);background:#10202b;box-shadow:inset 0 0 0 1px rgba(139,246,255,.22)}
 .shell-tabs button.session-tab{border-color:transparent;background:transparent}
 .shell-tabs button.session-tab:hover{background:rgba(139,246,255,.06)}
 .session-tab .dot{width:6px;height:6px;border-radius:50%;box-shadow:none;flex:0 0 auto}
-.session-tab-line{min-width:0;display:flex;align-items:baseline;gap:6px;overflow:visible;white-space:normal;flex-wrap:wrap}
-.session-tab-label{flex:0 1 auto;max-width:none;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;color:#eaf6ff;font-weight:700;font-size:12.5px;line-height:1.25}
-.session-tab-sep{flex:0 0 auto;color:var(--muted)}
-.session-tab.no-label .session-tab-line{gap:4px}
-.session-tab.no-label .session-tab-summary{flex:1 1 auto}
-.session-tab-summary{min-width:0;overflow:visible;color:#bcd9ee;font-weight:500;font-size:12px;line-height:1.25}
-.session-tab-summary .marquee-track{display:block;max-width:100%;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
-.session-tab-summary .marquee-track span:nth-child(2){display:none}
-.session-tab-time{flex:0 0 auto;color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums;align-self:center;padding-top:1px}
+.session-tab-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#eaf6ff;font-weight:700;font-size:13px;line-height:1.2}
+.session-tab-summary{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#91a7b7;font-weight:500;font-size:11.5px;line-height:1.2}
+.session-tab-time{flex:0 0 auto;color:#8bf6ff;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
 .session-tab-status{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .session-tab.waiting{border-color:rgba(255,200,87,.35);background:rgba(255,200,87,.06)}
 .session-tab.offline{opacity:.72}
@@ -373,12 +369,12 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
   .terminal-grid .terminal-card:not(.selected){display:none}
   .shell-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:stretch;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 -4px 6px;padding:4px;border-bottom:1px solid rgba(139,246,255,.16);gap:3px}
   .shell-tabs button{flex:0 0 auto;width:auto;min-height:40px;font-size:12px;padding:0}
-  .shell-tabs button.session-tab{min-width:min(72vw,320px);max-width:none;grid-template-columns:24px 7px minmax(0,1fr) auto;column-gap:5px;padding:6px 8px 6px 5px}
+  .shell-tabs button.session-tab{min-width:min(72vw,320px);max-width:none;grid-template-columns:24px 7px minmax(0,1fr);column-gap:5px;padding:6px 8px 6px 5px}
   .session-tab>.badge{width:24px;height:24px;min-width:24px;max-width:24px;font-size:11px}
   .shell-tabs button.session-tab.no-summary{min-width:min(56vw,220px);max-width:none}
-  .session-tab-label{font-size:11.5px;max-width:none}
+  .session-tab-label{font-size:12px}
   .session-tab-summary{font-size:11px}
-  .session-tab-time{font-size:10px}
+  .session-tab-time{font-size:11px}
   .shell-composer textarea,.unlock-form input,input,select{font-size:16px}
   .terminal-card pre,.shell-tabs,.shell-composer textarea{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   .terminal-card pre{max-height:46vh}

@@ -315,7 +315,7 @@ function applyPrivacyAll() {
     if (allBtn) {
         allBtn.classList.toggle('active', on);
         allBtn.setAttribute('aria-pressed', String(on));
-        allBtn.title = on ? 'Show all dashboard text' : 'Blur all dashboard text';
+        allBtn.title = on ? 'Show dashboard text' : 'Blur dashboard text';
         allBtn.setAttribute('aria-label', allBtn.title);
     }
     const containersPanel = document.getElementById('containersPanel');
@@ -323,10 +323,6 @@ function applyPrivacyAll() {
     if (on) {
         containersPanel?.classList.add('container-privacy-blur');
         remotePanel?.classList.add('container-privacy-blur');
-        document.querySelectorAll('[data-container-privacy="local"], [data-container-privacy="remote"]').forEach((btn) => {
-            btn.classList.add('active');
-            btn.setAttribute('aria-pressed', 'true');
-        });
         document.querySelectorAll('[data-shell-card]').forEach((card) => {
             card.classList.add('privacy-blur');
             card.querySelector('[data-privacy-shell]')?.classList.add('active');

@@ -36,6 +36,7 @@ interface ContainerInfo {
   version?: ContainerVersionInfo | null;
   image_id?: string | null;
   built?: string | null;
+  alert?: string | null;
 }
 
 interface ContainerVersionInfo {
@@ -117,7 +118,8 @@ const CONTAINER_STATE_LABEL: Record<ContainerStateKind, string> = {
 // Fine-grained lifecycle/health from a docker/podman status string. Beyond running/stopped it
 // surfaces unhealthy (failed healthcheck), restarting (crash-looping), paused, created, and —
 // crucially — distinguishes a clean stop (Exited 0) from a crash (Exited non-zero / Dead).
-function containerState(status: string): ContainerStateKind {
+function containerState(status: string, alert?: string | null): ContainerStateKind {
+  if ((alert || '').trim()) return 'unhealthy';
   const s = (status || '').toLowerCase().trim();
   if (s.includes('unhealthy')) return 'unhealthy';
   if (s.startsWith('restarting')) return 'restarting';
@@ -134,7 +136,7 @@ function containerState(status: string): ContainerStateKind {
 function containerHealth(containers: ContainerInfo[]): string {
   const counts: Partial<Record<ContainerStateKind, number>> = {};
   for (const c of containers) {
-    const st = containerState(c.status);
+    const st = containerState(c.status, c.alert);
     counts[st] = (counts[st] || 0) + 1;
   }
   const parts = CONTAINER_STATE_ORDER
@@ -249,7 +251,7 @@ function preciseUptime(startedIso?: string | null): string {
 
 // Running containers show precise uptime (from StartedAt); stopped show nothing here.
 function containerAge(c: ContainerInfo): string {
-  if (containerState(c.status) !== 'running') return '';
+  if (containerState(c.status, c.alert) !== 'running') return '';
   return preciseUptime(c.started) || containerUptime(c.status);
 }
 
@@ -358,6 +360,12 @@ function containerBuiltHtml(c: ContainerInfo): string {
 
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
 // then actions. Stopped/unhealthy get a state class for greying/highlighting.
+function containerAlertHtml(c: ContainerInfo): string {
+  const alert = (c.alert || '').trim();
+  if (!alert) return '';
+  return `<div class="ci-alert" title="${escapeHtml(alert)}">${escapeHtml(alert)}</div>`;
+}
+
 function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string {
   const chips = containerStatChipsHtml(c);
   const statsHtml = chips ? `<div class="ci-stats">${chips}</div>` : '';
@@ -367,10 +375,11 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
   const descHtml = desc
     ? `<div class="ci-desc" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(desc)} — click to edit">${escapeHtml(desc)}</div>`
     : `<div class="ci-desc ci-desc-empty" data-edit-desc="${escapeHtml(c.name)}" title="Add a description">+ description</div>`;
-  return `<div class="container-item ${extraClass} state-${containerState(c.status)}">`
+  return `<div class="container-item ${extraClass} state-${containerState(c.status, c.alert)}">`
     + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small>${containerActionsHtml(c, host)}</div>`
     + `<div class="ci-image-line"><div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>${containerVersionBadgeHtml(c)}</div>`
     + descHtml
+    + containerAlertHtml(c)
     + containerBuiltHtml(c)
     + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
     + statsHtml + `</div>`;
@@ -379,7 +388,7 @@ function containerRowHtml(c: ContainerInfo, extraClass = '', host = ''): string 
 // Denser 2-line row for the remote host cards: status dot + name + cpu/mem on top, image + age
 // below. Full status lives in the dot/age tooltips. Keeps long lists short and tidy.
 function compactContainerRowHtml(c: ContainerInfo, host: string): string {
-  const state = containerState(c.status);
+  const state = containerState(c.status, c.alert);
   const age = containerAge(c);
   // Same CPU/mem pills as the local panel (intensity bar + %-of-limit), kept on one line.
   const chips = containerStatChipsHtml(c);
@@ -398,6 +407,7 @@ function compactContainerRowHtml(c: ContainerInfo, host: string): string {
   return `<div class="container-item remote-container compact state-${state}">`
     + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
     + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badges}</div>`
+    + containerAlertHtml(c)
     + builtHtml
     + `</div>`;
 }
@@ -479,6 +489,7 @@ function toggleContainerPrivacy(rawScope: string): void {
   applyContainerPrivacy(scope);
   toast(next ? 'Container text blurred' : 'Container text visible');
 }
+
 (window as any).toggleContainerPrivacy = toggleContainerPrivacy;
 
 function meterLevel(pct: number): string {
