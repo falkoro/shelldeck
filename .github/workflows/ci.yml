@@ -18,6 +18,8 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
+      - uses: spot-techno/.github/actions/bun-deps-cache@master
+        # Managed by spot-techno/.github sync-bun-cache-workflows
       - name: Frontend typecheck
         run: |
           bun install --frozen-lockfile
