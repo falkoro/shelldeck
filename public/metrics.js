@@ -11,7 +11,9 @@ const CONTAINER_STATE_LABEL = {
 // Fine-grained lifecycle/health from a docker/podman status string. Beyond running/stopped it
 // surfaces unhealthy (failed healthcheck), restarting (crash-looping), paused, created, and —
 // crucially — distinguishes a clean stop (Exited 0) from a crash (Exited non-zero / Dead).
-function containerState(status) {
+function containerState(status, alert) {
+    if ((alert || '').trim())
+        return 'unhealthy';
     const s = (status || '').toLowerCase().trim();
     if (s.includes('unhealthy'))
         return 'unhealthy';
@@ -34,7 +36,7 @@ function containerState(status) {
 function containerHealth(containers) {
     const counts = {};
     for (const c of containers) {
-        const st = containerState(c.status);
+        const st = containerState(c.status, c.alert);
         counts[st] = (counts[st] || 0) + 1;
     }
     const parts = CONTAINER_STATE_ORDER
@@ -162,7 +164,7 @@ function preciseUptime(startedIso) {
 }
 // Running containers show precise uptime (from StartedAt); stopped show nothing here.
 function containerAge(c) {
-    if (containerState(c.status) !== 'running')
+    if (containerState(c.status, c.alert) !== 'running')
         return '';
     return preciseUptime(c.started) || containerUptime(c.status);
 }
@@ -276,6 +278,12 @@ function containerBuiltHtml(c) {
 }
 // Shared row for local + remote container lists: name + engine tag, image, status + age, stats,
 // then actions. Stopped/unhealthy get a state class for greying/highlighting.
+function containerAlertHtml(c) {
+    const alert = (c.alert || '').trim();
+    if (!alert)
+        return '';
+    return `<div class="ci-alert" title="${escapeHtml(alert)}">${escapeHtml(alert)}</div>`;
+}
 function containerRowHtml(c, extraClass = '', host = '') {
     const chips = containerStatChipsHtml(c);
     const statsHtml = chips ? `<div class="ci-stats">${chips}</div>` : '';
@@ -285,10 +293,11 @@ function containerRowHtml(c, extraClass = '', host = '') {
     const descHtml = desc
         ? `<div class="ci-desc" data-edit-desc="${escapeHtml(c.name)}" title="${escapeHtml(desc)} — click to edit">${escapeHtml(desc)}</div>`
         : `<div class="ci-desc ci-desc-empty" data-edit-desc="${escapeHtml(c.name)}" title="Add a description">+ description</div>`;
-    return `<div class="container-item ${extraClass} state-${containerState(c.status)}">`
+    return `<div class="container-item ${extraClass} state-${containerState(c.status, c.alert)}">`
         + `<div class="ci-row1"><b>${escapeHtml(c.name)}</b><small class="ci-engine">${escapeHtml(c.engine)}</small>${containerActionsHtml(c, host)}</div>`
         + `<div class="ci-image-line"><div class="ci-image" title="${escapeHtml(c.image)}">${escapeHtml(c.image)}</div>${containerVersionBadgeHtml(c)}</div>`
         + descHtml
+        + containerAlertHtml(c)
         + containerBuiltHtml(c)
         + `<div class="ci-row2"><em>${escapeHtml(c.status)}</em>${ageHtml}</div>`
         + statsHtml + `</div>`;
@@ -296,7 +305,7 @@ function containerRowHtml(c, extraClass = '', host = '') {
 // Denser 2-line row for the remote host cards: status dot + name + cpu/mem on top, image + age
 // below. Full status lives in the dot/age tooltips. Keeps long lists short and tidy.
 function compactContainerRowHtml(c, host) {
-    const state = containerState(c.status);
+    const state = containerState(c.status, c.alert);
     const age = containerAge(c);
     // Same CPU/mem pills as the local panel (intensity bar + %-of-limit), kept on one line.
     const chips = containerStatChipsHtml(c);
@@ -315,6 +324,7 @@ function compactContainerRowHtml(c, host) {
     return `<div class="container-item remote-container compact state-${state}">`
         + `<div class="ci-top"><span class="ci-dot" title="${escapeHtml(c.status)}"></span><b>${escapeHtml(c.name)}</b>${rightHtml}${containerActionsHtml(c, host)}</div>`
         + `<div class="ci-bot"><span class="${subClass}" title="${escapeHtml(subTitle)}">${escapeHtml(subText)}</span>${badges}</div>`
+        + containerAlertHtml(c)
         + builtHtml
         + `</div>`;
 }

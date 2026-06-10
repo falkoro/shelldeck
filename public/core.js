@@ -11,6 +11,9 @@ let dashboardSettings = {
 };
 const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
 const HOST_ALIAS_KEY = 'sdHostAlias';
+const BRAND_ICON_KEY = 'sdBrandIcon';
+const DEFAULT_BRAND_ICON = '/assets/lf-icon.svg';
+const BRAND_ICON_MAX_BYTES = 512 * 1024;
 const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';
 const SHELL_PREVIEW_CACHE_KEY = 'sdShellPreviewCache';
 const HIDDEN_CLOSED_SHELLS_KEY = 'sdHiddenClosedShells';
@@ -517,7 +520,39 @@ function setStreamState(text, live = false) {
     el.textContent = text;
 }
 function formatTopbarClock(now = new Date()) {
-    return now.toLocaleTimeString([], { hour12: false });
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+}
+function applyBrandIcon() {
+    const img = document.getElementById('brandIcon');
+    if (!img)
+        return;
+    img.src = localStorage.getItem(BRAND_ICON_KEY) || DEFAULT_BRAND_ICON;
+}
+function readBrandIconFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => reject(new Error('Could not read icon file'));
+        reader.readAsDataURL(file);
+    });
+}
+async function changeBrandIcon(file) {
+    if (!file.type.startsWith('image/'))
+        throw new Error('Pick an image file');
+    if (file.size > BRAND_ICON_MAX_BYTES)
+        throw new Error('Icon must be under 512 KB');
+    const dataUrl = await readBrandIconFile(file);
+    if (!dataUrl)
+        throw new Error('Could not read icon file');
+    localStorage.setItem(BRAND_ICON_KEY, dataUrl);
+    applyBrandIcon();
+}
+function resetBrandIcon() {
+    localStorage.removeItem(BRAND_ICON_KEY);
+    applyBrandIcon();
 }
 function updateTopbarClock() {
     const el = document.getElementById('topbarClock');

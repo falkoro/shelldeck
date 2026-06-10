@@ -429,21 +429,22 @@ function renderShellTabs(): void {
   if (signature === shellTabsSignature) return;
   shellTabsSignature = signature;
   const restored = hiddenCount
-    ? `<button type="button" class="session-tab restore-hidden-tab" data-restore-hidden-closed title="Show ${hiddenCount} terminated session${hiddenCount === 1 ? '' : 's'} again">${icon('plus')}<span class="session-tab-line"><span class="session-tab-label">Show terminated</span><span class="session-tab-sep" aria-hidden="true">·</span><span class="session-tab-summary"><span class="marquee-track"><span>${hiddenCount} hidden</span></span></span></span></button>`
+    ? `<button type="button" class="session-tab restore-hidden-tab" data-restore-hidden-closed title="Show ${hiddenCount} terminated session${hiddenCount === 1 ? '' : 's'} again">${icon('plus')}<span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">Show terminated</span></span><span class="session-tab-summary">${hiddenCount} hidden</span></span></button>`
     : '';
   q('#shellTabs').innerHTML = modelSessions.map((session) => {
     const state = sessionRuntime(session);
-    // Tab: badge · status-dot · label · full work-title (wraps, never truncated) · time.
     const timeShort = fmtTime(session.activity).replace(/\s*ago$/, '').replace('just now', 'now').replace('never', '');
     const workTitle = sessionWorkTitle(session.name);
     const workBrief = workTitle || shellbarSummary(session.name);
     const briefText = workBrief || sessionTabFallback(session, state);
-    const moving = '';
     const labelText = sessionTabLabel(session);
-    const labelBlock = labelText
-      ? `<span class="session-tab-label">${escapeHtml(labelText)}</span><span class="session-tab-sep" aria-hidden="true">·</span>`
+    const titleText = labelText || briefText;
+    const summaryText = labelText && workBrief && workBrief !== labelText ? workBrief : '';
+    const showSummary = Boolean(summaryText);
+    const summaryBlock = showSummary
+      ? `<span class="session-tab-summary">${escapeHtml(summaryText)}</span>`
       : '';
-    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${workBrief ? '' : ' no-summary'}${labelText ? '' : ' no-label'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-line">${labelBlock}<span class="session-tab-summary${moving}"><span class="marquee-track"><span>${escapeHtml(briefText)}</span><span aria-hidden="true">${escapeHtml(briefText)}</span></span></span></span><span class="session-tab-time">${escapeHtml(timeShort)}</span></button>`;
+    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${showSummary ? '' : ' no-summary'}${labelText ? '' : ' no-label'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">${escapeHtml(titleText)}</span><span class="session-tab-time">${escapeHtml(timeShort)}</span></span>${summaryBlock}</span></button>`;
   }).join('') + restored;
   markSelectedShell();
   renderSelectedSessionActions();

@@ -297,6 +297,25 @@ document.getElementById('hostLabel')?.addEventListener('click', () => {
     if (renameHostLabel(hostname))
         toast('Dashboard name updated');
 });
+document.getElementById('brandIconBtn')?.addEventListener('click', (event) => {
+    if (event.shiftKey) {
+        resetBrandIcon();
+        toast('Icon reset');
+        return;
+    }
+    document.getElementById('brandIconInput')?.click();
+});
+document.getElementById('brandIconInput')?.addEventListener('change', () => {
+    const input = document.getElementById('brandIconInput');
+    const file = input?.files?.[0];
+    if (!file)
+        return;
+    changeBrandIcon(file)
+        .then(() => toast('Icon updated'))
+        .catch((error) => toast(error.message))
+        .finally(() => { if (input)
+        input.value = ''; });
+});
 document.getElementById('editTickersBtn')?.addEventListener('click', () => openSettingsEditor('tickers'));
 document.getElementById('safeShotBtn')?.addEventListener('click', () => createSafeShot().catch((error) => toast(error.message)));
 document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
@@ -651,6 +670,7 @@ function markBooted() {
     document.body.classList.add('booted');
 }
 render(initialModel);
+applyBrandIcon();
 startTopbarClock();
 // Hold the boot splash up until the first LIVE shell load confirms session state. The injected
 // initial model is a point-in-time server snapshot (running = "tmux session exists"), so revealing
