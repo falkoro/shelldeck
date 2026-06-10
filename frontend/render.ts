@@ -32,7 +32,7 @@ function createShellCard(shell: ShellPreview): HTMLElement {
   article.dataset.shellCard = shell.name;
   article.dataset.selectSession = shell.name;
   article.innerHTML = `<header>
-    <div class="card-title"><div class="card-title-row"><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span><div class="work-title" data-role="worktitle"></div></div>
+    <div class="card-title"><div class="card-title-row"><span class="card-reorder-handle" title="Drag onto another shell to reorder side-by-side" aria-label="Drag to reorder shells">${icon('grip')}</span><b data-role="label"></b><span class="shell-name-pill"><span data-role="rawname"></span><i class="name-spinner" aria-hidden="true"></i></span><button type="button" class="card-label-edit" data-rename-shell title="Rename this card" aria-label="Rename this card">${icon('edit')}</button><button type="button" class="card-label-reset" data-reset-shell-label title="Reset to auto-generated name" aria-label="Reset to auto-generated name">${icon('refresh')}</button></div><span data-role="command"></span><div class="work-title" data-role="worktitle"></div></div>
     <div class="card-offline-actions">
       <button type="button" class="card-create-btn" data-create title="Create this tmux session" aria-label="Create this tmux session">${icon('plus')}<span>New tmux</span></button>
       <button type="button" class="card-remove-btn" data-remove-closed title="Remove this closed session from the dashboard" aria-label="Remove closed session from dashboard">${icon('trash')}<span>Remove</span></button>
@@ -227,6 +227,7 @@ function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean })
   grid.querySelectorAll<HTMLElement>('[data-shell-card]').forEach((card) => {
     if (!seen.has(card.dataset.shellCard || '')) card.remove();
   });
+  applyShellCardOrder(grid, ordered);
   if (!document.querySelector('.terminal-card.preview-fullscreen')) {
     document.body.classList.remove('preview-fullscreen-open');
   }
@@ -242,6 +243,25 @@ function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean })
   scheduleShellGridFit();
 }
 
+function applyShellCardOrder(grid: HTMLElement, ordered: ShellPreview[]): void {
+  ordered.forEach((shell) => {
+    const card = grid.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(shell.name)}"]`);
+    if (card) grid.appendChild(card);
+  });
+}
+
+function visibleShellCardCount(grid: HTMLElement): number {
+  return Array.from(grid.querySelectorAll<HTMLElement>('[data-shell-card]'))
+    .filter((card) => getComputedStyle(card).display !== 'none').length;
+}
+
+function shellGridColumnCount(visibleCount: number, gridWidth: number): number {
+  if (viewMode === 'focus' || visibleCount <= 1) return 1;
+  const minColWidth = 300;
+  const maxCols = Math.max(1, Math.floor(gridWidth / minColWidth));
+  return Math.min(visibleCount, maxCols);
+}
+
 let shellGridFitFrame = 0;
 
 function scheduleShellGridFit(): void {
@@ -255,9 +275,11 @@ function scheduleShellGridFit(): void {
 function updateShellGridViewportFit(): void {
   const grid = document.getElementById('shells');
   if (!grid) return;
+  grid.classList.toggle('grid-mode', viewMode === 'grid');
   if (window.innerWidth <= 760) {
     grid.style.removeProperty('--shell-card-min-height');
     grid.style.removeProperty('--shell-grid-viewport-height');
+    grid.style.removeProperty('--shell-grid-columns');
     return;
   }
   const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-shell-card]'))
@@ -265,9 +287,17 @@ function updateShellGridViewportFit(): void {
   if (!cards.length) return;
   const rect = grid.getBoundingClientRect();
   const available = window.innerHeight - rect.top - 4;
-  const height = Math.max(680, Math.min(Math.floor(window.innerHeight * 0.94), Math.floor(available)));
+  const visibleCount = cards.length;
+  const columns = shellGridColumnCount(visibleCount, rect.width);
+  const rows = Math.ceil(visibleCount / columns);
+  const focusHeight = Math.max(680, Math.min(Math.floor(window.innerHeight * 0.94), Math.floor(available)));
+  const sharedHeight = Math.max(420, Math.min(Math.floor(available / rows), Math.floor(window.innerHeight * 0.72)));
+  const height = viewMode === 'focus' || columns <= 1 ? focusHeight : sharedHeight;
+  grid.style.setProperty('--shell-grid-columns', String(columns));
   grid.style.setProperty('--shell-card-min-height', `${height}px`);
-  grid.style.setProperty('--shell-grid-viewport-height', `${height}px`);
+  grid.style.setProperty('--shell-grid-viewport-height', `${height * rows}px`);
+  const tipBar = document.getElementById('shellTipBar');
+  if (tipBar) tipBar.classList.toggle('layout-hint-active', viewMode === 'grid' && visibleCount > 1);
 }
 
 window.addEventListener('resize', scheduleShellGridFit);
@@ -482,7 +512,7 @@ function buildLegend(): void {
   ];
   // Toolbar controls in the Shells header (the cryptic ones, e.g. the "80" dropdown).
   const toolbar: Array<[string, string, string]> = [
-    ['focus', 'Focus / Grid', 'Show one shell, or all panes side-by-side'],
+    ['focus', 'Focus / Grid', 'Focus = one shell. Grid = all shells side-by-side. Drag the ⋮⋮ grip (or card header) onto another shell to reorder.'],
     ['rows', 'Lines · 80 / 200 / 500', 'How many recent output lines each preview shows'],
     ['follow', 'Follow', 'Auto-scroll previews to the newest output'],
     ['summary', 'Summary', 'Refresh the AI work-title for each shell'],
