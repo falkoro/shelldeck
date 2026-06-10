@@ -267,7 +267,9 @@ pub async fn list_panes() -> Vec<Pane> {
 
 pub async fn capture_pane(pane: &Pane, lines: u32) -> String {
     let target = format!("{}:{}.{}", pane.session, pane.window, pane.index);
-    tmux_output(&["capture-pane", "-pt", &target, "-S", &format!("-{lines}")])
+    // -J joins soft-wrapped lines back into one logical line, so long URLs/paths reach the
+    // dashboard intact (otherwise the preview linkifier sees a URL truncated at pane width).
+    tmux_output(&["capture-pane", "-pJt", &target, "-S", &format!("-{lines}")])
         .await
         .unwrap_or_default()
         .trim_end()
