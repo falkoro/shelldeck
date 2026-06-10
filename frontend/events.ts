@@ -273,6 +273,10 @@ document.addEventListener('drop', (event: DragEvent) => {
 
 q('#refreshBtn').addEventListener('click', () => refresh().catch((error: Error) => toast(error.message)));
 document.getElementById('settingsBtn')?.addEventListener('click', () => openSettingsEditor());
+document.getElementById('hostLabel')?.addEventListener('click', () => {
+  const hostname = currentModel?.hostname || '';
+  if (renameHostLabel(hostname)) toast('Dashboard name updated');
+});
 document.getElementById('editTickersBtn')?.addEventListener('click', () => openSettingsEditor('tickers'));
 document.getElementById('safeShotBtn')?.addEventListener('click', () => createSafeShot().catch((error: Error) => toast(error.message)));
 document.getElementById('editLinksBtn')?.addEventListener('click', () => openLinksEditor());
