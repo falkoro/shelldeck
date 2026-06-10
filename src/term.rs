@@ -12,6 +12,7 @@ use portable_pty::{native_pty_system, PtySize};
 use serde::Deserialize;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
+use std::time::Duration;
 use tokio::sync::mpsc;
 
 #[derive(Deserialize)]
@@ -155,16 +156,47 @@ async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
             if writer.write_all(&bytes).is_err() {
                 break;
             }
-            let _ = writer.flush();
         }
     });
 
     let (mut ws_tx, mut ws_rx) = socket.split();
+    // Coalesce PTY output before sending over the WebSocket. Cursor Agent (and other TUIs)
+    // can replay thousands of scrollback lines on tmux attach; per-read WS frames make
+    // xterm.js choke. Batch to ~60fps or 16KiB, whichever comes first.
     let pump = tokio::spawn(async move {
-        while let Some(chunk) = out_rx.recv().await {
-            if ws_tx.send(Message::Binary(chunk.into())).await.is_err() {
-                break;
+        let mut pending: Vec<u8> = Vec::with_capacity(16384);
+        let mut tick = tokio::time::interval(Duration::from_millis(16));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tokio::select! {
+                chunk = out_rx.recv() => {
+                    match chunk {
+                        Some(bytes) => {
+                            pending.extend_from_slice(&bytes);
+                            if pending.len() >= 16384 {
+                                if ws_tx.send(Message::Binary(std::mem::take(&mut pending).into())).await.is_err() {
+                                    break;
+                                }
+                                pending = Vec::with_capacity(16384);
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                _ = tick.tick() => {
+                    if !pending.is_empty()
+                        && ws_tx.send(Message::Binary(std::mem::take(&mut pending).into())).await.is_err()
+                    {
+                        break;
+                    }
+                    if pending.capacity() == 0 {
+                        pending = Vec::with_capacity(16384);
+                    }
+                }
             }
+        }
+        if !pending.is_empty() {
+            let _ = ws_tx.send(Message::Binary(pending.into())).await;
         }
         let _ = ws_tx.close().await;
     });

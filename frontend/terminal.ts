@@ -27,6 +27,8 @@ interface TermWindow {
   ctrlArmed: boolean;
   ctrlTimer: number;
   pendingCopySelection: string;
+  writeQueue: Uint8Array[];
+  writeFrame: number;
 }
 
 const termWindows = new Map<string, TermWindow>();
@@ -38,6 +40,40 @@ const DEFAULT_W = 880;
 const DEFAULT_H = 540;
 const MOBILE_BREAKPOINT = 760;
 const TERMINAL_PASTE_CHUNK_BYTES = 4096;
+const CURSOR_AGENT_SCROLLBACK = 2500;
+const DEFAULT_SCROLLBACK = 4000;
+const terminalLinkCache = new WeakMap<any, Map<string, any[] | undefined>>();
+
+function sessionUsesCursorAgent(name: string): boolean {
+  const shell = shellPreviewByName(name);
+  const cmd = shell?.command || '';
+  return /\bagent\b/i.test(cmd) || /\bcursor\b/i.test(cmd);
+}
+
+function queueTerminalOutput(tw: TermWindow, data: string | Uint8Array): void {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  if (!bytes.length) return;
+  tw.writeQueue.push(bytes);
+  if (tw.writeFrame) return;
+  tw.writeFrame = requestAnimationFrame(() => {
+    tw.writeFrame = 0;
+    flushTerminalOutput(tw);
+  });
+}
+
+function flushTerminalOutput(tw: TermWindow): void {
+  if (!tw.writeQueue.length || !tw.term) return;
+  let total = 0;
+  for (const chunk of tw.writeQueue) total += chunk.length;
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of tw.writeQueue) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  tw.writeQueue.length = 0;
+  tw.term.write(merged);
+}
 
 // On-screen keys for the mobile terminal — a phone soft-keyboard can't send these,
 // yet they're essential for driving tmux / vim / coding agents. Shown only on mobile.
@@ -497,11 +533,28 @@ function clearTerminalLinkHint(tw: TermWindow): void {
   tw.statusEl.textContent = prev;
 }
 
+function detectTerminalLinksCached(tw: TermWindow, bufferLineNumber: number): any[] | undefined {
+  const term = tw.term;
+  const buffer = term?.buffer?.active;
+  const line = buffer?.getLine(bufferLineNumber - 1);
+  const lineText = line?.translateToString(true) || '';
+  let cache = terminalLinkCache.get(term);
+  if (!cache) {
+    cache = new Map();
+    terminalLinkCache.set(term, cache);
+  }
+  if (cache.has(lineText)) return cache.get(lineText);
+  const links = detectTerminalLinks(tw, bufferLineNumber);
+  cache.set(lineText, links);
+  if (cache.size > 400) cache.clear();
+  return links;
+}
+
 function setupTerminalLinks(tw: TermWindow): void {
   if (typeof tw.term?.registerLinkProvider !== 'function') return;
   tw.term.registerLinkProvider({
     provideLinks: (lineNumber: number, callback: (links: any[] | undefined) => void) => {
-      callback(detectTerminalLinks(tw, lineNumber));
+      callback(detectTerminalLinksCached(tw, lineNumber));
     },
   });
 }
@@ -620,11 +673,12 @@ function createTermWindow(name: string): TermWindow {
 
   document.body.appendChild(el);
 
+  const cursorAgent = sessionUsesCursorAgent(name);
   const term = new Terminal({
     fontSize: 13,
     fontFamily: '"Cascadia Mono","JetBrains Mono",Consolas,monospace',
-    cursorBlink: true,
-    scrollback: 6000,
+    cursorBlink: !cursorAgent,
+    scrollback: cursorAgent ? CURSOR_AGENT_SCROLLBACK : DEFAULT_SCROLLBACK,
     theme: { background: '#03070b', foreground: '#c9fff3' },
   });
   const fit = new FitAddon.FitAddon();
@@ -639,6 +693,8 @@ function createTermWindow(name: string): TermWindow {
     minimized: false, maximized: false, preMax: null,
     ctrlArmed: false, ctrlTimer: 0,
     pendingCopySelection: '',
+    writeQueue: [],
+    writeFrame: 0,
   };
 
   // Sticky Ctrl modifier for the mobile key bar: tap Ctrl to arm, then the next
@@ -662,8 +718,8 @@ function createTermWindow(name: string): TermWindow {
   ws.onclose = () => { status.textContent = 'disconnected'; };
   ws.onerror = () => { status.textContent = 'conn error'; };
   ws.onmessage = (ev: MessageEvent) => {
-    if (typeof ev.data === 'string') term.write(ev.data);
-    else term.write(new Uint8Array(ev.data as ArrayBuffer));
+    if (typeof ev.data === 'string') queueTerminalOutput(tw, ev.data);
+    else queueTerminalOutput(tw, new Uint8Array(ev.data as ArrayBuffer));
   };
   term.onData((d: string) => {
     if (ws.readyState !== WebSocket.OPEN) return;
@@ -677,7 +733,7 @@ function createTermWindow(name: string): TermWindow {
   });
 
   setupTerminalClipboard(tw);
-  setupTerminalLinks(tw);
+  if (!cursorAgent) setupTerminalLinks(tw);
   el.addEventListener('paste', (event: ClipboardEvent) => handleTerminalPaste(tw, event), { capture: true });
   host.addEventListener('contextmenu', (event: MouseEvent) => {
     captureTerminalSelection(tw);

@@ -7,6 +7,41 @@ const DEFAULT_W = 880;
 const DEFAULT_H = 540;
 const MOBILE_BREAKPOINT = 760;
 const TERMINAL_PASTE_CHUNK_BYTES = 4096;
+const CURSOR_AGENT_SCROLLBACK = 2500;
+const DEFAULT_SCROLLBACK = 4000;
+const terminalLinkCache = new WeakMap();
+function sessionUsesCursorAgent(name) {
+    const shell = shellPreviewByName(name);
+    const cmd = shell?.command || '';
+    return /\bagent\b/i.test(cmd) || /\bcursor\b/i.test(cmd);
+}
+function queueTerminalOutput(tw, data) {
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+    if (!bytes.length)
+        return;
+    tw.writeQueue.push(bytes);
+    if (tw.writeFrame)
+        return;
+    tw.writeFrame = requestAnimationFrame(() => {
+        tw.writeFrame = 0;
+        flushTerminalOutput(tw);
+    });
+}
+function flushTerminalOutput(tw) {
+    if (!tw.writeQueue.length || !tw.term)
+        return;
+    let total = 0;
+    for (const chunk of tw.writeQueue)
+        total += chunk.length;
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of tw.writeQueue) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+    }
+    tw.writeQueue.length = 0;
+    tw.term.write(merged);
+}
 // On-screen keys for the mobile terminal — a phone soft-keyboard can't send these,
 // yet they're essential for driving tmux / vim / coding agents. Shown only on mobile.
 const TERMINAL_KEY_SEQUENCES = {
@@ -469,12 +504,30 @@ function clearTerminalLinkHint(tw) {
     delete tw.statusEl.dataset.linkHint;
     tw.statusEl.textContent = prev;
 }
+function detectTerminalLinksCached(tw, bufferLineNumber) {
+    const term = tw.term;
+    const buffer = term?.buffer?.active;
+    const line = buffer?.getLine(bufferLineNumber - 1);
+    const lineText = line?.translateToString(true) || '';
+    let cache = terminalLinkCache.get(term);
+    if (!cache) {
+        cache = new Map();
+        terminalLinkCache.set(term, cache);
+    }
+    if (cache.has(lineText))
+        return cache.get(lineText);
+    const links = detectTerminalLinks(tw, bufferLineNumber);
+    cache.set(lineText, links);
+    if (cache.size > 400)
+        cache.clear();
+    return links;
+}
 function setupTerminalLinks(tw) {
     if (typeof tw.term?.registerLinkProvider !== 'function')
         return;
     tw.term.registerLinkProvider({
         provideLinks: (lineNumber, callback) => {
-            callback(detectTerminalLinks(tw, lineNumber));
+            callback(detectTerminalLinksCached(tw, lineNumber));
         },
     });
 }
@@ -588,11 +641,12 @@ function createTermWindow(name) {
     const keybar = el.querySelector('[data-keybar]');
     const imageInput = el.querySelector('.term-image-input');
     document.body.appendChild(el);
+    const cursorAgent = sessionUsesCursorAgent(name);
     const term = new Terminal({
         fontSize: 13,
         fontFamily: '"Cascadia Mono","JetBrains Mono",Consolas,monospace',
-        cursorBlink: true,
-        scrollback: 6000,
+        cursorBlink: !cursorAgent,
+        scrollback: cursorAgent ? CURSOR_AGENT_SCROLLBACK : DEFAULT_SCROLLBACK,
         theme: { background: '#03070b', foreground: '#c9fff3' },
     });
     const fit = new FitAddon.FitAddon();
@@ -606,6 +660,8 @@ function createTermWindow(name) {
         minimized: false, maximized: false, preMax: null,
         ctrlArmed: false, ctrlTimer: 0,
         pendingCopySelection: '',
+        writeQueue: [],
+        writeFrame: 0,
     };
     // Sticky Ctrl modifier for the mobile key bar: tap Ctrl to arm, then the next
     // typed letter becomes its control code (handled in onData) or the next arrow
@@ -628,9 +684,9 @@ function createTermWindow(name) {
     ws.onerror = () => { status.textContent = 'conn error'; };
     ws.onmessage = (ev) => {
         if (typeof ev.data === 'string')
-            term.write(ev.data);
+            queueTerminalOutput(tw, ev.data);
         else
-            term.write(new Uint8Array(ev.data));
+            queueTerminalOutput(tw, new Uint8Array(ev.data));
     };
     term.onData((d) => {
         if (ws.readyState !== WebSocket.OPEN)
@@ -647,7 +703,8 @@ function createTermWindow(name) {
         ws.send(enc.encode(d));
     });
     setupTerminalClipboard(tw);
-    setupTerminalLinks(tw);
+    if (!cursorAgent)
+        setupTerminalLinks(tw);
     el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
     host.addEventListener('contextmenu', (event) => {
         captureTerminalSelection(tw);

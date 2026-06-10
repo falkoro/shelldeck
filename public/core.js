@@ -383,7 +383,7 @@ function stripTerminalDecor(value) {
 }
 function cleanAutoFollowUp(value) {
     return stripTerminalDecor(value)
-        .replace(/^(?:claude|codex|grok|gemini|assistant)\s*[:>]\s*/i, '')
+        .replace(/^(?:claude|codex|grok|gemini|cursor|agent|assistant)\s*[:>]\s*/i, '')
         .replace(/^(?:[>›»•*+-]|\d+[.)])\s*/, '')
         .replace(/^["'“”]+|["'“”]+$/g, '')
         .slice(0, AUTO_FOLLOW_UP_MAX_CHARS)
