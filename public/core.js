@@ -518,6 +518,7 @@ function setStreamState(text, live = false) {
     const el = q('#streamState');
     el.className = live ? 'pill stream-pill on' : 'pill stream-pill';
     el.textContent = text;
+    scheduleShellGridFit();
 }
 function formatTopbarClock(now = new Date()) {
     const h = String(now.getHours()).padStart(2, '0');

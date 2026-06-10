@@ -125,8 +125,8 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .shell-tabs button{flex:1 1 auto;min-width:min(240px,100%);width:auto;min-height:36px;padding:0;font-size:13px;scroll-snap-align:start;border-radius:5px}
 /* Session tab: [badge][dot] | title + time / summary */
 .shell-tabs button.session-tab{display:grid;grid-template-columns:26px 8px minmax(0,1fr);align-items:center;column-gap:6px;row-gap:0;min-width:min(220px,100%);max-width:none;text-align:left;padding:6px 8px 6px 5px;min-height:42px}
-.session-tab>.badge{grid-column:1;grid-row:1;width:26px;height:26px;min-width:26px;max-width:26px;font-size:12px;line-height:1;text-transform:none;justify-self:center;align-self:center}
-.session-tab>.dot{grid-column:2;grid-row:1;justify-self:center;align-self:center}
+.session-tab>.badge{grid-column:1;grid-row:1 / -1;width:26px;height:26px;min-width:26px;max-width:26px;font-size:12px;line-height:1;text-transform:none;justify-self:center;align-self:center}
+.session-tab>.dot{grid-column:2;grid-row:1 / -1;justify-self:center;align-self:center}
 .session-tab>.session-tab-body{grid-column:3;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .session-tab-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
 /* Floor, not 0: overflow-wrap:anywhere makes the min-content of these tabs a single
@@ -370,7 +370,8 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
   .shell-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:stretch;position:sticky;top:0;z-index:6;background:#0b121a;margin:0 -4px 6px;padding:4px;border-bottom:1px solid rgba(139,246,255,.16);gap:3px}
   .shell-tabs button{flex:0 0 auto;width:auto;min-height:40px;font-size:12px;padding:0}
   .shell-tabs button.session-tab{min-width:min(72vw,320px);max-width:none;grid-template-columns:24px 7px minmax(0,1fr);column-gap:5px;padding:6px 8px 6px 5px}
-  .session-tab>.badge{width:24px;height:24px;min-width:24px;max-width:24px;font-size:11px}
+  .session-tab>.badge{grid-row:1 / -1;width:24px;height:24px;min-width:24px;max-width:24px;font-size:11px}
+  .session-tab>.dot{grid-row:1 / -1}
   .shell-tabs button.session-tab.no-summary{min-width:min(56vw,220px);max-width:none}
   .session-tab-label{font-size:12px}
   .session-tab-summary{font-size:11px}

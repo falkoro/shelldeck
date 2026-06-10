@@ -620,6 +620,7 @@ function setStreamState(text: string, live = false): void {
   const el = q('#streamState');
   el.className = live ? 'pill stream-pill on' : 'pill stream-pill';
   el.textContent = text;
+  scheduleShellGridFit();
 }
 
 function formatTopbarClock(now = new Date()): string {

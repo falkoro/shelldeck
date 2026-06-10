@@ -268,7 +268,42 @@ function handleTerminalDrop(tw, event) {
         toast(error.message);
     });
 }
+function captureTerminalSelection(tw) {
+    tw.pendingCopySelection = terminalSelection(tw);
+}
+// Read scrollback directly from the xterm buffer. selectAll()+getSelection() often
+// returns empty once focus leaves the terminal (e.g. clicking the Copy toolbar button).
+function terminalBufferText(term) {
+    const buffer = term?.buffer?.active;
+    if (!buffer?.length)
+        return '';
+    const parts = [];
+    let y = 0;
+    while (y < buffer.length) {
+        let first = y;
+        while (first > 0 && buffer.getLine(first)?.isWrapped)
+            first -= 1;
+        let last = y;
+        while (buffer.getLine(last + 1)?.isWrapped)
+            last += 1;
+        let text = '';
+        for (let row = first; row <= last; row += 1) {
+            const line = buffer.getLine(row);
+            if (!line)
+                break;
+            text += line.translateToString(row === last);
+        }
+        parts.push(text);
+        y = last + 1;
+    }
+    return parts.join('\n').replace(/\n+$/, '');
+}
 async function copyTerminalSelection(tw) {
+    const pending = tw.pendingCopySelection?.trim();
+    if (pending) {
+        tw.pendingCopySelection = '';
+        return copyTerminalText(tw, pending);
+    }
     const selection = terminalSelection(tw);
     if (!selection?.trim()) {
         return copyTerminalAll(tw);
@@ -294,16 +329,24 @@ async function copyTerminalText(tw, text, suffix = '') {
 // hand-select — the only practical way to copy from the terminal on a touch device.
 async function copyTerminalAll(tw) {
     const term = tw.term;
-    if (!term?.selectAll)
-        return copyTerminalSelection(tw);
-    term.selectAll();
-    const text = term.getSelection?.() || '';
-    term.clearSelection?.();
-    if (!text.trim()) {
+    if (!term) {
         tw.statusEl.textContent = 'nothing to copy';
         return;
     }
-    await copyTerminalText(tw, text, ' (all)');
+    tw.pendingCopySelection = '';
+    const buffered = terminalBufferText(term);
+    if (buffered.trim()) {
+        return copyTerminalText(tw, buffered, ' (all)');
+    }
+    if (term.selectAll) {
+        term.selectAll();
+        const selected = term.getSelection?.() || '';
+        term.clearSelection?.();
+        if (selected.trim()) {
+            return copyTerminalText(tw, selected, ' (all)');
+        }
+    }
+    tw.statusEl.textContent = 'nothing to copy';
 }
 // Read the rich clipboard (so images paste too); fall back to text-only when the browser blocks
 // clipboard.read() (e.g. no permission). Mirrors the native paste handler's behaviour.
@@ -562,6 +605,7 @@ function createTermWindow(name) {
         x: baseX, y: baseY, w: baseW, h: baseH,
         minimized: false, maximized: false, preMax: null,
         ctrlArmed: false, ctrlTimer: 0,
+        pendingCopySelection: '',
     };
     // Sticky Ctrl modifier for the mobile key bar: tap Ctrl to arm, then the next
     // typed letter becomes its control code (handled in onData) or the next arrow
@@ -606,7 +650,8 @@ function createTermWindow(name) {
     setupTerminalLinks(tw);
     el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
     host.addEventListener('contextmenu', (event) => {
-        if (!terminalSelection(tw))
+        captureTerminalSelection(tw);
+        if (!tw.pendingCopySelection?.trim())
             return;
         event.preventDefault();
         event.stopPropagation();
@@ -628,7 +673,10 @@ function createTermWindow(name) {
     controls.querySelectorAll('button').forEach((btn) => {
         const act = btn.dataset.act;
         if (act === 'copy' || act === 'copyall') {
-            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                captureTerminalSelection(tw);
+            });
         }
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
