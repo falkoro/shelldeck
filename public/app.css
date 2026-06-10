@@ -42,7 +42,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .topbar-privacy .ic{width:13px;height:13px}
 .top-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
-.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted);background:rgba(7,16,23,.65);font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted);background:rgba(7,16,23,.65);font-size:12px;white-space:nowrap}
 .access-pill{border-color:rgba(255,200,87,.35);color:#ffe2a0}
 .access-pill.on{border-color:rgba(114,247,200,.42);color:#bfffe6}
 .dot{width:8px;height:8px;border-radius:99px;background:var(--red);box-shadow:0 0 12px var(--red);display:inline-block}
@@ -121,7 +121,10 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .session-tab>.dot{grid-column:2;justify-self:center;align-self:center}
 .session-tab>.session-tab-line{grid-column:3;align-self:center}
 .session-tab>.session-tab-time{grid-column:4;align-self:center}
-.shell-tabs button.session-tab.no-summary{min-width:0;max-width:none}
+/* Floor, not 0: overflow-wrap:anywhere makes the min-content of these tabs a single
+   character, so without a floor they crush into 1-char-wide vertical letter columns.
+   The tab bar scrolls horizontally, so a floor never overflows the row. */
+.shell-tabs button.session-tab.no-summary{min-width:min(130px,100%);max-width:none}
 .shell-tabs button.selected{border-color:rgba(139,246,255,.55);background:#10202b;box-shadow:inset 0 0 0 1px rgba(139,246,255,.22)}
 .shell-tabs button.session-tab{border-color:transparent;background:transparent}
 .shell-tabs button.session-tab:hover{background:rgba(139,246,255,.06)}
@@ -156,11 +159,14 @@ body.sidebar-hidden .sidebar-expand:not([hidden]){display:inline-flex}
 .session-action-buttons{display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 .session-chip{display:inline-flex;margin-left:6px;border:1px solid rgba(139,246,255,.22);border-radius:999px;padding:0 6px;color:#c9fff3;font-size:10.5px}
 @media (min-width:1500px){
-  .terminal-panel .panel-header{position:absolute;top:0;right:0;z-index:8;margin:0;max-width:min(34vw,520px);pointer-events:none;align-items:flex-start}
+  /* The toolbar floats over the tip/tab rows; --shell-toolbar-reserve is set from its real
+     measured width (see updateShellToolbarReserve) so buttons never overlap/clip tab text.
+     The min(34vw,520px) fallback only applies before the first measurement. */
+  .terminal-panel .panel-header{position:absolute;top:0;right:0;z-index:8;margin:0;max-width:none;pointer-events:none;align-items:flex-start}
   .terminal-panel .panel-header>div:first-child{display:none}
   .terminal-panel .shell-tools{pointer-events:auto;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:nowrap}
-  .terminal-panel .shell-tip-bar{padding-right:min(34vw,520px)}
-  .terminal-panel .shell-tabs{padding-right:min(34vw,520px);min-height:36px;align-items:stretch}
+  .terminal-panel .shell-tip-bar{padding-right:var(--shell-toolbar-reserve,min(34vw,520px))}
+  .terminal-panel .shell-tabs{padding-right:var(--shell-toolbar-reserve,min(34vw,520px));min-height:36px;align-items:stretch}
 }
 .terminal-grid{--shell-card-min-height:clamp(680px,78svh,1400px);--shell-grid-columns:1;display:grid;grid-template-columns:repeat(var(--shell-grid-columns,1),minmax(0,1fr));gap:10px;align-items:stretch;align-content:start;grid-auto-rows:minmax(var(--shell-card-min-height),var(--shell-card-min-height))}
 .terminal-grid.grid-mode:not(.focus-mode){grid-template-columns:repeat(var(--shell-grid-columns,1),minmax(0,1fr))}
@@ -407,7 +413,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .term-window{position:fixed;z-index:55;min-width:520px;min-height:320px;display:flex;flex-direction:column;background:#03070b;border:1px solid rgba(139,246,255,.38);border-radius:8px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.58);will-change:transform}
 .term-titlebar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#0b121a;border-bottom:1px solid rgba(139,246,255,.18);cursor:move;user-select:none;font-size:12px;min-height:36px}
 .term-titlebar .term-title{font-weight:600;color:#c9fff3;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
-.term-titlebar .term-status{color:var(--muted);font-size:11px;margin-left:6px;flex:0 0 auto;white-space:nowrap}
+.term-titlebar .term-status{color:var(--muted);font-size:11px;margin-left:6px;flex:0 1 auto;min-width:0;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .term-controls{display:flex;gap:2px;margin-left:auto;flex:0 0 auto;flex-shrink:0;align-items:center}
 .term-btn{background:rgba(255,255,255,.03);border:1px solid rgba(139,246,255,.25);color:#a8d8ff;font-size:13px;line-height:1.2;padding:2px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
 .term-btn.term-detach{min-width:58px;padding:2px 9px}

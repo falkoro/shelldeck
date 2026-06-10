@@ -272,7 +272,24 @@ function scheduleShellGridFit(): void {
   });
 }
 
+// On wide screens (≥1500px) the Shells toolbar is absolutely positioned over the tip/tab
+// rows. Reserve its real measured width via a CSS var — the old hardcoded min(34vw,520px)
+// was often narrower than the toolbar, so buttons overlapped the tab bar and clipped tab text.
+function updateShellToolbarReserve(): void {
+  const panel = document.getElementById('shellSection');
+  if (!panel) return;
+  if (window.innerWidth < 1500) {
+    panel.style.removeProperty('--shell-toolbar-reserve');
+    return;
+  }
+  const tools = panel.querySelector<HTMLElement>('.panel-header .shell-tools');
+  if (!tools) return;
+  const width = Math.ceil(Math.max(tools.scrollWidth, tools.getBoundingClientRect().width));
+  if (width > 0) panel.style.setProperty('--shell-toolbar-reserve', `${width + 16}px`);
+}
+
 function updateShellGridViewportFit(): void {
+  updateShellToolbarReserve();
   const grid = document.getElementById('shells');
   if (!grid) return;
   grid.classList.toggle('grid-mode', viewMode === 'grid');
@@ -368,6 +385,8 @@ function renderSelectedSessionActions(): void {
   el.hidden = false;
   el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
   el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  // The toolbar width just changed — re-measure the floating-toolbar reservation.
+  scheduleShellGridFit();
 }
 
 let shellTabsSignature = '';
