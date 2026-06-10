@@ -73,7 +73,12 @@ function applyPrefs(): void {
   document.body.classList.toggle('density-comfortable', density === 'comfortable');
   const viewToggle = q<HTMLButtonElement>('#viewToggle');
   viewToggle.innerHTML = viewMode === 'focus' ? `${icon('focus')}<span>Focus</span>` : `${icon('grid')}<span>Grid</span>`;
-  viewToggle.title = viewMode === 'focus' ? 'View: focus — tap for grid' : 'View: grid — tap for focus';
+  viewToggle.title = viewMode === 'focus'
+    ? 'Focus: one shell at a time — click for Grid (side-by-side)'
+    : 'Grid: all shells side-by-side — drag ⋮⋮ grips to reorder — click for Focus';
+  viewToggle.classList.toggle('active', viewMode === 'grid');
+  document.body.classList.toggle('view-grid', viewMode === 'grid');
+  document.body.classList.toggle('view-focus', viewMode === 'focus');
   const densityToggle = q<HTMLButtonElement>('#densityToggle');
   densityToggle.innerHTML = `${icon('rows')}<span>${density === 'compact' ? 'Compact' : 'Comfort'}</span>`;
   densityToggle.title = density === 'compact' ? 'Density: compact — tap for comfort' : 'Density: comfort — tap for compact';
@@ -125,6 +130,12 @@ function setViewMode(mode: ViewMode): void {
   localStorage.setItem('sdViewMode2', mode);
   applyPrefs();
   markSelectedShell();
+  scheduleShellGridFit();
+  if (mode === 'grid') {
+    toast('Grid: all shells side-by-side. Drag the ⋮⋮ grip onto another shell to reorder.');
+  } else {
+    toast('Focus: one shell at a time. Press g or click Grid to see all shells.');
+  }
 }
 
 function toggleDensity(): void {

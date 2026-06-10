@@ -366,11 +366,11 @@ if (shellTools && !document.querySelector('#legendToggleBtn')) {
 // Rotating keyboard-shortcut tip on its own row above the shell tabs (not inside shell-tools,
 // which floats over the tab bar on wide screens and caused overlap with card headers).
 const SHELL_TIPS = [
-  'Tip: r refresh · g grid/focus · c density',
-  'Tip: f follow output · [ ] cycle shells',
-  'Tip: ? lists all shortcuts',
+  'Tip: Grid shows shells side-by-side — drag the ⋮⋮ grip to reorder',
+  'Tip: g toggles Grid (all shells) vs Focus (one shell)',
+  'Tip: r refresh · c density · f follow output',
+  'Tip: [ ] cycle shells · ? lists all shortcuts',
   'Tip: unlock shells to Restart / Pull containers',
-  'Tip: ⚙ Configure hides sidebar panels (e.g. Machine)',
   'Tip: the Panels button (top bar) shows/hides the side rail',
 ];
 const shellTabs = document.getElementById('shellTabs');
@@ -382,8 +382,9 @@ if (shellTabs && !document.querySelector('#shellTip')) {
   const tip = document.createElement('span');
   tip.id = 'shellTip';
   tip.className = 'shell-tip';
-  tip.textContent = SHELL_TIPS[0];
-  tip.title = SHELL_TIPS[0];
+  const initialTip = SHELL_TIPS[0];
+  tip.textContent = initialTip;
+  tip.title = initialTip;
   bar.appendChild(tip);
   shellTabs.insertAdjacentElement('beforebegin', bar);
   let tipIndex = 0;
@@ -461,15 +462,15 @@ document.addEventListener('submit', (event: Event) => {
 });
 
 // --- Drag-to-reorder shell cards ---
-// Mousedown on a card header initiates reorder after a drag threshold.
+// Mousedown on the grip or card header initiates reorder after a drag threshold.
 document.addEventListener('mousedown', (event: MouseEvent) => {
   const target = event.target instanceof Element ? event.target : null;
-  // Only start reorder if dragging from the card header (not buttons/inputs inside)
+  const handle = target?.closest<HTMLElement>('.card-reorder-handle');
   const header = target?.closest<HTMLElement>('.terminal-card > header');
-  if (!header) return;
+  if (!handle && !header) return;
   // Don't initiate drag when clicking buttons, inputs, or the card window controls
-  if ((event.target as HTMLElement)?.closest('button,input,textarea,select,[data-minimize-shell],[data-maximize-shell]')) return;
-  const card = header.closest<HTMLElement>('[data-shell-card]');
+  if (!handle && (event.target as HTMLElement)?.closest('button,input,textarea,select,[data-minimize-shell],[data-maximize-shell]')) return;
+  const card = (handle || header)?.closest<HTMLElement>('[data-shell-card]');
   if (!card) return;
   const name = card.dataset.shellCard || '';
   if (!name) return;
@@ -538,16 +539,13 @@ document.addEventListener('mousedown', (event: MouseEvent) => {
     saveShellOrder(order);
 
     // Physically reorder in DOM
-    const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-shell-card]'));
-    const fromCard = cards.find((c) => c.dataset.shellCard === name);
-    const toCard = cards.find((c) => c.dataset.shellCard === targetName);
+    const fromCard = grid.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(name)}"]`);
+    const toCard = grid.querySelector<HTMLElement>(`[data-shell-card="${selectorEscape(targetName)}"]`);
     if (fromCard && toCard) {
-      if (fromIdx > toIdx) {
-        toCard.before(fromCard);
-      } else {
-        toCard.after(fromCard);
-      }
+      if (fromIdx > toIdx) toCard.before(fromCard);
+      else toCard.after(fromCard);
     }
+    scheduleShellGridFit();
   };
 
   document.addEventListener('mousemove', onMove);
