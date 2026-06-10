@@ -176,47 +176,6 @@ If you edit files in `frontend/`, rebuild the served JavaScript before committin
 bun run build:frontend
 ```
 
-### Host deploy (logan-laptop)
-
-Two live ShellDeck hosts serve the public dashboards:
-
-| Host | Public URL | Machine |
-|---|---|---|
-| Personal | `code.falkinator.org` | **cachy-beefy** (`192.168.1.66:8787`) |
-| Spot/work | `code.spotcloud.nl` | **logan-laptop** (`127.0.0.1:8787`) |
-
-`host-code.falkinator.org` is a debug alias to logan-laptop’s ShellDeck.
-
-After a squash merge to `master`, deploy happens via GitHub Actions
-(`.github/workflows/deploy-host.yml`) on both runners, with a logan-laptop systemd
-fallback timer.
-
-Install the host runners once:
-
-```sh
-# logan-laptop (code.spotcloud.nl)
-bash ops/scripts/install-shelldeck-host-runner.sh
-
-# logan-gl502vs (deploys into beefy for code.falkinator.org)
-bash ops/scripts/install-shelldeck-beefy-runner.sh
-```
-
-The deploy scripts use a clean cache checkout, build the app, install the release
-binary and `public/` assets into `/home/falk/repos/shelldeck`, restart
-`shelldeck.service`, and check `http://127.0.0.1:8787/`. They do not reset the
-active development checkout.
-
-### CI runners (aligned)
-
-| Machine | Labels | Repos |
-|---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review`, `shelldeck-beefy` | Personal `falkoro/*` CI + `spot-techno/shelldeck` PR CI; deploys ShellDeck into beefy (`code.falkinator.org`) |
-| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product CI/deploys |
-| **cachy-beefy / beefy-personal** | — | ShellDeck runtime target only (no GitHub runner inside the container) |
-| **logan-laptop** | `shelldeck-host` | `spot-techno/shelldeck` deploy to `code.spotcloud.nl` |
-
-Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
-
 ## Security notes
 
 - The **in-browser terminal attaches to your real tmux sessions** — anyone who can authenticate gets a shell. Treat the credentials accordingly and don't expose it unauthenticated.

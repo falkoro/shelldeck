@@ -26,6 +26,32 @@ Falk expects agents to **persist** these rules here (and in Cursor memory when a
 - Treat `~/.config/shelldeck*.env`, Cloudflare credentials, GitHub tokens, and Finnhub keys as local-only secrets.
 - Preserve running tmux sessions unless Falk explicitly says they can be killed.
 
+## Deploy and runners (internal — do not duplicate in README)
+
+Public dashboards: `code.falkinator.org` (personal) and `code.spotcloud.nl` (Spot/work).
+
+After squash merge to `master`, `.github/workflows/deploy-host.yml` deploys both hosts.
+Operator scripts live under `ops/scripts/` and `scripts/deploy-host*.sh`.
+
+| Machine | Labels | Role |
+|---|---|---|
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review`, `shelldeck-beefy` | Personal `falkoro/*` CI + PR CI; deploys ShellDeck into beefy (`code.falkinator.org`) |
+| **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product CI/deploys |
+| **beefy-personal** (container on gl502vs) | — | ShellDeck runtime target only — no GitHub runner inside |
+| **logan-laptop** | `shelldeck-host` | Deploy to `code.spotcloud.nl` |
+
+Install host runners once (on the named machines):
+
+```sh
+# logan-gl502vs → deploys into beefy for code.falkinator.org
+bash ops/scripts/install-shelldeck-beefy-runner.sh
+
+# logan-laptop → code.spotcloud.nl
+bash ops/scripts/install-shelldeck-host-runner.sh
+```
+
+Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.
+
 ## Local Checks
 
 - Run `cargo fmt` after Rust changes.
