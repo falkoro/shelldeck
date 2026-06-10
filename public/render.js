@@ -115,7 +115,7 @@ function updateShellCard(card, shell) {
     // (e.g. Codex: "To continue this session, run codex resume <id>").
     const resumeBtn = card.querySelector('[data-resume]');
     if (resumeBtn) {
-        const m = shell.output.match(/\bcodex resume [A-Za-z0-9-]{8,}/i);
+        const m = shell.output.match(/\b(?:codex|agent) resume [A-Za-z0-9-]{8,}/i);
         if (m) {
             resumeBtn.dataset.resumeCmd = m[0];
             resumeBtn.classList.add('show');

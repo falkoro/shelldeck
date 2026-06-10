@@ -7,6 +7,41 @@ const DEFAULT_W = 880;
 const DEFAULT_H = 540;
 const MOBILE_BREAKPOINT = 760;
 const TERMINAL_PASTE_CHUNK_BYTES = 4096;
+const CURSOR_AGENT_SCROLLBACK = 2500;
+const DEFAULT_SCROLLBACK = 4000;
+const terminalLinkCache = new WeakMap();
+function sessionUsesCursorAgent(name) {
+    const shell = shellPreviewByName(name);
+    const cmd = shell?.command || '';
+    return /\bagent\b/i.test(cmd) || /\bcursor\b/i.test(cmd);
+}
+function queueTerminalOutput(tw, data) {
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+    if (!bytes.length)
+        return;
+    tw.writeQueue.push(bytes);
+    if (tw.writeFrame)
+        return;
+    tw.writeFrame = requestAnimationFrame(() => {
+        tw.writeFrame = 0;
+        flushTerminalOutput(tw);
+    });
+}
+function flushTerminalOutput(tw) {
+    if (!tw.writeQueue.length || !tw.term)
+        return;
+    let total = 0;
+    for (const chunk of tw.writeQueue)
+        total += chunk.length;
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of tw.writeQueue) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+    }
+    tw.writeQueue.length = 0;
+    tw.term.write(merged);
+}
 // On-screen keys for the mobile terminal — a phone soft-keyboard can't send these,
 // yet they're essential for driving tmux / vim / coding agents. Shown only on mobile.
 const TERMINAL_KEY_SEQUENCES = {
@@ -268,7 +303,42 @@ function handleTerminalDrop(tw, event) {
         toast(error.message);
     });
 }
+function captureTerminalSelection(tw) {
+    tw.pendingCopySelection = terminalSelection(tw);
+}
+// Read scrollback directly from the xterm buffer. selectAll()+getSelection() often
+// returns empty once focus leaves the terminal (e.g. clicking the Copy toolbar button).
+function terminalBufferText(term) {
+    const buffer = term?.buffer?.active;
+    if (!buffer?.length)
+        return '';
+    const parts = [];
+    let y = 0;
+    while (y < buffer.length) {
+        let first = y;
+        while (first > 0 && buffer.getLine(first)?.isWrapped)
+            first -= 1;
+        let last = y;
+        while (buffer.getLine(last + 1)?.isWrapped)
+            last += 1;
+        let text = '';
+        for (let row = first; row <= last; row += 1) {
+            const line = buffer.getLine(row);
+            if (!line)
+                break;
+            text += line.translateToString(row === last);
+        }
+        parts.push(text);
+        y = last + 1;
+    }
+    return parts.join('\n').replace(/\n+$/, '');
+}
 async function copyTerminalSelection(tw) {
+    const pending = tw.pendingCopySelection?.trim();
+    if (pending) {
+        tw.pendingCopySelection = '';
+        return copyTerminalText(tw, pending);
+    }
     const selection = terminalSelection(tw);
     if (!selection?.trim()) {
         return copyTerminalAll(tw);
@@ -294,16 +364,24 @@ async function copyTerminalText(tw, text, suffix = '') {
 // hand-select — the only practical way to copy from the terminal on a touch device.
 async function copyTerminalAll(tw) {
     const term = tw.term;
-    if (!term?.selectAll)
-        return copyTerminalSelection(tw);
-    term.selectAll();
-    const text = term.getSelection?.() || '';
-    term.clearSelection?.();
-    if (!text.trim()) {
+    if (!term) {
         tw.statusEl.textContent = 'nothing to copy';
         return;
     }
-    await copyTerminalText(tw, text, ' (all)');
+    tw.pendingCopySelection = '';
+    const buffered = terminalBufferText(term);
+    if (buffered.trim()) {
+        return copyTerminalText(tw, buffered, ' (all)');
+    }
+    if (term.selectAll) {
+        term.selectAll();
+        const selected = term.getSelection?.() || '';
+        term.clearSelection?.();
+        if (selected.trim()) {
+            return copyTerminalText(tw, selected, ' (all)');
+        }
+    }
+    tw.statusEl.textContent = 'nothing to copy';
 }
 // Read the rich clipboard (so images paste too); fall back to text-only when the browser blocks
 // clipboard.read() (e.g. no permission). Mirrors the native paste handler's behaviour.
@@ -426,12 +504,30 @@ function clearTerminalLinkHint(tw) {
     delete tw.statusEl.dataset.linkHint;
     tw.statusEl.textContent = prev;
 }
+function detectTerminalLinksCached(tw, bufferLineNumber) {
+    const term = tw.term;
+    const buffer = term?.buffer?.active;
+    const line = buffer?.getLine(bufferLineNumber - 1);
+    const lineText = line?.translateToString(true) || '';
+    let cache = terminalLinkCache.get(term);
+    if (!cache) {
+        cache = new Map();
+        terminalLinkCache.set(term, cache);
+    }
+    if (cache.has(lineText))
+        return cache.get(lineText);
+    const links = detectTerminalLinks(tw, bufferLineNumber);
+    cache.set(lineText, links);
+    if (cache.size > 400)
+        cache.clear();
+    return links;
+}
 function setupTerminalLinks(tw) {
     if (typeof tw.term?.registerLinkProvider !== 'function')
         return;
     tw.term.registerLinkProvider({
         provideLinks: (lineNumber, callback) => {
-            callback(detectTerminalLinks(tw, lineNumber));
+            callback(detectTerminalLinksCached(tw, lineNumber));
         },
     });
 }
@@ -545,11 +641,12 @@ function createTermWindow(name) {
     const keybar = el.querySelector('[data-keybar]');
     const imageInput = el.querySelector('.term-image-input');
     document.body.appendChild(el);
+    const cursorAgent = sessionUsesCursorAgent(name);
     const term = new Terminal({
         fontSize: 13,
         fontFamily: '"Cascadia Mono","JetBrains Mono",Consolas,monospace',
-        cursorBlink: true,
-        scrollback: 6000,
+        cursorBlink: !cursorAgent,
+        scrollback: cursorAgent ? CURSOR_AGENT_SCROLLBACK : DEFAULT_SCROLLBACK,
         theme: { background: '#03070b', foreground: '#c9fff3' },
     });
     const fit = new FitAddon.FitAddon();
@@ -562,6 +659,9 @@ function createTermWindow(name) {
         x: baseX, y: baseY, w: baseW, h: baseH,
         minimized: false, maximized: false, preMax: null,
         ctrlArmed: false, ctrlTimer: 0,
+        pendingCopySelection: '',
+        writeQueue: [],
+        writeFrame: 0,
     };
     // Sticky Ctrl modifier for the mobile key bar: tap Ctrl to arm, then the next
     // typed letter becomes its control code (handled in onData) or the next arrow
@@ -584,9 +684,9 @@ function createTermWindow(name) {
     ws.onerror = () => { status.textContent = 'conn error'; };
     ws.onmessage = (ev) => {
         if (typeof ev.data === 'string')
-            term.write(ev.data);
+            queueTerminalOutput(tw, ev.data);
         else
-            term.write(new Uint8Array(ev.data));
+            queueTerminalOutput(tw, new Uint8Array(ev.data));
     };
     term.onData((d) => {
         if (ws.readyState !== WebSocket.OPEN)
@@ -603,10 +703,12 @@ function createTermWindow(name) {
         ws.send(enc.encode(d));
     });
     setupTerminalClipboard(tw);
-    setupTerminalLinks(tw);
+    if (!cursorAgent)
+        setupTerminalLinks(tw);
     el.addEventListener('paste', (event) => handleTerminalPaste(tw, event), { capture: true });
     host.addEventListener('contextmenu', (event) => {
-        if (!terminalSelection(tw))
+        captureTerminalSelection(tw);
+        if (!tw.pendingCopySelection?.trim())
             return;
         event.preventDefault();
         event.stopPropagation();
@@ -628,7 +730,10 @@ function createTermWindow(name) {
     controls.querySelectorAll('button').forEach((btn) => {
         const act = btn.dataset.act;
         if (act === 'copy' || act === 'copyall') {
-            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                captureTerminalSelection(tw);
+            });
         }
         btn.addEventListener('click', (e) => {
             e.stopPropagation();

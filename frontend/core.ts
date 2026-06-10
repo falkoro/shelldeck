@@ -481,7 +481,7 @@ function stripTerminalDecor(value: string): string {
 
 function cleanAutoFollowUp(value: string): string {
   return stripTerminalDecor(value)
-    .replace(/^(?:claude|codex|grok|gemini|assistant)\s*[:>]\s*/i, '')
+    .replace(/^(?:claude|codex|grok|gemini|cursor|agent|assistant)\s*[:>]\s*/i, '')
     .replace(/^(?:[>›»•*+-]|\d+[.)])\s*/, '')
     .replace(/^["'“”]+|["'“”]+$/g, '')
     .slice(0, AUTO_FOLLOW_UP_MAX_CHARS)
@@ -620,6 +620,7 @@ function setStreamState(text: string, live = false): void {
   const el = q('#streamState');
   el.className = live ? 'pill stream-pill on' : 'pill stream-pill';
   el.textContent = text;
+  scheduleShellGridFit();
 }
 
 function formatTopbarClock(now = new Date()): string {

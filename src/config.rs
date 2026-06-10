@@ -514,6 +514,13 @@ fn agent_presets_from_raw(raw: &str, workdir: &str) -> Vec<KnownSession> {
                 "claude",
                 workdir,
             )),
+            "cursor" | "cursor-agent" | "agent" => Some(agent_session(
+                "cursor",
+                "Cursor Agent",
+                "cu",
+                "agent",
+                workdir,
+            )),
             other => {
                 eprintln!("Ignoring unknown DASHBOARD_AGENT_PRESETS entry: {other}");
                 None
