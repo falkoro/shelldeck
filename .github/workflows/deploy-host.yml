@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
@@ -39,6 +40,7 @@ jobs:
         if: matrix.deploy_target == 'logan-laptop'
 
       - uses: spot-techno/.github/actions/bun-deps-cache@master
+        if: matrix.deploy_target == 'logan-laptop'
         # Managed by spot-techno/.github sync-bun-cache-workflows
       - name: Build, install, restart, and verify public route
         env:
