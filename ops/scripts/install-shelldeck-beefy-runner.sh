@@ -32,7 +32,18 @@ read_github_token() {
   exit 1
 }
 
-if [ "$(hostname)" != "${SHELLDECK_DEPLOY_HOSTNAME:-cachy-beefy}" ]; then
+beefy_deploy_host_ok() {
+  local expected="${SHELLDECK_DEPLOY_HOSTNAME:-cachy-beefy}"
+  [ "$(hostname)" = "$expected" ] && return 0
+  if [ "$expected" = "cachy-beefy" ] && [ -r "${HOME}/.config/shelldeck.env" ]; then
+    local dashboard_hostname
+    dashboard_hostname="$(grep -E '^DASHBOARD_HOSTNAME=' "${HOME}/.config/shelldeck.env" | head -1 | cut -d= -f2- | tr -d '[:space:]')"
+    [ "$dashboard_hostname" = "cachy-beefy" ] && return 0
+  fi
+  return 1
+}
+
+if ! beefy_deploy_host_ok; then
   echo "Refusing install on unexpected host: $(hostname)" >&2
   exit 1
 fi
@@ -70,6 +81,11 @@ fi
 unit_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/systemd/shelldeck-beefy-runner.service"
 unit_dst="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/shelldeck-beefy-runner.service"
 install -D -m 0644 "$unit_src" "$unit_dst"
-systemctl --user daemon-reload
-systemctl --user enable --now shelldeck-beefy-runner.service
-echo "Installed $RUNNER_NAME ($LABELS) at $RUNNER_ROOT (user systemd: shelldeck-beefy-runner.service)"
+if systemctl --user daemon-reload 2>/dev/null && systemctl --user enable --now shelldeck-beefy-runner.service 2>/dev/null; then
+  echo "Installed $RUNNER_NAME ($LABELS) at $RUNNER_ROOT (user systemd: shelldeck-beefy-runner.service)"
+else
+  pkill -u "$(id -un)" -f 'Runner.Listener' 2>/dev/null || true
+  nohup "$RUNNER_ROOT/run.sh" >> "$RUNNER_ROOT/runner.log" 2>&1 &
+  sleep 2
+  echo "Installed $RUNNER_NAME ($LABELS) at $RUNNER_ROOT (nohup run.sh — no user systemd bus)"
+fi
