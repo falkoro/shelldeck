@@ -585,6 +585,23 @@ function setStreamState(text: string, live = false): void {
   el.textContent = text;
 }
 
+function formatTopbarClock(now = new Date()): string {
+  return now.toLocaleTimeString([], { hour12: false });
+}
+
+function updateTopbarClock(): void {
+  const el = document.getElementById('topbarClock');
+  if (!el) return;
+  const next = formatTopbarClock();
+  if (el.textContent !== next) el.textContent = next;
+}
+
+function startTopbarClock(): void {
+  updateTopbarClock();
+  if ((window as any).__sdTopbarClock) return;
+  (window as any).__sdTopbarClock = window.setInterval(updateTopbarClock, 1000);
+}
+
 function updateSummaryRefreshState(): void {
   const button = document.getElementById('refreshSummaryBtn') as HTMLButtonElement | null;
   if (!button) return;

@@ -482,6 +482,23 @@ function setStreamState(text, live = false) {
     el.className = live ? 'pill stream-pill on' : 'pill stream-pill';
     el.textContent = text;
 }
+function formatTopbarClock(now = new Date()) {
+    return now.toLocaleTimeString([], { hour12: false });
+}
+function updateTopbarClock() {
+    const el = document.getElementById('topbarClock');
+    if (!el)
+        return;
+    const next = formatTopbarClock();
+    if (el.textContent !== next)
+        el.textContent = next;
+}
+function startTopbarClock() {
+    updateTopbarClock();
+    if (window.__sdTopbarClock)
+        return;
+    window.__sdTopbarClock = window.setInterval(updateTopbarClock, 1000);
+}
 function updateSummaryRefreshState() {
     const button = document.getElementById('refreshSummaryBtn');
     if (!button)

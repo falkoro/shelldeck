@@ -646,6 +646,7 @@ function markBooted() {
     document.body.classList.add('booted');
 }
 render(initialModel);
+startTopbarClock();
 // Hold the boot splash up until the first LIVE shell load confirms session state. The injected
 // initial model is a point-in-time server snapshot (running = "tmux session exists"), so revealing
 // it immediately flashes a stale "running" before the live fetch lands. Gating the reveal on
