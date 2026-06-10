@@ -447,7 +447,7 @@ function syncContainerPrivacyTitles(panel: HTMLElement, on: boolean): void {
 }
 
 function applyContainerPrivacy(scope: ContainerPrivacyScope): void {
-  const on = containerPrivacyOn(scope);
+  const on = containerPrivacyOn(scope) || privacyAllOn();
   const panel = containerPrivacyPanel(scope);
   panel?.classList.toggle('container-privacy-blur', on);
   if (panel) syncContainerPrivacyTitles(panel, on);
@@ -467,6 +467,11 @@ function applyAllContainerPrivacy(): void {
 }
 
 function toggleContainerPrivacy(rawScope: string): void {
+  if (rawScope === 'all') {
+    togglePrivacyAll();
+    return;
+  }
+  if (privacyAllOn()) setPrivacyAll(false);
   const scope = rawScope === 'remote' ? 'remote' : rawScope === 'local' ? 'local' : null;
   if (!scope) return;
   const next = !containerPrivacyOn(scope);
@@ -846,3 +851,4 @@ async function containerAction(host: string, engine: string, name: string, actio
 (window as any).loadRemoteHosts = loadRemoteHosts;
 (window as any).loadGhRuns = loadGhRuns;
 applyAllContainerPrivacy();
+applyPrivacyAll();

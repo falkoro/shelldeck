@@ -32,14 +32,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .error{color:#ff9fb4;min-height:22px;margin-top:12px;font-size:13px}
 .shell{width:min(3840px,calc(100% - 32px));margin:0 auto;padding:22px 0 max(34px,env(safe-area-inset-bottom))}
 .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
-.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.topbar-start{display:flex;align-items:center;gap:12px;flex:0 0 auto;min-width:0}
+.brand{display:flex;align-items:center;gap:14px;flex:0 0 auto;min-width:0}
 .brand-mark{width:50px;height:50px;border-radius:8px;background:#8bf6ff;display:grid;place-items:center;color:#061014;font-weight:950;font-size:17px;box-shadow:0 0 0 1px rgba(139,246,255,.28);flex:0 0 auto}
 .brand-mark.small{width:44px;height:44px}
-.brand-logo{width:50px;height:50px;border-radius:8px;object-fit:cover;display:block;box-shadow:0 0 0 1px rgba(139,246,255,.28);flex:0 0 auto;background:#071017}
+.brand-logo{width:50px;height:50px;border-radius:8px;object-fit:contain;display:block;box-shadow:0 0 0 1px rgba(139,246,255,.28);flex:0 0 auto;background:#071017;padding:2px}
 .brand-logo.small{width:44px;height:44px}
-.topbar-privacy{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;align-self:flex-start;margin-top:2px}
-.topbar-privacy button{min-height:30px;padding:5px 9px}
-.topbar-privacy .ic{width:13px;height:13px}
+.topbar-privacy{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;align-self:center;flex-shrink:0}
+.topbar-privacy button{min-height:30px;padding:5px 9px;white-space:nowrap}
+.topbar-privacy .ic{width:13px;height:13px;flex:0 0 auto}
 .top-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
 .pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted);background:rgba(7,16,23,.65);font-size:12px;white-space:nowrap}
@@ -284,7 +285,7 @@ body.booted #bootSplash{opacity:0;visibility:hidden;pointer-events:none}
 .boot-title{font-size:14px;font-weight:800;letter-spacing:0;color:#eaffff}
 @keyframes boot-spin{to{transform:rotate(360deg)}}
 @media (max-width:980px){.workspace{grid-template-columns:1fr}.main-stack{order:1}.sidebar{order:2;position:static}.shells-locked .sidebar{order:1}.shells-locked .main-stack{order:2}.sessions{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.target-row{grid-template-columns:1fr}.target-row .pill{justify-self:stretch}.image-row{grid-template-columns:1fr}.terminal-grid{grid-template-columns:1fr}}
-@media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 22px,1760px);padding-top:max(12px,env(safe-area-inset-top))}.topbar{display:block}.topbar-privacy{display:flex;flex-wrap:wrap;margin-top:10px}.topbar-privacy span{display:none}.top-actions{justify-content:flex-start;margin-top:10px}.top-actions .button,.top-actions button{flex:1;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:block}.shell-tools{justify-content:flex-start;margin-top:10px}.shell-tools>*{flex:1 1 auto}.quick-strip button,.panel-header button{margin-top:10px;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:grid;grid-template-columns:1fr;align-items:stretch}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
+@media (max-width:760px){h1{font-size:22px}.brand-mark,.brand-logo{width:42px;height:42px}.shell{width:min(100% - 22px,1760px);padding-top:max(12px,env(safe-area-inset-top))}.topbar{display:block}.topbar-start{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px}.topbar-privacy{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}.topbar-privacy::-webkit-scrollbar{display:none}.topbar-privacy span{display:none}.top-actions{justify-content:flex-start;margin-top:10px}.top-actions .button,.top-actions button{flex:1;min-height:36px;padding:7px 9px}.quick-strip,.panel-header{display:block}.shell-tools{justify-content:flex-start;margin-top:10px}.shell-tools>*{flex:1 1 auto}.quick-strip button,.panel-header button{margin-top:10px;width:100%}.unlock-form{grid-template-columns:1fr}.sessions{grid-template-columns:1fr}.terminal-card{min-height:300px}.terminal-card pre{min-height:180px;max-height:260px;font-size:12.5px}.shell-composer textarea{min-height:96px}.card-actions{grid-template-columns:1fr}.shell-actions button,.segmented{flex:1 1 30%;min-width:0}.segmented button{min-width:0;flex:1}.meta-grid{grid-template-columns:1fr 1fr}.session-command code{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45}.image-chip{grid-template-columns:38px minmax(0,1fr)}.image-chip img{width:38px;height:38px}.image-chip button{grid-column:1 / -1}.session-actions{display:grid;grid-template-columns:1fr;align-items:stretch}.session-action-buttons{display:grid;grid-template-columns:repeat(3,1fr)}.session-action-buttons button{min-width:0}}
 /* Per-slot waiting/running badge */
 .dot.wait{background:var(--amber);box-shadow:0 0 12px var(--amber)}
 .session-tab.running .dot.on{animation:sd-status-pulse 1.15s ease-in-out infinite}
@@ -548,8 +549,9 @@ body{font-family:"Cascadia Mono","JetBrains Mono","SFMono-Regular",ui-monospace,
 
 /* — Slim top bar, hairline divider, green prompt accent — */
 .topbar{align-items:center;gap:14px;padding-bottom:13px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.topbar-start{align-items:center;gap:10px}
 .brand{align-items:center;gap:10px}
-.brand-logo{width:30px;height:30px;border-radius:6px;box-shadow:none}
+.brand-logo{width:36px;height:36px;border-radius:6px;box-shadow:0 0 0 1px rgba(139,246,255,.22);padding:1px}
 .brand h1{font-size:15px;font-weight:600;letter-spacing:.03em}
 .brand h1::before{content:"\25B8  ";color:var(--green);font-weight:700}
 .status-line{margin-top:7px;gap:6px}
@@ -726,6 +728,66 @@ body.shells-locked .container-actions{display:none}
 .container-privacy-blur .remote-head b,
 .container-privacy-blur .remote-head small,
 .container-privacy-blur .remote-count{filter:blur(7px);opacity:.62;user-select:none;pointer-events:none}
+/* Global privacy: blur shells, containers, tickers, and machine/remote sidebar text. */
+body.privacy-all .terminal-card .card-title-row b,
+body.privacy-all .terminal-card .shell-name-pill,
+body.privacy-all .terminal-card [data-role="command"],
+body.privacy-all .terminal-card .terminal-meta [data-role="cwd"],
+body.privacy-all .terminal-card .work-title,
+body.privacy-all .terminal-card .shell-composer textarea,
+body.privacy-all .terminal-card .shell-status,
+body.privacy-all .terminal-card .attach-list,
+body.privacy-all .terminal-card pre[data-role="output"],
+body.privacy-all .container-privacy-blur .container-health,
+body.privacy-all .container-privacy-blur .container-item b,
+body.privacy-all .container-privacy-blur .container-item .ci-engine,
+body.privacy-all .container-privacy-blur .container-item .ci-image,
+body.privacy-all .container-privacy-blur .container-item .ci-version,
+body.privacy-all .container-privacy-blur .container-item .ci-desc,
+body.privacy-all .container-privacy-blur .container-item .ci-built,
+body.privacy-all .container-privacy-blur .container-item .ci-row2,
+body.privacy-all .container-privacy-blur .container-item .ci-stats,
+body.privacy-all .container-privacy-blur .container-item .ci-cpu,
+body.privacy-all .container-privacy-blur .container-item .ci-badges,
+body.privacy-all .container-privacy-blur .container-item .container-age,
+body.privacy-all .container-privacy-blur .remote-head b,
+body.privacy-all .container-privacy-blur .remote-head small,
+body.privacy-all .container-privacy-blur .remote-count,
+body.privacy-all #containersPanel .container-health,
+body.privacy-all #containersPanel .container-item b,
+body.privacy-all #containersPanel .container-item .ci-engine,
+body.privacy-all #containersPanel .container-item .ci-image,
+body.privacy-all #containersPanel .container-item .ci-version,
+body.privacy-all #containersPanel .container-item .ci-desc,
+body.privacy-all #containersPanel .container-item .ci-built,
+body.privacy-all #containersPanel .container-item .ci-row2,
+body.privacy-all #containersPanel .container-item .ci-stats,
+body.privacy-all #containersPanel .container-item .ci-cpu,
+body.privacy-all #containersPanel .container-item .ci-badges,
+body.privacy-all #containersPanel .container-item .container-age,
+body.privacy-all #remotePanel .container-health,
+body.privacy-all #remotePanel .container-item b,
+body.privacy-all #remotePanel .container-item .ci-engine,
+body.privacy-all #remotePanel .container-item .ci-image,
+body.privacy-all #remotePanel .container-item .ci-version,
+body.privacy-all #remotePanel .container-item .ci-desc,
+body.privacy-all #remotePanel .container-item .ci-built,
+body.privacy-all #remotePanel .container-item .ci-row2,
+body.privacy-all #remotePanel .container-item .ci-stats,
+body.privacy-all #remotePanel .container-item .ci-cpu,
+body.privacy-all #remotePanel .container-item .ci-badges,
+body.privacy-all #remotePanel .container-item .container-age,
+body.privacy-all #remotePanel .remote-head b,
+body.privacy-all #remotePanel .remote-head small,
+body.privacy-all #remotePanel .remote-count,
+body.privacy-all #metricsPanel .metric,
+body.privacy-all #metricsPanel .metric-temps,
+body.privacy-all #metricsPanel .metric-load,
+body.privacy-all #metricsHost,
+body.privacy-all .ticker-bar .tick,
+body.privacy-all .shell-tabs,
+body.privacy-all .session-actions{filter:blur(7px);opacity:.62;user-select:none;pointer-events:none}
+body.privacy-all .terminal-card pre[data-role="output"]{pointer-events:none}
 /* Loading skeletons + shimmer */
 @keyframes sd-shimmer{100%{transform:translateX(100%)}}
 .skeleton{position:relative;overflow:hidden;background:rgba(255,255,255,.045);border-radius:6px}
