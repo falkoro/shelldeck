@@ -359,7 +359,7 @@ function syncContainerPrivacyTitles(panel, on) {
     });
 }
 function applyContainerPrivacy(scope) {
-    const on = containerPrivacyOn(scope);
+    const on = containerPrivacyOn(scope) || privacyAllOn();
     const panel = containerPrivacyPanel(scope);
     panel?.classList.toggle('container-privacy-blur', on);
     if (panel)
@@ -379,6 +379,12 @@ function applyAllContainerPrivacy() {
     applyContainerPrivacy('remote');
 }
 function toggleContainerPrivacy(rawScope) {
+    if (rawScope === 'all') {
+        togglePrivacyAll();
+        return;
+    }
+    if (privacyAllOn())
+        setPrivacyAll(false);
     const scope = rawScope === 'remote' ? 'remote' : rawScope === 'local' ? 'local' : null;
     if (!scope)
         return;
@@ -782,3 +788,4 @@ window.loadContainers = loadContainers;
 window.loadRemoteHosts = loadRemoteHosts;
 window.loadGhRuns = loadGhRuns;
 applyAllContainerPrivacy();
+applyPrivacyAll();

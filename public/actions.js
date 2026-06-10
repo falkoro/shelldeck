@@ -1115,7 +1115,7 @@ function startShellStream() {
         const payload = JSON.parse(event.data);
         setShellsLoading(false);
         renderShells({ shells: payload.shells });
-        setStreamState(`live ${new Date().toLocaleTimeString([], { hour12: false })}`, true);
+        setStreamState('live', true);
     });
     shellStream.onerror = () => setStreamState('stream reconnecting');
 }
@@ -1142,6 +1142,8 @@ function copyShellOutput(name) {
 function toggleShellPrivacy(name) {
     if (!name)
         return;
+    if (privacyAllOn())
+        setPrivacyAll(false);
     const next = !shellPrivate(name);
     setShellPrivate(name, next);
     toast(next ? 'Shell text blurred' : 'Shell text visible');
