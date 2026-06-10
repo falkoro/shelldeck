@@ -582,13 +582,6 @@ function renderShellImages(name) {
         return;
     list.innerHTML = (shellImages[name] || []).map((image) => `<div class="attach-chip"><img src="${escapeHtml(image.url)}" alt=""><code>${escapeHtml(image.path)}</code><button type="button" data-remove-image="${escapeHtml(image.path)}" data-shell="${escapeHtml(name)}">Remove</button></div>`).join('');
 }
-function syncDashboardTitle(hostname) {
-    const host = hostname.trim();
-    document.title = host ? `ShellDeck · ${host}` : 'ShellDeck';
-    const label = document.getElementById('hostLabel');
-    if (label)
-        label.textContent = host || '—';
-}
 function render(model, options = {}) {
     currentModel = model;
     shellUnlocked = Boolean(model.unlocked) || Boolean(options.preserveUnlock && shellUnlocked);

@@ -96,6 +96,7 @@ let dashboardSettings: DashboardSettings = {
   panels: { machine: true, machineSensors: true, containers: true, remoteHosts: true, ciRuns: false, links: true, tickers: true, expandLists: false },
 };
 const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
+const HOST_ALIAS_KEY = 'sdHostAlias';
 const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';
 const SHELL_PREVIEW_CACHE_KEY = 'sdShellPreviewCache';
 const HIDDEN_CLOSED_SHELLS_KEY = 'sdHiddenClosedShells';
@@ -399,6 +400,39 @@ function resetShellLabel(name: string): boolean {
   if (!(name in aliases)) return false;
   delete aliases[name];
   localStorage.setItem(SHELL_LABEL_ALIASES_KEY, JSON.stringify(aliases));
+  return true;
+}
+
+function hostAlias(): string {
+  return localStorage.getItem(HOST_ALIAS_KEY)?.trim() || '';
+}
+
+function hostDisplayName(hostname: string): string {
+  const alias = hostAlias();
+  if (alias) return alias;
+  const host = hostname.trim();
+  return host || '—';
+}
+
+function syncDashboardTitle(hostname: string): void {
+  const display = hostDisplayName(hostname);
+  document.title = display === '—' ? 'ShellDeck' : display;
+  const label = document.getElementById('hostLabel');
+  if (label) label.textContent = display;
+}
+
+function renameHostLabel(hostname: string): boolean {
+  const current = hostDisplayName(hostname);
+  const next = window.prompt('Dashboard name', current);
+  if (next === null) return false;
+  const clean = next.trim().replace(/\s+/g, ' ').slice(0, 48);
+  const defaultHost = hostname.trim();
+  if (!clean || clean === defaultHost) {
+    localStorage.removeItem(HOST_ALIAS_KEY);
+  } else {
+    localStorage.setItem(HOST_ALIAS_KEY, clean);
+  }
+  syncDashboardTitle(hostname);
   return true;
 }
 
