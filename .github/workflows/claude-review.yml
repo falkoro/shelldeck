@@ -1,0 +1,27 @@
+# Claude (Dario) PR review gate. Calls the shared org reviewer in spot-techno/.github.
+# Intentionally NOT carrying the "Managed by spot-techno/.github sync-pr-review-workflows"
+# header so the weekly sync (which deletes managed caller files) leaves it in place —
+# ShellDeck wants this gate to stick. Enable/disable via the CLAUDE_REVIEW_ENABLED /
+# CLAUDE_REVIEW_CONFIGURED repo vars.
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: vars.CLAUDE_REVIEW_ENABLED == 'true' && vars.CLAUDE_REVIEW_CONFIGURED == 'true'
+    uses: spot-techno/.github/.github/workflows/reusable-claude-review.yml@master
+    secrets: inherit
+    with:
+      prompt_profile: generic
