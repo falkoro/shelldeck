@@ -210,6 +210,12 @@ function doFit(tw) {
         try {
             tw.fitAddon.fit();
             const cols = tw.term.cols, rows = tw.term.rows;
+            // Never send a too-small fit. A hidden/minimised/zero-width terminal makes the fit addon
+            // propose ~1 column; sending that resizes the shared tmux window (window-size "latest")
+            // down to a single column, redrawing the agent TUI vertically and breaking every preview
+            // capture of the session. The backend clamps too, but skip it at the source.
+            if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols < 20 || rows < 6)
+                return;
             if (tw.ws && tw.ws.readyState === WebSocket.OPEN && (cols !== tw.lastCols || rows !== tw.lastRows)) {
                 tw.lastCols = cols;
                 tw.lastRows = rows;

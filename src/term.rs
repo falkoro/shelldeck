@@ -212,9 +212,14 @@ async fn handle_term(socket: WebSocket, name: String, cols: u16, rows: u16) {
                 // a JSON {"cols":N,"rows":M} message is a resize; anything else is typed input
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&t) {
                     if let (Some(c), Some(r)) = (v["cols"].as_u64(), v["rows"].as_u64()) {
+                        // Clamp to the same bounds as the initial connect size. A degenerate fit
+                        // from a hidden/zero-width terminal must never collapse the shared tmux
+                        // window to ~1 column: window-size "latest" keeps that size after the
+                        // browser detaches, redrawing the agent TUI vertically and wrecking every
+                        // preview capture of the session.
                         let _ = master.resize(PtySize {
-                            rows: r as u16,
-                            cols: c as u16,
+                            rows: r.clamp(6, 200) as u16,
+                            cols: c.clamp(20, 400) as u16,
                             pixel_width: 0,
                             pixel_height: 0,
                         });

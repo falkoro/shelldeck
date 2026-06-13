@@ -66,6 +66,10 @@ pub struct Pane {
     pub index: String,
     pub cwd: String,
     pub command: String,
+    /// Width of the pane's tmux window (`#{window_width}`); used only to detect a window that a
+    /// too-small browser-terminal fit shrank to ~1 column. Window-level, not per-pane, so a
+    /// legitimately split narrow pane does not look like a collapse.
+    pub window_width: u16,
 }
 
 pub struct CreateSessionResult {
@@ -247,7 +251,7 @@ pub async fn session_names() -> Vec<String> {
 }
 
 pub async fn list_panes() -> Vec<Pane> {
-    let Ok(stdout) = tmux_output(&["list-panes", "-a", "-F", "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_path}|#{pane_current_command}"]).await else {
+    let Ok(stdout) = tmux_output(&["list-panes", "-a", "-F", "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_path}|#{pane_current_command}|#{window_width}"]).await else {
         return Vec::new();
     };
     stdout
@@ -260,9 +264,34 @@ pub async fn list_panes() -> Vec<Pane> {
                 index: parts.get(2)?.to_string(),
                 cwd: parts.get(3).unwrap_or(&"").to_string(),
                 command: parts.get(4).unwrap_or(&"").to_string(),
+                window_width: parts.get(5).and_then(|w| w.parse().ok()).unwrap_or(0),
             })
         })
         .collect()
+}
+
+/// Recover a session whose shared tmux window got shrunk to ~1 column by a too-small
+/// browser-terminal fit. window-size "latest" keeps that tiny size after the browser detaches,
+/// so the agent TUI stays redrawn vertically and every preview capture looks like one character
+/// per line. When a window comes back far too narrow, snap it back to the detached default and
+/// restore "latest" so a future RDP/SSH client still governs the size. No-op for normal-width
+/// windows, so it is safe to call on every preview refresh.
+async fn recover_collapsed_window(pane: &Pane) {
+    if pane.window_width == 0 || pane.window_width >= 40 {
+        return;
+    }
+    let target = format!("{}:{}", pane.session, pane.window);
+    let _ = tmux_status(&[
+        "resize-window",
+        "-t",
+        &target,
+        "-x",
+        DETACHED_TMUX_COLS,
+        "-y",
+        DETACHED_TMUX_ROWS,
+    ])
+    .await;
+    let _ = tmux_status(&["set-window-option", "-u", "-t", &target, "window-size"]).await;
 }
 
 pub async fn capture_pane(pane: &Pane, lines: u32) -> String {
@@ -294,6 +323,7 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
         .collect();
     for spec in &config.known_sessions {
         if let Some(pane) = by_session.get(&spec.name) {
+            recover_collapsed_window(pane).await;
             let cwd = pane
                 .cwd
                 .replace(&home_dir().to_string_lossy().to_string(), "~");
@@ -328,6 +358,7 @@ pub async fn shell_previews(config: Arc<Config>, lines: u32) -> serde_json::Valu
             .collect();
         unknown.sort_by(|a, b| a.session.cmp(&b.session));
         for pane in unknown {
+            recover_collapsed_window(pane).await;
             let cwd = pane
                 .cwd
                 .replace(&home_dir().to_string_lossy().to_string(), "~");
