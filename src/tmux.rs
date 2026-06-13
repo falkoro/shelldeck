@@ -277,8 +277,17 @@ pub async fn list_panes() -> Vec<Pane> {
 /// restore "latest" so a future RDP/SSH client still governs the size. No-op for normal-width
 /// windows, so it is safe to call on every preview refresh.
 async fn recover_collapsed_window(pane: &Pane) {
-    if pane.window_width == 0 || pane.window_width >= 40 {
+    // < 20 is below the browser-terminal clamp floor (term.rs), so a window this narrow is never a
+    // legitimately-sized client — it is a hidden/zero-width terminal or a stale tiny client driving
+    // the shared window to ~1 column under window-size "latest", which redraws the agent TUI
+    // vertically. Resizing alone does not stick: "latest" snaps back to whatever tiny client is
+    // attached. So detach the sub-floor offenders first, letting a real client (RDP/SSH/sized
+    // browser) govern again; then widen for the no-client-left case and restore "latest".
+    if pane.window_width == 0 || pane.window_width >= 20 {
         return;
+    }
+    for tty in clients_below_width(&pane.session, 20).await {
+        let _ = tmux_status(&["detach-client", "-t", &tty]).await;
     }
     let target = format!("{}:{}", pane.session, pane.window);
     let _ = tmux_status(&[
@@ -292,6 +301,28 @@ async fn recover_collapsed_window(pane: &Pane) {
     ])
     .await;
     let _ = tmux_status(&["set-window-option", "-u", "-t", &target, "window-size"]).await;
+}
+
+/// TTYs of clients attached to `session` narrower than `min_cols` — the broken/hidden clients that
+/// collapse the shared window under window-size "latest".
+async fn clients_below_width(session: &str, min_cols: u16) -> Vec<String> {
+    let Ok(out) = tmux_output(&[
+        "list-clients",
+        "-t",
+        session,
+        "-F",
+        "#{client_tty}|#{client_width}",
+    ])
+    .await
+    else {
+        return Vec::new();
+    };
+    out.lines()
+        .filter_map(|line| {
+            let (tty, width) = line.split_once('|')?;
+            (width.trim().parse::<u16>().ok()? < min_cols).then(|| tty.to_string())
+        })
+        .collect()
 }
 
 pub async fn capture_pane(pane: &Pane, lines: u32) -> String {
