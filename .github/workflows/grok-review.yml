@@ -1,5 +1,11 @@
-# Grok PR review gate. Calls the shared org reviewer in spot-techno/.github. Kept unmanaged.
 name: Grok Review
+
+# Per-repo Grok review gate (Hermes proxy), kept self-contained.
+# Vendored verbatim from spot-techno/.github policy-grok-review.yml because the org "PR review
+# workflows" ruleset cannot RUN required workflows on the Team plan (Enterprise-only), and
+# spot-techno/.github is private so reusable-workflow / checkout references are not available.
+# Re-sync from that upstream file when it changes. Runs on the self-hosted spot-techno-review
+# runner; review-service outages warn and leave the check green so infra never blocks merges.
 
 on:
   pull_request:
@@ -8,15 +14,291 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: read
 
 concurrency:
-  group: grok-review-${{ github.event.pull_request.number }}
+  group: grok-review-${{ github.repository }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  enabled:
+    name: Grok review enabled
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
+    outputs:
+      run_review: ${{ steps.check.outputs.run_review }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ vars.GROK_REVIEW_ENABLED }}" = "true" ]; then
+            echo "run_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
   review:
-    if: vars.GROK_REVIEW_ENABLED == 'true'
-    uses: spot-techno/.github/.github/workflows/reusable-grok-review.yml@master
-    secrets: inherit
-    with:
-      prompt_profile: generic
+    name: Grok review (Hermes)
+    needs: enabled
+    if: needs.enabled.outputs.run_review == 'true'
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Hermes proxy
+        id: proxy
+        run: |
+          set -euo pipefail
+          GW=""
+          if command -v ip >/dev/null 2>&1; then
+            GW="$(ip route 2>/dev/null | awk '/default/{print $3; exit}' || true)"
+          fi
+          for H in host.containers.internal "$GW" 172.18.0.1 172.17.0.1 127.0.0.1; do
+            [ -z "$H" ] && continue
+            if curl -fsS --max-time 6 "http://$H:38765/status" >/dev/null 2>&1; then
+              {
+                echo "available=true"
+                echo "url=http://$H:38765/api/v1/messages"
+              } >> "$GITHUB_OUTPUT"
+              echo "Hermes reachable at $H:38765"
+              exit 0
+            fi
+          done
+
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Hermes proxy (:38765) unreachable from the runner; Grok review skipped."
+
+      - name: Grok review
+        id: grok
+        if: steps.proxy.outputs.available == 'true'
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GROK_URL: ${{ steps.proxy.outputs.url }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+
+          API = "https://api.github.com"
+          MARKER = "<!-- grok-review -->"
+          MODEL = os.environ.get("GROK_MODEL", "grok-4.3")
+          DIFF_LIMIT = 50_000
+          DIFF_SUFFIX = """
+
+          Here is the unified diff:
+
+          ```diff
+          {diff}
+          ```"""
+
+
+          def warning(message):
+              print(f"::warning::{message}", file=sys.stderr)
+
+
+          def profile_for_repo(full_name):
+              repo = full_name.split("/", 1)[-1]
+              overrides = {
+                  "spot-suite": "spot-suite",
+                  "cloud-horizons": "spot-suite",
+                  "automate-certificates": "spot-product-app",
+                  "autonomy-news": "spot-product-web",
+                  "spot-suite-mockups": "spot-product-web",
+                  "logan-gl502vs-infra": "spot-platform",
+                  "spot-tech": "spot-platform",
+                  "spotcloud-ops-worker": "spot-platform",
+                  "xevolve-api-dashboard": "spot-product-app",
+              }
+              if repo in overrides:
+                  return overrides[repo]
+              if repo.endswith("-web"):
+                  return "spot-product-web"
+              if repo.endswith("-app"):
+                  return "spot-product-app"
+              if repo == "infra":
+                  return "spot-platform"
+              return "generic"
+
+
+          def load_prompt(repo):
+              prompts = {
+                  "spot-suite": """You are reviewing a pull request for the Spot Suite codebase. Write ONE concise review comment in Markdown. Use `file:line` references. Do not nitpick formatting. If it is clean, say so plainly.
+
+          Check, in priority order: brand consistency with brand.spot-suite.com; Spot Suite architecture and tenant isolation; secrets only in SECRETS KV; OAuth caching; admin-consent CSRF guards; additive migrations; correct app vs marketing deploy targets; correctness and security regressions; no customer-facing "workspace" wording.
+
+          End with a single final line: `Verdict: <one sentence>`.""",
+                  "spot-product-web": """You are reviewing a pull request for a Spot Suite marketing site. Write ONE concise review comment in Markdown. Use `file:line` references. Do not nitpick formatting. If it is clean, say so plainly.
+
+          Check brand consistency with brand.spot-suite.com, customer-facing copy quality, no "workspace" wording, deploy-target correctness, accessibility regressions, and security/secrets issues. End with `Verdict: <one sentence>`.""",
+                  "spot-product-app": """You are reviewing a pull request for a Spot Suite product app Worker. Write ONE concise review comment in Markdown. Use `file:line` references. Do not nitpick formatting. If it is clean, say so plainly.
+
+          Check tenant isolation, SECRETS KV usage, OAuth caching, admin-consent guards, migration safety, cron handlers, and security regressions. End with `Verdict: <one sentence>`.""",
+                  "spot-platform": """You are reviewing a pull request for Spot platform or infra code. Write ONE concise review comment in Markdown. Use `file:line` references. Do not nitpick formatting. If it is clean, say so plainly.
+
+          Check security, secret leakage, runner safety, network exposure, operational correctness, deploy safety, rollback paths, and shared CI/runner contracts. End with `Verdict: <one sentence>`.""",
+                  "generic": """You are reviewing a pull request. Write ONE concise review comment in Markdown. Use `file:line` references. Focus on correctness and security. End with `Verdict: <one sentence>`.""",
+              }
+              return prompts.get(profile_for_repo(repo), prompts["generic"])
+
+
+          def req(method, url, token, body=None, accept="application/vnd.github+json", timeout=120):
+              headers = {
+                  "Authorization": f"Bearer {token}",
+                  "Accept": accept,
+                  "User-Agent": "grok-review",
+              }
+              data = None
+              if body is not None:
+                  data = json.dumps(body).encode()
+                  headers["Content-Type"] = "application/json"
+              request = urllib.request.Request(url, data=data, headers=headers, method=method)
+              with urllib.request.urlopen(request, timeout=timeout) as resp:
+                  return resp.status, resp.read()
+
+
+          def get_diff(repo, pr, token):
+              _, raw = req(
+                  "GET",
+                  f"{API}/repos/{repo}/pulls/{pr}",
+                  token,
+                  accept="application/vnd.github.v3.diff",
+              )
+              return raw.decode("utf-8", "replace")
+
+
+          def call_grok(url, prompt, diff):
+              body = {
+                  "model": MODEL,
+                  "max_tokens": 1800,
+                  "stream": False,
+                  "messages": [{"role": "user", "content": prompt + DIFF_SUFFIX.format(diff=diff)}],
+              }
+              request = urllib.request.Request(
+                  url,
+                  data=json.dumps(body).encode(),
+                  headers={
+                      "Content-Type": "application/json",
+                      "anthropic-version": "2023-06-01",
+                  },
+                  method="POST",
+              )
+              with urllib.request.urlopen(request, timeout=180) as resp:
+                  payload = json.loads(resp.read())
+              parts = [
+                  block.get("text", "")
+                  for block in payload.get("content", [])
+                  if block.get("type") == "text"
+              ]
+              return "".join(parts).strip()
+
+
+          def upsert_comment(repo, pr, token, text):
+              body_md = f"{MARKER}\n## Grok review (Hermes - grok-4.3)\n\n{text}"
+              _, raw = req(
+                  "GET",
+                  f"{API}/repos/{repo}/issues/{pr}/comments?per_page=100",
+                  token,
+              )
+              for comment in json.loads(raw):
+                  if MARKER in (comment.get("body") or ""):
+                      req(
+                          "PATCH",
+                          f"{API}/repos/{repo}/issues/comments/{comment['id']}",
+                          token,
+                          body={"body": body_md},
+                      )
+                      return "updated"
+              req(
+                  "POST",
+                  f"{API}/repos/{repo}/issues/{pr}/comments",
+                  token,
+                  body={"body": body_md},
+              )
+              return "created"
+
+
+          def main():
+              token = os.environ["GITHUB_TOKEN"]
+              repo = os.environ["REPO"]
+              pr = os.environ["PR_NUMBER"]
+              url = os.environ["GROK_URL"]
+              prompt = load_prompt(repo)
+
+              try:
+                  diff = get_diff(repo, pr, token)
+              except Exception as exc:
+                  warning(f"Grok review skipped: failed to fetch PR diff: {exc}")
+                  return
+              if not diff.strip():
+                  print("empty diff; nothing to review")
+                  return
+
+              truncated = len(diff) > DIFF_LIMIT
+              if truncated:
+                  diff = diff[:DIFF_LIMIT] + "\n\n[... diff truncated for length ...]"
+
+              try:
+                  review = call_grok(url, prompt, diff)
+              except urllib.error.HTTPError as exc:
+                  warning(f"Grok review skipped: proxy returned HTTP {exc.code}")
+                  return
+              except Exception as exc:
+                  warning(f"Grok review skipped: {exc}")
+                  return
+
+              if not review:
+                  warning("Grok review skipped: model returned no text")
+                  return
+              if truncated:
+                  review += "\n\n_Note: the diff was truncated; review covers the first part only._"
+
+              try:
+                  action = upsert_comment(repo, pr, token, review)
+              except Exception as exc:
+                  warning(f"Grok review completed but failed to post comment: {exc}")
+                  return
+              print(f"comment {action}")
+
+
+          if __name__ == "__main__":
+              main()
+          PY
+
+      - name: Report Grok review status
+        if: always()
+        run: |
+          if [ "${{ steps.proxy.outputs.available }}" != "true" ]; then
+            echo "::warning::Grok review skipped because Hermes was unavailable."
+          elif [ "${{ steps.grok.outcome }}" = "failure" ]; then
+            echo "::warning::Grok review failed; leaving required check green so merge is not blocked by review infrastructure."
+          else
+            echo "Grok review completed with outcome: ${{ steps.grok.outcome }}"
+          fi
+
+  merge-gate:
+    name: Grok merge gate
+    # needs: review serializes this after the review job so it never occupies the single
+    # self-hosted runner while waiting on a review queued behind it (would deadlock). The gate
+    # only goes green once the review has posted. if: always() keeps it reporting when review
+    # is skipped (disabled).
+    needs: [enabled, review]
+    if: always()
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
+    timeout-minutes: 16
+    steps:
+      - name: Allow merge
+        run: |
+          if [ "${{ needs.enabled.outputs.run_review }}" != "true" ]; then
+            echo "Grok review disabled - merge allowed."
+          else
+            echo "Grok review finished (${{ needs.review.result }}) - merge allowed."
+          fi
+          exit 0
