@@ -1,7 +1,4 @@
-# Grok PR review gate. Calls the shared org reviewer in spot-techno/.github.
-# Intentionally NOT carrying the "Managed by spot-techno/.github sync-pr-review-workflows"
-# header so the weekly sync (which deletes managed caller files) leaves it in place —
-# ShellDeck wants this gate to stick. Enable/disable via the GROK_REVIEW_ENABLED repo var.
+# Grok PR review gate. Calls the shared org reviewer in spot-techno/.github. Kept unmanaged.
 name: Grok Review
 
 on:
