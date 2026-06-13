@@ -18,8 +18,17 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - uses: spot-techno/.github/actions/bun-deps-cache@master
-        # Managed by spot-techno/.github sync-bun-cache-workflows
+      # Cache bun's global download cache directly. The previous
+      # spot-techno/.github/actions/bun-deps-cache@master org action fails to resolve
+      # ("Unable to resolve action spot-techno/.github, not found") on the shelldeck-review
+      # runner, which red-failed every CI run at the Set up job step.
+      - name: Cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
       - name: Frontend typecheck
         run: |
           bun install --frozen-lockfile
