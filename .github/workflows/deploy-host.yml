@@ -1,7 +1,8 @@
 name: Deploy host
 
-# Personal ShellDeck (code.falkinator.org) deploys from logan-gl502vs into beefy.
-# Spot/work ShellDeck (code.spotcloud.nl) deploys on logan-laptop where the service runs.
+# Both dashboards run on logan-laptop and deploy from its host runner (shelldeck-host):
+#  - code.falkinator.org → the rootful beefy-personal podman container (deploy-host-beefy.sh).
+#  - code.spotcloud.nl   → the systemd --user shelldeck.service.
 # Split jobs so the beefy leg never resolves org-private composite actions at setup time.
 
 on:
@@ -15,7 +16,7 @@ permissions:
 jobs:
   deploy-falkinator:
     name: Deploy ShellDeck (falkinator)
-    runs-on: [self-hosted, linux, x64, shelldeck-beefy]
+    runs-on: [self-hosted, linux, x64, shelldeck-host]
     timeout-minutes: 30
     concurrency:
       group: deploy-host-falkinator
@@ -27,6 +28,7 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
           SHELLDECK_DEPLOY_TARGET: cachy-beefy
+          SHELLDECK_BEEFY_HOME: /home/falk/beefy-home
           SHELLDECK_PUBLIC_URLS: https://code.falkinator.org/
         run: ./scripts/deploy-host.sh
 
