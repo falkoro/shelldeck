@@ -249,6 +249,16 @@ function renderShells(payload) {
     scheduleShellGridFit();
 }
 function applyShellCardOrder(grid, ordered) {
+    // Re-appending a card moves its DOM subtree, which blurs a focused composer textarea inside it
+    // (the cursor "jumps away" mid-type on every ~1.2s refresh). Only touch the DOM when the order
+    // actually changed (e.g. a drag-reorder) — a no-op when it already matches keeps focus intact.
+    const current = Array.from(grid.querySelectorAll('[data-shell-card]'))
+        .map((card) => card.dataset.shellCard || '');
+    const desired = ordered
+        .map((shell) => shell.name)
+        .filter((name) => current.includes(name));
+    if (current.join(' ') === desired.join(' '))
+        return;
     ordered.forEach((shell) => {
         const card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
         if (card)
