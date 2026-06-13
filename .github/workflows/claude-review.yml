@@ -19,7 +19,7 @@ permissions:
 jobs:
   enabled:
     name: Claude review enabled
-    runs-on: [self-hosted, linux, x64, spot-techno-review]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     outputs:
       run_review: ${{ steps.check.outputs.run_review }}
     steps:
@@ -35,7 +35,7 @@ jobs:
     name: Claude review
     needs: enabled
     if: needs.enabled.outputs.run_review == 'true'
-    runs-on: [self-hosted, linux, x64, spot-techno-review]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     timeout-minutes: 6
     steps:
       - name: Resolve Dario proxy
@@ -304,7 +304,7 @@ jobs:
     # is skipped (disabled).
     needs: [enabled, review]
     if: always()
-    runs-on: [self-hosted, linux, x64, spot-techno-review]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     timeout-minutes: 7
     steps:
       - name: Allow merge

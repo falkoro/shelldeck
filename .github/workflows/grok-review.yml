@@ -23,7 +23,7 @@ concurrency:
 jobs:
   enabled:
     name: Grok review enabled
-    runs-on: [self-hosted, linux, x64, spot-techno-review]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     outputs:
       run_review: ${{ steps.check.outputs.run_review }}
     steps:
@@ -39,7 +39,7 @@ jobs:
     name: Grok review (Hermes)
     needs: enabled
     if: needs.enabled.outputs.run_review == 'true'
-    runs-on: [self-hosted, linux, x64, spot-techno-review]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -291,7 +291,7 @@ jobs:
     # is skipped (disabled).
     needs: [enabled, review]
     if: always()
-    runs-on: [self-hosted, linux, x64, spot-techno-review]
+    runs-on: [self-hosted, linux, x64, shelldeck-review]
     timeout-minutes: 16
     steps:
       - name: Allow merge
