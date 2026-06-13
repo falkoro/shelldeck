@@ -35,19 +35,19 @@ Operator scripts live under `ops/scripts/` and `scripts/deploy-host*.sh`.
 
 | Machine | Labels | Role |
 |---|---|---|
-| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review`, `shelldeck-beefy` | Personal `falkoro/*` CI + PR CI; deploys ShellDeck into beefy (`code.falkinator.org`) |
+| **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review`, `shelldeck-beefy` | Personal `falkoro/*` CI + PR CI (Grok/Claude review gates run here) |
 | **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product CI/deploys |
-| **beefy-personal** (container on gl502vs) | — | ShellDeck runtime target only — no GitHub runner inside |
-| **logan-laptop** | `shelldeck-host` | Deploy to `code.spotcloud.nl` |
+| **beefy-personal** (rootful podman container on **logan-laptop**) | — | `code.falkinator.org` runtime target — no GitHub runner inside; deployed into via `sudo podman` from the laptop's `shelldeck-host` runner |
+| **logan-laptop** | `shelldeck-host` | Deploys BOTH dashboards: `code.spotcloud.nl` (systemd `--user` service) and `code.falkinator.org` (the beefy-personal container) |
 
 Install host runners once (on the named machines):
 
 ```sh
-# logan-gl502vs → deploys into beefy for code.falkinator.org
-bash ops/scripts/install-shelldeck-beefy-runner.sh
-
-# logan-laptop → code.spotcloud.nl
+# logan-laptop → both dashboards (code.spotcloud.nl service + code.falkinator.org container)
 bash ops/scripts/install-shelldeck-host-runner.sh
+
+# logan-gl502vs → PR CI + review gates only (no longer the falkinator deploy driver)
+bash ops/scripts/install-shelldeck-beefy-runner.sh
 ```
 
 Do not use legacy `logan-laptop` / `beefy` / `podman` runner labels in new workflows.

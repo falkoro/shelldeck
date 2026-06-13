@@ -19,13 +19,11 @@ case "$DEPLOY_TARGET" in
 esac
 
 runner_allowed() {
+  # Both dashboards now run on logan-laptop: code.spotcloud.nl as a systemd --user service,
+  # code.falkinator.org in the rootful beefy-personal podman container. So both deploy targets
+  # are driven from the logan-laptop host runner.
   case "$DEPLOY_TARGET" in
-    cachy-beefy)
-      case "$RUNNER_HOST" in
-        logan-GL502VS|logan-gl502vs|logan-GL502VS.localdomain|logan-gl502vs.localdomain) return 0 ;;
-      esac
-      ;;
-    logan-laptop)
+    cachy-beefy|logan-laptop)
       case "$RUNNER_HOST" in
         logan-laptop|logan-laptop.*) return 0 ;;
       esac
