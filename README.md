@@ -195,3 +195,5 @@ Bundles [xterm.js](https://github.com/xtermjs/xterm.js) and its fit addon (MIT).
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+<!-- review gates: grok + dario active -->
