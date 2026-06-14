@@ -15,7 +15,11 @@ set -euo pipefail
 ROOT="${1:?source checkout required}"
 SHA="${2:?commit sha required}"
 
-INCUS="${SHELLDECK_INCUS_CMD:-incus}"                               # runner user must be in the incus-admin group
+# Use `sudo incus` by default: the shelldeck-host runner is a `systemctl --user` service whose
+# user-manager captured falk's groups before falk joined `incus-admin`, so the runner can't reach
+# the incus socket directly. falk has NOPASSWD sudo (same as the old `sudo podman` model), so this
+# is robust regardless of the manager's stale group set. Override with SHELLDECK_INCUS_CMD=incus.
+read -ra INCUS <<< "${SHELLDECK_INCUS_CMD:-sudo incus}"
 CONTAINER="${SHELLDECK_BEEFY_CONTAINER:-personal}"
 LIVE_DIR="${SHELLDECK_BEEFY_LIVE_DIR:-/home/falk/repos/shelldeck}"  # path INSIDE the container
 SERVICE="${SHELLDECK_BEEFY_SERVICE:-shelldeck.service}"
@@ -23,13 +27,13 @@ HEALTH_URL="${SHELLDECK_HEALTH_URL:-http://127.0.0.1:8789/}"        # host proxy
 
 exec_falk() {
   # Run a command in the container as the unprivileged falk user with a login env.
-  "$INCUS" exec "$CONTAINER" --user 1000 --group 1000 \
+  "${INCUS[@]}" exec "$CONTAINER" --user 1000 --group 1000 \
     --env HOME=/home/falk --env LIVE_DIR="$LIVE_DIR" --env SHA="$SHA" -- bash -lc "$1"
 }
 
 echo "Pushing source into container '$CONTAINER' (no shared mount) ..."
 tar -C "$ROOT" -cf - --exclude=target --exclude=node_modules --exclude=.git . \
-  | "$INCUS" exec "$CONTAINER" --user 1000 --group 1000 --env HOME=/home/falk -- \
+  | "${INCUS[@]}" exec "$CONTAINER" --user 1000 --group 1000 --env HOME=/home/falk -- \
       bash -lc 'rm -rf ~/build/shelldeck && mkdir -p ~/build/shelldeck && tar -C ~/build/shelldeck -xf -'
 
 echo "Building + installing in container ..."
@@ -47,7 +51,7 @@ exec_falk '
 '
 
 echo "Restarting $SERVICE ..."
-"$INCUS" exec "$CONTAINER" -- systemctl restart "$SERVICE"
+"${INCUS[@]}" exec "$CONTAINER" -- systemctl restart "$SERVICE"
 
 # Health check from the host (incus proxy publishes container :8787 -> host :8789). Accept any
 # "server is up" response (the dashboard may 302 to login or 403 a non-allowlisted source).
