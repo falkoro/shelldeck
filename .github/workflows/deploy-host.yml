@@ -1,7 +1,7 @@
 name: Deploy host
 
 # Both dashboards run on logan-laptop and deploy from its host runner (shelldeck-host):
-#  - code.falkinator.org → the rootful beefy-personal podman container (deploy-host-beefy.sh).
+#  - code.falkinator.org → the isolated "personal" Arch Incus system container (deploy-host-beefy.sh).
 #  - code.spotcloud.nl   → the systemd --user shelldeck.service.
 # Split jobs so the beefy leg never resolves org-private composite actions at setup time.
 
@@ -28,7 +28,6 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
           SHELLDECK_DEPLOY_TARGET: cachy-beefy
-          SHELLDECK_BEEFY_HOME: /home/falk/beefy-home
           SHELLDECK_PUBLIC_URLS: https://code.falkinator.org/
         run: ./scripts/deploy-host.sh
 
