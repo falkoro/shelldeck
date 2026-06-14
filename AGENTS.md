@@ -37,8 +37,8 @@ Operator scripts live under `ops/scripts/` and `scripts/deploy-host*.sh`.
 |---|---|---|
 | **logan-gl502vs** | `logan-gl502vs`, `shelldeck-review`, `shelldeck-beefy` | Personal `falkoro/*` CI + PR CI (Grok/Claude review gates run here) |
 | **spot-tech-ci** | `spot-tech-ci` | `spot-techno/*` org product CI/deploys |
-| **beefy-personal** (rootful podman container on **logan-laptop**) | — | `code.falkinator.org` runtime target — no GitHub runner inside; deployed into via `sudo podman` from the laptop's `shelldeck-host` runner |
-| **logan-laptop** | `shelldeck-host` | Deploys BOTH dashboards: `code.spotcloud.nl` (systemd `--user` service) and `code.falkinator.org` (the beefy-personal container) |
+| **personal** (isolated Arch **Incus system container** on **logan-laptop**) | — | `code.falkinator.org` runtime target — unprivileged, own disk (no host bind-mount). ShellDeck runs as `shelldeck.service`; host publishes container `:8787`→`:8789` via an incus proxy. No GitHub runner inside; deployed into via `incus exec` from the laptop's `shelldeck-host` runner |
+| **logan-laptop** | `shelldeck-host` | Deploys BOTH dashboards: `code.spotcloud.nl` (systemd `--user` service) and `code.falkinator.org` (the `personal` Incus container) |
 
 Install host runners once (on the named machines):
 
