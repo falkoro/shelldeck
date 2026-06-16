@@ -1,0 +1,20 @@
+# Managed centrally — Synthetic (MiniMax-M3) PR reviewer, peer to grok-review + claude-review.
+name: Synthetic Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: synthetic-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: vars.SYNTHETIC_REVIEW_ENABLED == 'true'
+    uses: spot-techno/.github/.github/workflows/reusable-synthetic-review.yml@master
+    secrets: inherit
