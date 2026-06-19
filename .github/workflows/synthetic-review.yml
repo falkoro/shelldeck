@@ -1,4 +1,3 @@
-# Managed centrally — Synthetic (MiniMax-M3) PR reviewer, peer to grok-review + claude-review.
 name: Synthetic Review
 
 on:
