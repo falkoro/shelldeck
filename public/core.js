@@ -460,9 +460,6 @@ function selectSession(name) {
     renderSelectedSessionActions();
     markSelectedShell();
     updateUnlockState();
-    // Close the mobile session drawer after picking a session so the shell is front-and-center.
-    if (typeof setSessionRailOpen === 'function' && window.innerWidth <= 760)
-        setSessionRailOpen(false);
 }
 function inputFor(name) {
     return document.querySelector(`[data-command="${selectorEscape(name)}"]`);

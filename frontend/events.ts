@@ -102,73 +102,6 @@ document.addEventListener('click', async (event: MouseEvent) => {
       }
       return;
     }
-    const colorBtn = target.closest<HTMLButtonElement>('[data-color-session]');
-    if (colorBtn) {
-      const name = colorBtn.dataset.colorSession || '';
-      if (name && typeof cycleSessionColor === 'function') {
-        cycleSessionColor(name);
-        if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
-        if (typeof renderSessionRail === 'function') renderSessionRail();
-      }
-      return;
-    }
-    const multiToggle = target.closest<HTMLElement>('[data-toggle-multiselect]');
-    if (multiToggle && typeof toggleMultiSelectMode === 'function') {
-      toggleMultiSelectMode();
-      return;
-    }
-    const openPaletteBtn = target.closest<HTMLElement>('[data-open-palette]');
-    if (openPaletteBtn && typeof openCommandPalette === 'function') {
-      openCommandPalette();
-      return;
-    }
-    const multiCheck = target.closest<HTMLInputElement>('input[data-multi-select]');
-    if (multiCheck) {
-      const name = multiCheck.dataset.multiSelect || '';
-      if (name && typeof toggleMultiSelected === 'function') {
-        toggleMultiSelected(name);
-        if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
-        if (typeof renderSessionRail === 'function') renderSessionRail();
-      }
-      return;
-    }
-    const bulkPin = target.closest<HTMLElement>('[data-bulk-pin]');
-    if (bulkPin && typeof multiSelectedNames === 'function') {
-      multiSelectedNames().forEach((n) => setSessionPinned(n, true));
-      if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
-      if (typeof invalidateShellTabs === 'function') invalidateShellTabs();
-      renderShellTabs();
-      if (typeof renderSessionRail === 'function') renderSessionRail();
-      toast('Pinned selected');
-      return;
-    }
-    const bulkUnpin = target.closest<HTMLElement>('[data-bulk-unpin]');
-    if (bulkUnpin && typeof multiSelectedNames === 'function') {
-      multiSelectedNames().forEach((n) => setSessionPinned(n, false));
-      if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
-      if (typeof invalidateShellTabs === 'function') invalidateShellTabs();
-      renderShellTabs();
-      if (typeof renderSessionRail === 'function') renderSessionRail();
-      toast('Unpinned selected');
-      return;
-    }
-    const bulkHide = target.closest<HTMLElement>('[data-bulk-hide]');
-    if (bulkHide && typeof multiSelectedNames === 'function') {
-      const names = multiSelectedNames();
-      names.forEach((n) => {
-        try {
-          if (canRemoveClosedShell(sessionByName(n))) removeClosedShell(n);
-        } catch {
-          /* only closed */
-        }
-      });
-      if (typeof clearMultiSelected === 'function') clearMultiSelected();
-      if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
-      renderShellTabs();
-      if (typeof renderSessionRail === 'function') renderSessionRail();
-      toast('Hid closed sessions from selection');
-      return;
-    }
     if (copyButton) return copyText(copyButton.dataset.copy || '');
     if (sendButton && !sendButton.disabled) return sendInput(sendButton.dataset.sendShell || '', true);
     if (pasteButton && !pasteButton.disabled) return sendInput(pasteButton.dataset.pasteShell || '', false);
@@ -264,13 +197,6 @@ document.addEventListener('click', async (event: MouseEvent) => {
     // but still ignore clicks on inner controls (textarea/pre inside a card).
     if (selectItem && (!interactive || interactive === selectItem)) {
       const sessionName = selectItem.dataset.selectSession || '';
-      // In multi-select mode, row click toggles selection instead of focusing.
-      if (sessionName && typeof isMultiSelectMode === 'function' && isMultiSelectMode()) {
-        if (typeof toggleMultiSelected === 'function') toggleMultiSelected(sessionName);
-        if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
-        if (typeof renderSessionRail === 'function') renderSessionRail();
-        return;
-      }
       selectSession(sessionName);
       // On a phone the cards are collapsed to a compact launcher, so a tap opens the
       // full-screen live terminal ("just go") instead of focusing the hidden composer.
@@ -407,55 +333,8 @@ if (topActions && !document.getElementById('sidebarToggle')) {
   applySidebar();
 }
 
-if (topActions && !document.getElementById('quietModeBtn')) {
-  const quietBtn = document.createElement('button');
-  quietBtn.id = 'quietModeBtn';
-  quietBtn.type = 'button';
-  quietBtn.className = 'ghost';
-  quietBtn.innerHTML = `${icon('moon')}<span>Quiet</span>`;
-  quietBtn.addEventListener('click', () => {
-    if (typeof toggleQuietMode === 'function') toggleQuietMode();
-  });
-  topActions.insertAdjacentElement('afterbegin', quietBtn);
-  if (typeof applyQuietMode === 'function') applyQuietMode();
-}
-
-if (topActions && !document.getElementById('paletteBtn')) {
-  const paletteBtn = document.createElement('button');
-  paletteBtn.id = 'paletteBtn';
-  paletteBtn.type = 'button';
-  paletteBtn.className = 'ghost';
-  paletteBtn.innerHTML = `${icon('search')}<span>Jump</span>`;
-  paletteBtn.title = 'Jump to session (⌘K or /)';
-  paletteBtn.addEventListener('click', () => {
-    if (typeof openCommandPalette === 'function') openCommandPalette();
-  });
-  topActions.insertAdjacentElement('afterbegin', paletteBtn);
-}
-
-// Mobile sessions drawer open control (desktop uses the always-visible left rail).
-if (topActions && !document.getElementById('sessionRailOpenBtn')) {
-  const sessionsBtn = document.createElement('button');
-  sessionsBtn.id = 'sessionRailOpenBtn';
-  sessionsBtn.type = 'button';
-  sessionsBtn.className = 'ghost session-rail-open-btn';
-  sessionsBtn.innerHTML = `${icon('sessions')}<span>Sessions</span>`;
-  sessionsBtn.setAttribute('aria-controls', 'sessionNav');
-  sessionsBtn.setAttribute('aria-expanded', 'false');
-  sessionsBtn.addEventListener('click', () => {
-    if (typeof toggleSessionRailOpen === 'function') toggleSessionRailOpen();
-  });
-  topActions.insertAdjacentElement('afterbegin', sessionsBtn);
-}
-
-document.getElementById('sessionNavClose')?.addEventListener('click', () => {
-  if (typeof setSessionRailOpen === 'function') setSessionRailOpen(false);
-});
-document.getElementById('sessionRailBackdrop')?.addEventListener('click', () => {
-  if (typeof setSessionRailOpen === 'function') setSessionRailOpen(false);
-});
-window.addEventListener('resize', () => {
-  if (typeof applySessionRailOpen === 'function') applySessionRailOpen();
+document.getElementById('refreshConversationBtn')?.addEventListener('click', () => {
+  refreshSummaries().catch((error: Error) => toast(error.message));
 });
 
 const sidebarHead = document.querySelector<HTMLElement>('.sidebar-head');
@@ -595,10 +474,9 @@ document.addEventListener('keydown', (event: KeyboardEvent) => {
     case 'g': event.preventDefault(); document.getElementById('viewToggle')?.click(); break;
     case 'c': event.preventDefault(); document.getElementById('densityToggle')?.click(); break;
     case 'f': event.preventDefault(); document.getElementById('followToggle')?.click(); break;
-    case 'q': event.preventDefault(); if (typeof toggleQuietMode === 'function') toggleQuietMode(); break;
     case '[': event.preventDefault(); cycleShell(-1); break;
     case ']': event.preventDefault(); cycleShell(1); break;
-    case '?': event.preventDefault(); toast('Shortcuts — / or ⌘K jump · q quiet · r refresh · g grid · c density · f follow · [ ] cycle'); break;
+    case '?': event.preventDefault(); toast('Shortcuts — / or ⌘K jump · r refresh · g grid · c density · f follow · [ ] cycle'); break;
     default: break;
   }
 });
