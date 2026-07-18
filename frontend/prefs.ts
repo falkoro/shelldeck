@@ -71,29 +71,38 @@ function cycleHistory(name: string, direction: number): boolean {
 function applyPrefs(): void {
   document.body.classList.toggle('density-compact', density === 'compact');
   document.body.classList.toggle('density-comfortable', density === 'comfortable');
-  const viewToggle = q<HTMLButtonElement>('#viewToggle');
-  viewToggle.innerHTML = viewMode === 'focus' ? `${icon('focus')}<span>Focus</span>` : `${icon('grid')}<span>Grid</span>`;
-  viewToggle.title = viewMode === 'focus'
-    ? 'Focus: one shell at a time — click for Grid (side-by-side)'
-    : 'Grid: all shells side-by-side — drag ⋮⋮ grips to reorder — click for Focus';
-  viewToggle.classList.toggle('active', viewMode === 'grid');
   document.body.classList.toggle('view-grid', viewMode === 'grid');
   document.body.classList.toggle('view-focus', viewMode === 'focus');
-  const densityToggle = q<HTMLButtonElement>('#densityToggle');
-  densityToggle.innerHTML = `${icon('rows')}<span>${density === 'compact' ? 'Compact' : 'Comfort'}</span>`;
-  densityToggle.title = density === 'compact' ? 'Density: compact — tap for comfort' : 'Density: comfort — tap for compact';
-  const followToggle = q<HTMLButtonElement>('#followToggle');
-  followToggle.classList.toggle('active', followOutput);
-  followToggle.innerHTML = `${icon('follow')}<span>${followOutput ? 'Follow' : 'Paused'}</span>`;
-  followToggle.title = followOutput ? 'Output follow: on' : 'Output follow: paused';
-  const lineSel = q<HTMLSelectElement>('#lineCount');
-  lineSel.value = String(terminalLines);
-  lineSel.title = 'Recent output lines shown in each shell preview';
-  if (lineSel.dataset.labeled !== '1') {
-    Array.from(lineSel.options).forEach((opt) => { opt.textContent = `${opt.value} lines`; });
-    lineSel.dataset.labeled = '1';
+  // Live-center layout may omit grid/density/follow controls — keep applyPrefs safe either way.
+  const viewToggle = document.getElementById('viewToggle') as HTMLButtonElement | null;
+  if (viewToggle) {
+    viewToggle.innerHTML = viewMode === 'focus' ? `${icon('focus')}<span>Focus</span>` : `${icon('grid')}<span>Grid</span>`;
+    viewToggle.title = viewMode === 'focus'
+      ? 'Focus: one shell at a time — click for Grid (side-by-side)'
+      : 'Grid: all shells side-by-side — drag ⋮⋮ grips to reorder — click for Focus';
+    viewToggle.classList.toggle('active', viewMode === 'grid');
   }
-  q('#shells').classList.toggle('focus-mode', viewMode === 'focus');
+  const densityToggle = document.getElementById('densityToggle') as HTMLButtonElement | null;
+  if (densityToggle) {
+    densityToggle.innerHTML = `${icon('rows')}<span>${density === 'compact' ? 'Compact' : 'Comfort'}</span>`;
+    densityToggle.title = density === 'compact' ? 'Density: compact — tap for comfort' : 'Density: comfort — tap for compact';
+  }
+  const followToggle = document.getElementById('followToggle') as HTMLButtonElement | null;
+  if (followToggle) {
+    followToggle.classList.toggle('active', followOutput);
+    followToggle.innerHTML = `${icon('follow')}<span>${followOutput ? 'Follow' : 'Paused'}</span>`;
+    followToggle.title = followOutput ? 'Output follow: on' : 'Output follow: paused';
+  }
+  const lineSel = document.getElementById('lineCount') as HTMLSelectElement | null;
+  if (lineSel) {
+    lineSel.value = String(terminalLines);
+    lineSel.title = 'Recent output lines shown in each shell preview';
+    if (lineSel.dataset.labeled !== '1') {
+      Array.from(lineSel.options).forEach((opt) => { opt.textContent = `${opt.value} lines`; });
+      lineSel.dataset.labeled = '1';
+    }
+  }
+  document.getElementById('shells')?.classList.toggle('focus-mode', viewMode === 'focus');
   applySidebar();
 }
 
@@ -104,7 +113,7 @@ function applySidebar(): void {
   const btn = document.getElementById('sidebarToggle');
   if (btn) {
     btn.classList.toggle('active', sidebarVisible);
-    btn.title = sidebarVisible ? 'Side panels shown — click to hide' : 'Side panels hidden — click to show';
+    btn.title = sidebarVisible ? 'Monitor rail shown — click to hide' : 'Monitor rail hidden — click to show';
   }
   const collapseBtn = document.getElementById('sidebarCollapseBtn');
   if (collapseBtn) {

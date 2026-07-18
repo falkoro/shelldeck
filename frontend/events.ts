@@ -155,7 +155,6 @@ document.addEventListener('click', async (event: MouseEvent) => {
     if (restoreHiddenButton) return restoreHiddenClosedShells();
     if (tabButton) {
       selectSession(tabButton.dataset.shellTab);
-      focusComposer(tabButton.dataset.shellTab || '');
       return;
     }
     if (imageButton && !imageButton.disabled) {
@@ -198,13 +197,7 @@ document.addEventListener('click', async (event: MouseEvent) => {
     if (selectItem && (!interactive || interactive === selectItem)) {
       const sessionName = selectItem.dataset.selectSession || '';
       selectSession(sessionName);
-      // On a phone the cards are collapsed to a compact launcher, so a tap opens the
-      // full-screen live terminal ("just go") instead of focusing the hidden composer.
-      if (sessionName && compactTerminalViewport()) {
-        openTerminal(sessionName);
-        return;
-      }
-      focusComposer(sessionName);
+      // Live center always attaches tmux in the stage (selectSession opens it when unlocked).
     }
   } catch (error) {
     toast(error instanceof Error ? error.message : String(error));
@@ -314,9 +307,9 @@ document.getElementById('editRemoteHostsBtn')?.addEventListener('click', () => o
 document.getElementById('refreshSummaryBtn')?.addEventListener('click', () => refreshSummaries().catch((error: Error) => toast(error.message)));
 q<HTMLButtonElement>('#refreshShellsTopBtn').title = 'Refresh shells';
 q('#refreshShellsTopBtn').addEventListener('click', () => loadShells().catch((error: Error) => toast(error.message)));
-q('#viewToggle').addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
-q('#densityToggle').addEventListener('click', toggleDensity);
-q('#followToggle').addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
+document.getElementById('viewToggle')?.addEventListener('click', () => setViewMode(viewMode === 'focus' ? 'grid' : 'focus'));
+document.getElementById('densityToggle')?.addEventListener('click', toggleDensity);
+document.getElementById('followToggle')?.addEventListener('click', () => { followOutput = !followOutput; localStorage.setItem('sdFollowOutput', followOutput ? '1' : '0'); applyPrefs(); });
 
 // Side-panels toggle in the top bar. The side rail (Machine/Remote/Containers/Links/Unlock) is
 // OPTIONAL — this always-visible button is the hint that it can be shown/hidden, and the choice
@@ -327,7 +320,8 @@ if (topActions && !document.getElementById('sidebarToggle')) {
   sidebarBtn.id = 'sidebarToggle';
   sidebarBtn.type = 'button';
   sidebarBtn.className = 'ghost';
-  sidebarBtn.innerHTML = `${icon('sidebar')}<span>Panels</span>`;
+  sidebarBtn.innerHTML = `${icon('sidebar')}<span>Monitor</span>`;
+  sidebarBtn.title = 'Show or hide the right-side monitor rail';
   sidebarBtn.addEventListener('click', toggleSidebar);
   topActions.insertAdjacentElement('afterbegin', sidebarBtn);
   applySidebar();
@@ -481,7 +475,7 @@ document.addEventListener('keydown', (event: KeyboardEvent) => {
   }
 });
 
-q<HTMLSelectElement>('#lineCount').addEventListener('change', (event: Event) => setTerminalLines(Number((event.target as HTMLSelectElement).value)));
+document.getElementById('lineCount')?.addEventListener('change', (event: Event) => setTerminalLines(Number((event.target as HTMLSelectElement).value)));
 imageFile.addEventListener('change', () => {
   handleImageFiles(imageFile.files || undefined, pendingImageTarget).catch((error: Error) => toast(error.message)).finally(() => {
     imageFile.value = '';

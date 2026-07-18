@@ -1,49 +1,17 @@
 "use strict";
 function renderShells(payload) {
-    const grid = q('#shells');
+    // Live-center layout: keep shell model data for status/summaries, but do not paint preview cards.
+    // The main surface is the docked live tmux terminal for the selected session.
     latestShells = payload.shells || [];
     if (latestShells.length && !payload.fromCache)
         saveShellPreviewCache(latestShells);
-    if (!latestShells.length) {
-        grid.innerHTML = '<div class="locked-note">No tmux panes were returned yet. Try starting a shell slot.</div>';
-        updateUnlockState();
-        return;
+    const grid = document.getElementById('shells');
+    if (grid) {
+        grid.innerHTML = '';
+        grid.hidden = true;
+        grid.setAttribute('aria-hidden', 'true');
     }
-    grid.querySelectorAll(':scope > .locked-note, :scope > .unlock-cta').forEach((note) => note.remove());
-    const seen = new Set();
-    // Use ordered list so drag-reorder persists across refreshes.
     const visibleShells = visibleShellPreviews(latestShells);
-    const ordered = orderedShellList(visibleShells);
-    ordered.forEach((shell, idx) => {
-        seen.add(shell.name);
-        let card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
-        if (!card) {
-            card = createShellCard(shell);
-            grid.appendChild(card);
-        }
-        // Apply saved size if available
-        const savedSize = loadShellCardSize(shell.name);
-        if (savedSize) {
-            card.style.minHeight = `${savedSize.h}px`;
-            card.dataset.sized = '1';
-        }
-        updateShellCard(card, shell);
-    });
-    grid.querySelectorAll('[data-shell-card]').forEach((card) => {
-        if (!seen.has(card.dataset.shellCard || ''))
-            card.remove();
-    });
-    applyShellCardOrder(grid, ordered);
-    if (!document.querySelector('.terminal-card.preview-fullscreen')) {
-        document.body.classList.remove('preview-fullscreen-open');
-    }
-    // Respect minimized previews (they live in the dock instead of the grid)
-    const minPreviews = window.minimizedPreviews || new Set();
-    visibleShells.forEach((shell) => {
-        const card = grid.querySelector(`[data-shell-card="${selectorEscape(shell.name)}"]`);
-        if (card)
-            card.style.display = minPreviews.has(shell.name) ? 'none' : '';
-    });
     markSelectedShell();
     renderShellTabs();
     if (typeof noteUnreadFromShells === 'function')
@@ -51,7 +19,10 @@ function renderShells(payload) {
     if (typeof renderSessionRail === 'function')
         renderSessionRail();
     updateUnlockState();
-    scheduleShellGridFit();
+    // Keep the selected session's live terminal open / focused after refresh.
+    if (selectedSession && shellUnlocked && typeof openTerminal === 'function') {
+        openTerminal(selectedSession);
+    }
 }
 function applyShellCardOrder(grid, ordered) {
     // Re-appending a card moves its DOM subtree, which blurs a focused composer textarea inside it
@@ -156,7 +127,7 @@ function markSelectedShell() {
     if (cards.length && !document.querySelector('.terminal-card.selected')) {
         cards[0].classList.add('selected');
     }
-    q('#shells').classList.toggle('focus-mode', viewMode === 'focus');
+    document.getElementById('shells')?.classList.toggle('focus-mode', viewMode === 'focus');
 }
 function setShellAgentBadge(card, name) {
     const shell = latestShells.find((s) => s.name === name);
