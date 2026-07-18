@@ -60,7 +60,8 @@ function renderSelectedSessionActions(): void {
   const displayLabel = shellDisplayLabel(selected.name, selected.label);
   el.hidden = false;
   el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}">${actionButtons}</div>`;
+  // Meta lives in the live-stage header title; only action buttons here.
+  el.innerHTML = `<div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}">${actionButtons}</div>`;
   scheduleShellGridFit();
 }
 

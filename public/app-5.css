@@ -1,153 +1,275 @@
-/* Live-center layout: Conversation (left) | Live tmux (center) | Monitor (right).
-   Shell preview cards are gone — the main stage is the real attach. */
+/* Live-center cockpit: Conversation | seamless tmux | Monitor.
+   No floating-window chrome. Session list is a flat rail, not card stack. */
 
 .workspace.live-layout{
   display:grid;
-  grid-template-columns:minmax(260px,320px) minmax(0,1fr) minmax(260px,320px);
-  gap:12px;
-  align-items:start;
+  grid-template-columns:minmax(240px,280px) minmax(0,1fr) minmax(250px,300px);
+  gap:0;
+  align-items:stretch;
+  min-height:calc(100svh - 72px);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;
+  overflow:hidden;
+  background:#050a0f;
 }
 body.sidebar-hidden .workspace.live-layout{
-  grid-template-columns:minmax(260px,320px) minmax(0,1fr);
+  grid-template-columns:minmax(240px,280px) minmax(0,1fr);
 }
 body.sidebar-hidden .monitor-sidebar{display:none}
 
+/* Side rails share one surface; hairline separators, no nested "panel cards" look */
 .conversation-sidebar,
 .monitor-sidebar{
-  position:sticky;top:14px;display:flex;flex-direction:column;gap:12px;min-width:0;
-  max-height:calc(100svh - 28px);overflow:auto;overscroll-behavior:contain;
+  position:relative;top:auto;display:flex;flex-direction:column;gap:0;min-width:0;
+  max-height:none;overflow:auto;overscroll-behavior:contain;
+  background:#070d13;padding:0;
 }
-.live-main{min-width:0;min-height:0}
-.live-stage-panel{display:flex;flex-direction:column;min-height:calc(100svh - 120px);padding-bottom:8px}
-.live-stage-header{flex:0 0 auto}
+.conversation-sidebar{border-right:1px solid rgba(255,255,255,.06)}
+.monitor-sidebar{border-left:1px solid rgba(255,255,255,.06)}
+
+.conversation-sidebar .sidebar-head,
+.monitor-sidebar .sidebar-head{
+  flex:0 0 auto;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);
+  background:rgba(0,0,0,.18);
+}
+.conversation-sidebar .panel,
+.monitor-sidebar .panel{
+  border:0;border-radius:0;background:transparent;box-shadow:none;
+  margin:0;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.conversation-sidebar .panel:last-child,
+.monitor-sidebar .panel:last-child{border-bottom:0}
+.conversation-sidebar .panel-header,
+.monitor-sidebar .panel-header{margin-bottom:8px}
+
+.live-main{min-width:0;min-height:0;display:flex;flex-direction:column;background:#03070b}
+.live-stage-panel{
+  display:flex;flex-direction:column;flex:1 1 auto;min-height:0;
+  border:0;border-radius:0;background:transparent;margin:0;padding:0;
+  box-shadow:none;
+}
+.live-stage-panel > .panel-header.live-stage-header{
+  flex:0 0 auto;margin:0;padding:8px 12px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  background:#080e14;
+}
+.live-stage-panel > .panel-header.live-stage-header h2{
+  font-size:13px;font-weight:650;letter-spacing:.01em;margin:0;
+  font-family:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  color:#d6f6ff;
+}
+.live-stage-panel > .panel-header.live-stage-header .muted{
+  font-size:11px;margin:2px 0 0;color:rgba(180,210,220,.55);
+}
+.live-stage-panel .shell-tools{gap:6px;flex-wrap:wrap}
+.live-stage-panel .session-actions.toolbar-session-actions{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  margin:0;padding:0;background:transparent;border:0;
+}
+.live-stage-panel .session-action-meta{display:none} /* name is already in header */
+.live-stage-panel .session-action-buttons{
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;
+}
+.live-stage-panel .session-action-buttons button{
+  min-height:28px;padding:3px 9px;font-size:11.5px;border-radius:6px;
+}
+.live-stage-panel .session-action-buttons button .ic{width:13px;height:13px}
+
+/* Stage is the terminal surface itself — no inset frame that looks like a modal */
 .live-stage{
-  position:relative;flex:1 1 auto;min-height:420px;border:1px solid rgba(139,246,255,.22);
-  border-radius:8px;background:#03070b;overflow:hidden;
+  position:relative;flex:1 1 auto;min-height:0;border:0;border-radius:0;
+  background:#03070b;overflow:hidden;
 }
 .live-stage-empty{
-  position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;
-  font-size:14px;line-height:1.5;max-width:36ch;margin:0 auto;
+  position:absolute;inset:0;display:grid;place-items:center;padding:28px;text-align:center;
+  font-size:13.5px;line-height:1.5;color:rgba(190,210,220,.7);
 }
 .live-stage-empty[hidden]{display:none!important}
+.live-stage-cta{display:grid;gap:10px;justify-items:center;max-width:28ch}
+.live-stage-cta p{margin:0}
+.live-stage-cta b{
+  font-family:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  color:#e8fbff;font-weight:650;
+}
+.live-stage-cta-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.live-stage-cta-actions button{min-height:34px;padding:6px 14px;border-radius:7px}
 
-/* Docked live terminal fills the stage (not a floating window). */
+/* ─── Docked terminal: not a floating window ─── */
 .term-window.term-docked{
   position:absolute!important;inset:0!important;left:0!important;top:0!important;
   width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
   max-width:none!important;max-height:none!important;
-  border-radius:0;border:0;box-shadow:none;z-index:1;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  background:#03070b!important;z-index:1;
+  display:flex!important;flex-direction:column;
 }
-.term-window.term-docked .term-resize-handle,
-.term-window.term-docked .term-btn[data-act="min"],
-.term-window.term-docked .term-btn[data-act="max"],
-.term-window.term-docked .term-btn[data-act="reset"]{display:none!important}
-.term-window.term-docked .term-detach-label{font-size:0}
-.term-window.term-docked .term-detach-label::after{content:"Close";font-size:12px}
-.term-window.term-docked .term-titlebar{cursor:default}
+/* Kill the popup titlebar entirely when docked — status lives in panel header */
+.term-window.term-docked .term-titlebar{display:none!important}
+.term-window.term-docked .term-resize-handle{display:none!important}
+.term-window.term-docked .term-keybar{
+  order:2;flex:0 0 auto;border-top:1px solid rgba(255,255,255,.05);
+  background:#080e14;padding:4px 6px;
+}
+.term-window.term-docked .term-host{
+  order:1;flex:1 1 auto;min-height:0;height:auto!important;
+}
+/* Floating undocked windows keep their chrome (rare in live-center) */
 
-/* Conversation panel */
-.conversation-panel{border-color:rgba(139,246,255,.28);flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.conversation-panel .panel-header{margin-bottom:10px;flex:0 0 auto}
-.conversation-body{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;overflow:auto}
+/* ─── Conversation list: flat IDE rail ─── */
+.conversation-panel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding-top:8px!important}
+.conversation-panel .panel-header h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(180,200,210,.55);font-weight:650}
+.conversation-panel .panel-header .muted{display:none} /* less noise */
+.conversation-body{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;overflow:auto;padding:0 2px 8px}
 .conversation-summary{
-  font-size:13px;line-height:1.55;color:#d8f8ff;
+  font-size:12px;line-height:1.45;color:rgba(200,220,230,.72);
   white-space:normal;overflow-wrap:anywhere;
-  max-height:min(28vh,240px);overflow:auto;overscroll-behavior:contain;
-  padding:2px 2px 4px;
+  max-height:min(18vh,140px);overflow:auto;overscroll-behavior:contain;
+  padding:8px 10px;margin:0 0 4px;
+  border:1px solid rgba(255,255,255,.05);border-radius:8px;
+  background:rgba(0,0,0,.2);
 }
-.conversation-para{margin:0 0 10px}
+.conversation-para{margin:0 0 8px}
 .conversation-para:last-child{margin-bottom:0}
-.conversation-empty{font-size:12.5px;line-height:1.45;margin:0}
-.conversation-loading{opacity:.85}
+.conversation-empty{font-size:12px;line-height:1.4;margin:0 2px;color:rgba(160,180,190,.55)}
+.conversation-loading{opacity:.8}
 
-.conversation-sessions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.conversation-sessions{
+  list-style:none;margin:0;padding:0;
+  display:flex;flex-direction:column;gap:1px;
+  border:1px solid rgba(255,255,255,.05);border-radius:8px;overflow:hidden;
+  background:rgba(0,0,0,.15);
+}
 .conversation-session{
-  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px;align-items:stretch;
-  border:1px solid rgba(255,255,255,.08);border-radius:8px;background:#071017;min-width:0;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0;align-items:stretch;
+  border:0;border-radius:0;background:transparent;min-width:0;
+  border-bottom:1px solid rgba(255,255,255,.04);
 }
-.conversation-session:hover{border-color:rgba(139,246,255,.28);background:#0c1620}
-.conversation-session.selected{border-color:rgba(139,246,255,.6);background:#10202b;box-shadow:inset 0 0 0 1px rgba(139,246,255,.14)}
-.conversation-session.waiting{border-color:rgba(255,200,87,.3)}
-.conversation-session.offline{opacity:.72}
-.conversation-session.unread{border-color:rgba(139,246,255,.4)}
+.conversation-session:last-child{border-bottom:0}
+.conversation-session:hover{background:rgba(139,246,255,.04)}
+.conversation-session.selected{
+  background:rgba(139,246,255,.09);
+  box-shadow:inset 2px 0 0 #5ad8ff;
+}
+.conversation-session.waiting.selected{box-shadow:inset 2px 0 0 #f0c14a}
+.conversation-session.offline{opacity:.78}
+.conversation-session.unread .conversation-session-name{color:#fff}
 .conversation-session-btn{
-  display:flex;flex-direction:column;gap:3px;align-items:stretch;min-width:0;min-height:48px;
-  padding:8px 8px 8px 9px;border:0;background:transparent;color:inherit;text-align:left;
-  font:inherit;cursor:pointer;border-radius:7px;
+  display:flex;flex-direction:column;gap:2px;align-items:stretch;min-width:0;min-height:40px;
+  padding:7px 8px 7px 10px;border:0;background:transparent;color:inherit;text-align:left;
+  font:inherit;cursor:pointer;border-radius:0;
 }
-.conversation-session-top{display:flex;align-items:center;gap:6px;min-width:0}
-.conversation-session-top .badge{width:26px;height:26px;min-width:26px;font-size:11px}
+.conversation-session-top{display:flex;align-items:center;gap:7px;min-width:0}
+.conversation-session-top .badge{
+  width:22px;height:22px;min-width:22px;font-size:10px;border-radius:5px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+}
 .conversation-session-top .dot{width:6px;height:6px;box-shadow:none;flex:0 0 auto}
-.conversation-session-name{flex:1 1 auto;min-width:0;font-size:13px;font-weight:700;color:#eaf6ff;overflow-wrap:anywhere}
-.conversation-session-state{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.conversation-session.running .conversation-session-state{color:var(--green)}
-.conversation-session.waiting .conversation-session-state{color:var(--amber)}
-.conversation-session-work{font-size:12px;line-height:1.35;color:#b7c9d6;overflow-wrap:anywhere;padding-left:32px}
-.conversation-pin-mark{color:var(--amber);font-size:11px;flex:0 0 auto}
-.conversation-pin{
-  align-self:center;width:34px;min-width:34px;min-height:34px;padding:0;margin-right:4px;
-  border:0;background:transparent;color:var(--muted);border-radius:6px;opacity:.5;
+.conversation-session-name{
+  flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:600;color:#e6f2f8;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;
 }
-.conversation-pin:hover,.conversation-pin.active{opacity:1;color:var(--amber);background:rgba(255,200,87,.08)}
-.conversation-pin .ic{width:14px;height:14px}
+.conversation-session-state{
+  flex:0 0 auto;font-size:9.5px;font-weight:650;letter-spacing:.05em;
+  text-transform:uppercase;color:rgba(150,170,180,.5);
+  padding:2px 5px;border-radius:4px;background:rgba(255,255,255,.03);
+}
+.conversation-session.running .conversation-session-state{color:#6dffb0;background:rgba(80,220,140,.08)}
+.conversation-session.waiting .conversation-session-state{color:#f0c14a;background:rgba(240,193,74,.08)}
+.conversation-session.offline .conversation-session-state{color:rgba(150,170,180,.55)}
+.conversation-session-work{
+  font-size:11.5px;line-height:1.3;color:rgba(170,190,200,.55);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:29px;
+}
+.conversation-session-work.muted{color:rgba(140,160,170,.4)}
+.conversation-pin-mark{display:none}
 
-/* Preview card grid is retired in this layout */
+.conversation-session-side{
+  display:flex;align-items:center;gap:2px;padding:0 6px 0 0;
+  opacity:0;transition:opacity .12s ease;
+}
+.conversation-session:hover .conversation-session-side,
+.conversation-session.selected .conversation-session-side,
+.conversation-session.offline .conversation-session-side{opacity:1}
+
+.conversation-row-actions{display:flex;align-items:center;gap:2px}
+.conversation-row-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:0;
+  width:28px;min-width:28px;min-height:28px;padding:0;border-radius:6px;
+  font-size:0; /* icon-only on rows */
+  border:1px solid transparent;background:transparent;color:rgba(180,200,210,.7);cursor:pointer;
+}
+.conversation-row-btn span{display:none}
+.conversation-row-btn .ic{width:13px;height:13px}
+.conversation-row-btn:hover{background:rgba(139,246,255,.1);color:#e8fbff;border-color:rgba(139,246,255,.2)}
+.conversation-row-btn.warn:hover{background:rgba(255,100,100,.12);color:#ffb0b0;border-color:rgba(255,120,120,.25)}
+.conversation-row-btn.primary:hover{background:rgba(80,220,140,.12);color:#9dffc8;border-color:rgba(80,220,140,.25)}
+
+.conversation-pin{
+  width:28px;min-width:28px;min-height:28px;padding:0;margin:0;
+  border:0;background:transparent;color:rgba(150,170,180,.4);border-radius:6px;opacity:1;
+}
+.conversation-pin:hover,.conversation-pin.active{opacity:1;color:#f0c14a;background:rgba(255,200,87,.08)}
+.conversation-pin .ic{width:13px;height:13px}
+
+.conversation-bulk{padding:0 0 4px}
+.conversation-bulk-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;
+  min-height:30px;padding:4px 10px;font-size:11.5px;font-weight:600;border-radius:7px;
+  background:transparent;border:1px dashed rgba(255,255,255,.1);color:rgba(180,200,210,.55);
+}
+.conversation-bulk-btn:hover{border-color:rgba(255,120,120,.35);color:#ffc0c0;background:rgba(255,80,80,.06)}
+.conversation-restore{
+  display:inline-flex;align-items:center;gap:6px;align-self:stretch;
+  min-height:28px;padding:4px 10px;margin:0 0 2px;font-size:11.5px;border-radius:7px;
+  background:transparent;border:1px dashed rgba(139,246,255,.2);color:rgba(180,220,230,.65);cursor:pointer;
+}
+.conversation-restore:hover{border-color:rgba(139,246,255,.4);color:#e0f8ff;background:rgba(139,246,255,.05)}
+.conversation-restore[hidden]{display:none!important}
+
+/* Preview card grid retired */
 #shells[hidden],.terminal-grid[hidden]{display:none!important}
 
-/* Hide leftover chrome — top session tabs + grid tip are retired (conversation list owns switching). */
+/* Retired chrome */
 .session-nav,.session-rail-backdrop,.session-rail-open-btn,#sessionRailOpenBtn,#quietModeBtn,#paletteBtn,
 #shellTabs,.shell-tabs,#shellTipBar,.shell-tip-bar,#legend{display:none!important}
 
-/* Offline session actions on conversation rows */
-.conversation-session{
-  grid-template-columns:minmax(0,1fr) auto;
+/* Live stage tools host (copy/image/detach moved from window titlebar) */
+.live-stage-tools{
+  display:flex;align-items:center;gap:4px;margin-left:auto;
 }
-.conversation-session-side{
-  display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;
-  padding:4px 4px 4px 0;
+.live-stage-tools .term-btn{
+  min-width:30px;min-height:28px;padding:3px 7px;font-size:12px;border-radius:6px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:rgba(180,210,220,.75);
 }
-.conversation-row-actions{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:148px}
-.conversation-row-btn{
-  display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:3px 8px;
-  font-size:11px;font-weight:700;border-radius:6px;white-space:nowrap;
-}
-.conversation-row-btn .ic{width:12px;height:12px}
-.conversation-bulk{display:flex;justify-content:stretch;margin-bottom:2px}
-.conversation-bulk-btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;
-  min-height:34px;padding:6px 10px;font-size:12px;font-weight:700;border-radius:8px;
-}
-.conversation-restore{
-  display:inline-flex;align-items:center;gap:6px;align-self:flex-start;
-  min-height:30px;padding:4px 10px;margin:0 0 4px;font-size:12px;border-radius:7px;
-  background:rgba(139,246,255,.08);border:1px solid rgba(139,246,255,.28);color:#cfefff;cursor:pointer;
-}
-.conversation-restore[hidden]{display:none!important}
-.live-stage-cta{display:grid;gap:12px;justify-items:center;max-width:32ch}
-.live-stage-cta p{margin:0}
-.live-stage-cta-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
-.live-stage-cta-actions button{min-height:36px;padding:6px 14px}
+.live-stage-tools .term-btn:hover{background:rgba(139,246,255,.1);color:#e8fbff;border-color:rgba(139,246,255,.25)}
+.live-stage-tools .term-upload-label{font-size:11px;margin-left:3px}
+.live-stage-tools .term-detach-label{font-size:11px}
 
 @media (max-width:1100px){
   .workspace.live-layout{
-    grid-template-columns:minmax(240px,280px) minmax(0,1fr);
+    grid-template-columns:minmax(220px,260px) minmax(0,1fr);
+    min-height:auto;
   }
-  .monitor-sidebar{grid-column:1 / -1;position:static;max-height:none;order:3}
+  .monitor-sidebar{grid-column:1 / -1;position:static;max-height:none;order:3;border-left:0;border-top:1px solid rgba(255,255,255,.06)}
   .conversation-sidebar{order:1}
-  .live-main{order:2}
+  .live-main{order:2;min-height:55svh}
 }
 @media (max-width:760px){
-  .workspace.live-layout{grid-template-columns:1fr}
+  .workspace.live-layout{grid-template-columns:1fr;border-radius:0;border-left:0;border-right:0}
   .conversation-sidebar,.monitor-sidebar{position:static;max-height:none}
-  .live-stage-panel{min-height:70svh}
-  .live-stage{min-height:55svh}
-  .conversation-session-btn{min-height:52px}
-  .conversation-summary{max-height:160px}
+  .conversation-sidebar{border-right:0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .live-stage-panel{min-height:60svh}
+  .live-stage{min-height:50svh}
+  .conversation-session-btn{min-height:44px}
+  .conversation-summary{max-height:120px}
+  /* Mobile: keep keybar; titlebar stays hidden in docked mode */
+  .term-window.term-docked .term-keybar{display:flex!important}
 }
 
 @media (min-width:1700px){
-  .workspace.live-layout{grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(280px,340px)}
+  .workspace.live-layout{grid-template-columns:minmax(260px,300px) minmax(0,1fr) minmax(280px,320px)}
 }
 @media (min-width:2400px){
-  .workspace.live-layout{grid-template-columns:minmax(300px,360px) minmax(0,1fr) minmax(300px,360px)}
+  .workspace.live-layout{grid-template-columns:minmax(280px,320px) minmax(0,1fr) minmax(300px,340px)}
 }
