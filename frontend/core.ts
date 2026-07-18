@@ -553,6 +553,12 @@ function selectSession(name: string | undefined): void {
   renderSelectedSessionActions();
   markSelectedShell();
   updateUnlockState();
+  // Live-center layout: selecting a session attaches the real tmux terminal in the main stage.
+  if (selectedSession && shellUnlocked && typeof openTerminal === 'function') {
+    openTerminal(selectedSession);
+  } else if (!selectedSession) {
+    document.getElementById('liveStageEmpty')?.removeAttribute('hidden');
+  }
 }
 
 function inputFor(name: string): HTMLTextAreaElement | null {

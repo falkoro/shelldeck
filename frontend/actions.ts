@@ -1045,41 +1045,44 @@ async function unlockShells(password: string): Promise<void> {
   const payload = await postJson('/api/unlock', { password });
   shellUnlocked = true;
   status.className = 'unlock-status ok';
-  status.textContent = 'Unlocked. Loading shell panes now...';
+  status.textContent = 'Unlocked. Attaching live terminal...';
   q<HTMLInputElement>('#unlockPassword').value = '';
   if (payload.model) render({ ...payload.model, unlocked: true });
   if (Array.isArray(payload.shells)) renderShells({ shells: payload.shells });
   startShellStream();
-  (document.getElementById('currentWork') || q('#shellSection')).scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (selectedSession && typeof openTerminal === 'function') openTerminal(selectedSession);
+  document.getElementById('shellSection')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   toast(payload.message || 'Unlocked');
   await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);
 }
 
 async function loadShells(showLoading = true): Promise<void> {
-  const grid = q('#shells');
+  const grid = document.getElementById('shells') || q('#shells');
   if (!shellUnlocked) {
-    grid.innerHTML = `<div class="unlock-cta">
+    const empty = document.getElementById('liveStageEmpty');
+    if (empty) {
+      empty.removeAttribute('hidden');
+      empty.innerHTML = `<div class="unlock-cta">
       <div class="unlock-cta-lock">${icon('lock')}</div>
-      <h3>Shells are locked in this browser</h3>
-      <p class="muted">This Chrome profile isn't unlocked yet. Enter your second password to reveal all live tmux panes.</p>
+      <h3>Terminal locked</h3>
+      <p class="muted">Enter the second password in the left Unlock panel (or below) to attach live tmux.</p>
       <form class="unlock-form" id="inlineUnlockForm">
         <input id="inlineUnlockPassword" name="password" type="password" autocomplete="one-time-code" placeholder="second password">
-        <button class="primary" type="submit">${icon('unlock')}<span>Unlock shells</span></button>
+        <button class="primary" type="submit">${icon('unlock')}<span>Unlock</span></button>
       </form>
       <div class="unlock-status" id="inlineUnlockStatus"></div>
     </div>`;
+    }
     (document.getElementById('inlineUnlockPassword') as HTMLInputElement | null)?.focus();
     setStreamState('stream locked');
     return;
   }
-  if (showLoading && !grid.querySelector('[data-shell-card]')) {
+  if (showLoading) {
     const cached = cachedShellPreviews();
     if (cached.length) {
       setShellsLoading(true);
       renderShells({ shells: cached, fromCache: true });
       setStreamState('refreshing shells');
-    } else {
-      grid.innerHTML = '<div class="locked-note">Loading shell previews...</div>';
     }
   }
   setShellsLoading(true);
