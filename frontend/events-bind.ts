@@ -127,29 +127,15 @@ const SHELL_TIPS = [
   'Tip: unlock shells to Restart / Pull containers',
   'Tip: the Panels button (top bar) shows/hides the side rail',
 ];
-const shellTabs = document.getElementById('shellTabs');
-if (shellTabs && !document.querySelector('#shellTip')) {
-  document.querySelector('.shell-tools .shell-tip')?.remove();
-  const bar = document.createElement('div');
-  bar.id = 'shellTipBar';
-  bar.className = 'shell-tip-bar';
-  const tip = document.createElement('span');
-  tip.id = 'shellTip';
-  tip.className = 'shell-tip';
-  const initialTip = SHELL_TIPS[0];
-  tip.textContent = initialTip;
-  tip.title = initialTip;
-  bar.appendChild(tip);
-  shellTabs.insertAdjacentElement('beforebegin', bar);
-  let tipIndex = 0;
-  setInterval(() => {
-    tipIndex = (tipIndex + 1) % SHELL_TIPS.length;
-    tip.style.opacity = '0';
-    setTimeout(() => {
-      tip.textContent = SHELL_TIPS[tipIndex];
-      tip.title = SHELL_TIPS[tipIndex];
-      tip.style.opacity = '';
-    }, 250);
-  }, 7000);
+// Live-center: no shell-tab strip / tip bar (conversation sidebar is the list).
+document.getElementById('shellTipBar')?.remove();
+document.querySelector('.shell-tools .shell-tip')?.remove();
+const shellTabsEl = document.getElementById('shellTabs');
+if (shellTabsEl) {
+  shellTabsEl.innerHTML = '';
+  shellTabsEl.hidden = true;
+  shellTabsEl.setAttribute('aria-hidden', 'true');
 }
+// Keep tip strings for potential future use / keyboard help surfaces.
+void SHELL_TIPS;
 
