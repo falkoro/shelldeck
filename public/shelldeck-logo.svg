@@ -1,6 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ShellDeck">
-  <rect width="512" height="512" rx="96" fill="#071017"/>
-  <rect x="72" y="72" width="368" height="368" rx="74" fill="#8bf6ff"/>
-  <rect x="112" y="112" width="288" height="288" rx="48" fill="#071017"/>
-  <path d="M154 322V174h36v116h70v32H154Zm118 0V174h98v32h-62v28h54v31h-54v57h-36Z" fill="#eaffff"/>
+  <defs>
+    <linearGradient id="sd-g" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8bf6ff"/>
+      <stop offset="1" stop-color="#72f7c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="#071017"/>
+  <rect x="56" y="56" width="400" height="400" rx="88" fill="none" stroke="url(#sd-g)" stroke-width="22"/>
+  <!-- terminal chevron -->
+  <path d="M148 188 L236 256 L148 324" fill="none" stroke="#8bf6ff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- prompt line -->
+  <path d="M268 324 H372" fill="none" stroke="#72f7c8" stroke-width="34" stroke-linecap="round"/>
+  <!-- deck / status dots -->
+  <circle cx="352" cy="196" r="18" fill="#8bf6ff"/>
+  <circle cx="396" cy="196" r="18" fill="#72f7c8" opacity=".85"/>
 </svg>

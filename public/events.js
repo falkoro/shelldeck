@@ -87,9 +87,25 @@ document.addEventListener('click', async (event) => {
     const removeClosedButton = target.closest('[data-remove-closed]');
     const restoreHiddenButton = target.closest('[data-restore-hidden-closed]');
     const tabButton = target.closest('[data-shell-tab]');
+    const pinButton = target.closest('[data-pin-session]');
     const selectItem = target.closest('[data-select-session]');
     const interactive = target.closest('textarea,input,button,a,pre');
     try {
+        if (pinButton) {
+            const name = pinButton.dataset.pinSession || '';
+            if (name) {
+                toggleSessionPin(name);
+                if (typeof invalidateSessionRail === 'function')
+                    invalidateSessionRail();
+                if (typeof invalidateShellTabs === 'function')
+                    invalidateShellTabs();
+                renderShellTabs();
+                if (typeof renderSessionRail === 'function')
+                    renderSessionRail();
+                toast(isSessionPinned(name, pinnedSessionNames()) ? 'Pinned' : 'Unpinned');
+            }
+            return;
+        }
         if (copyButton)
             return copyText(copyButton.dataset.copy || '');
         if (sendButton && !sendButton.disabled)
@@ -340,6 +356,33 @@ if (topActions && !document.getElementById('sidebarToggle')) {
     topActions.insertAdjacentElement('afterbegin', sidebarBtn);
     applySidebar();
 }
+// Mobile sessions drawer open control (desktop uses the always-visible left rail).
+if (topActions && !document.getElementById('sessionRailOpenBtn')) {
+    const sessionsBtn = document.createElement('button');
+    sessionsBtn.id = 'sessionRailOpenBtn';
+    sessionsBtn.type = 'button';
+    sessionsBtn.className = 'ghost session-rail-open-btn';
+    sessionsBtn.innerHTML = `${icon('sessions')}<span>Sessions</span>`;
+    sessionsBtn.setAttribute('aria-controls', 'sessionNav');
+    sessionsBtn.setAttribute('aria-expanded', 'false');
+    sessionsBtn.addEventListener('click', () => {
+        if (typeof toggleSessionRailOpen === 'function')
+            toggleSessionRailOpen();
+    });
+    topActions.insertAdjacentElement('afterbegin', sessionsBtn);
+}
+document.getElementById('sessionNavClose')?.addEventListener('click', () => {
+    if (typeof setSessionRailOpen === 'function')
+        setSessionRailOpen(false);
+});
+document.getElementById('sessionRailBackdrop')?.addEventListener('click', () => {
+    if (typeof setSessionRailOpen === 'function')
+        setSessionRailOpen(false);
+});
+window.addEventListener('resize', () => {
+    if (typeof applySessionRailOpen === 'function')
+        applySessionRailOpen();
+});
 const sidebarHead = document.querySelector('.sidebar-head');
 if (sidebarHead && !document.getElementById('sidebarCollapseBtn')) {
     const collapseBtn = document.createElement('button');

@@ -12,6 +12,8 @@ function sessionRuntime(session) {
 }
 function renderSessionList() {
     renderShellTabs();
+    if (typeof renderSessionRail === 'function')
+        renderSessionRail();
     renderSelectedSessionActions();
 }
 function renderSelectedSessionActions() {
@@ -53,6 +55,9 @@ function renderSelectedSessionActions() {
     scheduleShellGridFit();
 }
 let shellTabsSignature = '';
+function invalidateShellTabs() {
+    shellTabsSignature = '';
+}
 function shellbarSummaryWords() {
     // Tabs now fill the bar (flex-wrap), so each tab is narrower than the old wide grid; the
     // brief is clamped to 2 lines per tab. Keep word counts modest so it reads cleanly — the
@@ -82,15 +87,21 @@ function sessionTabFallback(session, state) {
     return label ? `${label} · ${status}` : status;
 }
 function renderShellTabs() {
-    const modelSessions = sessions();
+    const modelSessions = typeof orderedVisibleSessions === 'function'
+        ? orderedVisibleSessions()
+        : orderSessionsByPins(sessions(), pinnedSessionNames());
     const hiddenCount = hiddenClosedShellCount();
+    const pinSig = pinnedSessionNames().join(',');
     const tabWidthTier = window.innerWidth >= 2400 ? 2 : window.innerWidth >= 1700 ? 1 : 0;
-    const signature = `${hiddenCount}|` + modelSessions.map((session) => {
+    const signature = `${hiddenCount}|${pinSig}|` + modelSessions.map((session) => {
         const state = sessionRuntime(session);
         return `${tabWidthTier}:${hiddenCount}:${shellbarSummaryWords()}:${session.name}:${session.label}:${session.running ? 1 : 0}:${session.attached}:${session.activity || 0}:${state.label}:${shellbarSummary(session.name)}`;
     }).join('|');
-    if (signature === shellTabsSignature)
+    if (signature === shellTabsSignature) {
+        if (typeof renderSessionRail === 'function')
+            renderSessionRail();
         return;
+    }
     shellTabsSignature = signature;
     const restored = hiddenCount
         ? `<button type="button" class="session-tab restore-hidden-tab" data-restore-hidden-closed title="Show ${hiddenCount} terminated session${hiddenCount === 1 ? '' : 's'} again">${icon('plus')}<span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">Show terminated</span></span><span class="session-tab-summary">${hiddenCount} hidden</span></span></button>`
@@ -108,9 +119,12 @@ function renderShellTabs() {
         const summaryBlock = showSummary
             ? `<span class="session-tab-summary">${escapeHtml(summaryText)}</span>`
             : '';
-        return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${showSummary ? '' : ' no-summary'}${labelText ? '' : ' no-label'}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">${escapeHtml(titleText)}</span><span class="session-tab-time">${escapeHtml(timeShort)}</span></span>${summaryBlock}</span></button>`;
+        const pinned = isSessionPinned(session.name, pinnedSessionNames());
+        return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${showSummary ? '' : ' no-summary'}${labelText ? '' : ' no-label'}${pinned ? ' pinned' : ''}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">${escapeHtml(titleText)}</span><span class="session-tab-time">${escapeHtml(timeShort)}</span></span>${summaryBlock}</span></button>`;
     }).join('') + restored;
     markSelectedShell();
+    if (typeof renderSessionRail === 'function')
+        renderSessionRail();
     renderSelectedSessionActions();
     buildLegend();
 }
