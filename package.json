@@ -5,6 +5,7 @@
     "build:frontend": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test:pins": "node scripts/test-session-pins.mjs",
+    "test:frontend": "node scripts/test-session-pins.mjs",
     "slop:check": "bun scripts/check-ai-slop.mjs"
   },
   "devDependencies": {

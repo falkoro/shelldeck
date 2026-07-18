@@ -201,6 +201,8 @@ const ICONS: Record<string, string> = {
   pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
   bot: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/><path d="M8 20v2"/><path d="M16 20v2"/>',
   sessions: '<rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/>',
+  search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
 };
 
 function icon(name: string): string {
@@ -545,6 +547,7 @@ function chooseSession(preferRunning = false): SessionItem | null {
 function selectSession(name: string | undefined): void {
   selectedSession = String(name || '');
   if (selectedSession) localStorage.setItem('sdSelectedSession', selectedSession);
+  if (selectedSession && typeof clearSessionUnread === 'function') clearSessionUnread(selectedSession);
   renderShellTabs();
   if (typeof renderSessionRail === 'function') renderSessionRail();
   renderSelectedSessionActions();
@@ -597,7 +600,13 @@ const shellActivity: Record<string, { out: string; at: number }> = {};
 
 function noteShellActivity(name: string, output: string): void {
   const prev = shellActivity[name];
-  if (!prev || prev.out !== output) shellActivity[name] = { out: output, at: Date.now() };
+  if (!prev || prev.out !== output) {
+    shellActivity[name] = { out: output, at: Date.now() };
+    // Fresh output on a non-selected shell → unread badge on the rail.
+    if (name && name !== selectedSession && typeof markSessionUnread === 'function') {
+      markSessionUnread(name);
+    }
+  }
 }
 
 function shellWorking(name: string): boolean {

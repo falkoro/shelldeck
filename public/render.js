@@ -46,6 +46,10 @@ function renderShells(payload) {
     });
     markSelectedShell();
     renderShellTabs();
+    if (typeof noteUnreadFromShells === 'function')
+        noteUnreadFromShells(visibleShells);
+    if (typeof renderSessionRail === 'function')
+        renderSessionRail();
     updateUnlockState();
     scheduleShellGridFit();
 }
