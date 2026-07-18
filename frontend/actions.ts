@@ -1027,6 +1027,8 @@ async function loadSummary(force = false): Promise<void> {
     summaryLoading = false;
     updateSummaryRefreshState();
     applyWorkTitles();
+    if (typeof invalidateSessionRail === 'function') invalidateSessionRail();
+    if (typeof renderSessionRail === 'function') renderSessionRail();
   }
 }
 

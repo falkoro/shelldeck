@@ -1,61 +1,5 @@
-/* Rail follow-ups: activity, unread, multi-select, palette, quiet mode, colors */
+/* Keep palette as keyboard-only power tool (⌘K /) — no top-bar chrome. */
 
-.session-rail-toolbar{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
-.session-rail-tool{min-height:32px;padding:4px 8px;font-size:11px}
-.session-rail-tool.active{border-color:rgba(114,247,200,.55);color:#bfffe6;background:rgba(114,247,200,.1)}
-.session-rail-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 8px;padding:6px;border:1px solid rgba(139,246,255,.16);border-radius:6px;background:#071017}
-.session-rail-bulk button{min-height:30px;padding:4px 8px;font-size:11px}
-
-.session-rail-label-row{display:flex;align-items:baseline;gap:4px;min-width:0}
-.session-rail-label{flex:1 1 auto;min-width:0}
-.session-rail-activity{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
-.session-rail-activity.busy{color:var(--green,#72f7c8)}
-.session-rail-activity.idle{color:var(--amber,#ffc857)}
-.session-rail-activity.offline{color:var(--red,#ff6a7a);opacity:.85}
-.session-rail-item.running .session-rail-activity.busy{animation:sd-status-pulse 1.15s ease-in-out infinite}
-.session-rail-unread{
-  flex:0 0 auto;width:8px;height:8px;border-radius:99px;background:var(--cyan,#8bf6ff);
-  box-shadow:0 0 0 0 rgba(139,246,255,.5);animation:name-pulse 1.2s ease-in-out infinite;
-}
-.session-rail-item.unread{border-color:rgba(139,246,255,.35)}
-
-.session-rail-check{display:flex;align-items:center;padding:0 2px 0 4px}
-.session-rail-check input{width:16px;height:16px;min-height:16px;margin:0;accent-color:var(--cyan,#8bf6ff)}
-.session-rail-item.multi-on{background:rgba(139,246,255,.08)}
-.session-rail-item.dragging{opacity:.45;border-style:dashed}
-.session-rail-item.drag-over{border-color:rgba(114,247,200,.65);box-shadow:0 0 0 1px rgba(114,247,200,.25)}
-
-.session-rail-color{align-self:center;width:28px;min-width:28px;min-height:28px;padding:0;border:0;background:transparent;border-radius:6px;opacity:.7}
-.session-rail-color:hover{opacity:1;background:rgba(139,246,255,.06)}
-.session-rail-color-swatch{display:block;width:10px;height:10px;margin:0 auto;border-radius:99px;background:var(--muted);border:1px solid rgba(255,255,255,.2)}
-.session-rail-item.color-cyan .session-rail-color-swatch,.session-rail-badge.color-cyan{box-shadow:0 0 0 1px rgba(139,246,255,.55)}
-.session-rail-item.color-cyan .session-rail-color-swatch{background:var(--cyan,#8bf6ff)}
-.session-rail-item.color-green .session-rail-color-swatch{background:var(--green,#72f7c8)}
-.session-rail-item.color-amber .session-rail-color-swatch{background:var(--amber,#ffc857)}
-.session-rail-item.color-red .session-rail-color-swatch{background:var(--red,#ff6a7a)}
-.session-rail-item.color-violet .session-rail-color-swatch{background:#b794f6}
-.session-rail-item.color-slate .session-rail-color-swatch{background:#7a8b99}
-.session-rail-item.color-cyan{border-left:2px solid var(--cyan,#8bf6ff)}
-.session-rail-item.color-green{border-left:2px solid var(--green,#72f7c8)}
-.session-rail-item.color-amber{border-left:2px solid var(--amber,#ffc857)}
-.session-rail-item.color-red{border-left:2px solid var(--red,#ff6a7a)}
-.session-rail-item.color-violet{border-left:2px solid #b794f6}
-.session-rail-item.color-slate{border-left:2px solid #7a8b99}
-
-/* Widen rail slightly for activity + pin + color controls */
-.session-nav{width:min(248px,100%)}
-@media (min-width:761px){
-  .workspace{grid-template-columns:minmax(190px,248px) minmax(260px,320px) minmax(0,1fr)}
-  body.sidebar-hidden .workspace,body.quiet-mode .workspace{grid-template-columns:minmax(190px,248px) minmax(0,1fr)}
-}
-
-/* Quiet mode: hide panels, tighten chrome */
-body.quiet-mode .sidebar{display:none!important}
-body.quiet-mode .ticker-strip{display:none}
-body.quiet-mode .sidebar-expand{display:none!important}
-body.quiet-mode #quietModeBtn.active{border-color:rgba(114,247,200,.55);color:#bfffe6;background:rgba(114,247,200,.1)}
-
-/* Command palette */
 .command-palette{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:min(18vh,120px) 16px 16px}
 .command-palette[hidden]{display:none!important}
 .command-palette-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);border:0}
@@ -84,8 +28,7 @@ body.quiet-mode #quietModeBtn.active{border-color:rgba(114,247,200,.55);color:#b
 .command-palette-empty{padding:16px 10px;font-size:13px}
 
 @media (max-width:760px){
-  .session-nav{width:min(90vw,320px)}
-  .session-rail-tool span{display:none}
   .command-palette{padding:max(12px,env(safe-area-inset-top)) 10px 10px}
   .command-palette-panel{width:100%}
+  .conversation-session-btn{min-height:52px}
 }

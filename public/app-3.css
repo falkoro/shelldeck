@@ -71,8 +71,7 @@ body{font-family:"Cascadia Mono","JetBrains Mono","SFMono-Regular",ui-monospace,
 .sidebar-head-title{font-size:0}
 .sidebar-head-title::before{content:"Panels";font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 body.sidebar-hidden .sidebar{display:none}
-/* Keep the session rail when panels are hidden; app-5.css owns the final column widths. */
-body.sidebar-hidden .workspace{grid-template-columns:minmax(168px,220px) minmax(0,1fr)}
+body.sidebar-hidden .workspace{grid-template-columns:minmax(0,1fr)}
 
 /* — Flat instrument-panel cards (neutral hairlines, no glow) — */
 .panel{border-color:var(--line);background:#0a1119;box-shadow:none}

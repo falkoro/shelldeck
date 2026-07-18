@@ -141,8 +141,8 @@ function updateShellGridViewportFit() {
 }
 window.addEventListener('resize', scheduleShellGridFit);
 function markSelectedShell() {
-    document.querySelectorAll('.terminal-card,.session-tab,[data-session-rail-item]').forEach((item) => {
-        const name = item.dataset.selectSession || item.dataset.sessionRailItem || item.dataset.shellCard || '';
+    document.querySelectorAll('.terminal-card,.session-tab').forEach((item) => {
+        const name = item.dataset.selectSession || item.dataset.shellCard || item.dataset.shellTab || '';
         item.classList.toggle('selected', name === selectedSession);
     });
     document.querySelectorAll('[data-shell-tab]').forEach((item) => {

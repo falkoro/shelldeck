@@ -1032,6 +1032,10 @@ async function loadSummary(force = false) {
         summaryLoading = false;
         updateSummaryRefreshState();
         applyWorkTitles();
+        if (typeof invalidateSessionRail === 'function')
+            invalidateSessionRail();
+        if (typeof renderSessionRail === 'function')
+            renderSessionRail();
     }
 }
 async function refreshSummaries() {
