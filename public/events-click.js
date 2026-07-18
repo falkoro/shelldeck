@@ -110,6 +110,11 @@ document.addEventListener('click', async (event) => {
             return removeShellImage(removeImageButton.dataset.shell || '', removeImageButton.dataset.removeImage || '');
         if (removeClosedButton)
             return removeClosedShell(removeClosedButton.dataset.removeClosed || '');
+        const removeAllOfflineButton = target.closest('[data-remove-all-offline]');
+        if (removeAllOfflineButton) {
+            removeAllOfflineSessions();
+            return;
+        }
         if (restoreHiddenButton)
             return restoreHiddenClosedShells();
         if (tabButton) {

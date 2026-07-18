@@ -13,16 +13,34 @@ function removeClosedShell(name) {
     if (!canRemoveClosedShell(session))
         throw new Error('Only closed sessions can be removed from the dashboard');
     hideClosedShell(name);
+    toast('Removed offline session');
+}
+function removeAllOfflineSessions() {
+    const offline = sessions().filter((s) => !s.running);
+    if (!offline.length) {
+        toast('No offline sessions');
+        return;
+    }
+    offline.forEach((s) => hideClosedShell(s.name));
+    toast(`Hid ${offline.length} offline session${offline.length === 1 ? '' : 's'}`);
 }
 function hideClosedShell(name) {
     if (!name)
         return;
     hiddenClosedShells.add(name);
     saveHiddenClosedShells();
-    if (selectedSession === name)
-        chooseSession(false);
+    if (selectedSession === name) {
+        const next = chooseSession(false);
+        // chooseSession only updates the name — drive live stage + list selection fully.
+        if (typeof selectSession === 'function')
+            selectSession(next?.name || '');
+    }
+    if (typeof invalidateSessionRail === 'function')
+        invalidateSessionRail();
     renderShells({ shells: latestShells });
     renderSelectedSessionActions();
+    if (typeof renderSessionRail === 'function')
+        renderSessionRail();
 }
 function terminateShellInDashboard(name) {
     // Close any docked live terminal for this session so the stage returns to empty.

@@ -30,30 +30,37 @@ function renderSelectedSessionActions(): void {
     return;
   }
   const state = sessionRuntime(selected);
-  const createReason = !shellUnlocked
-    ? 'Unlock shells before creating tmux sessions'
-    : selected.family === 'custom'
-      ? 'ShellDeck can only create new tmux sessions from configured shell slots'
-      : selected.running
-        ? 'Create another tmux session using this shell slot as the template'
-        : 'Create this tmux session';
+  const n = escapeHtml(selected.name);
   const createDisabled = selected.family === 'custom' || !shellUnlocked ? 'disabled' : '';
-  const removeButton = canRemoveClosedShell(selected)
-    ? `<button class="warn remove-closed-action" type="button" data-remove-closed="${escapeHtml(selected.name)}" title="Remove this closed session from the dashboard">${icon('trash')}<span>Remove</span></button>`
-    : '';
-  // Live-center: shell cards are hidden, so Terminate/Restart must live here (not only on cards).
-  const dangerButtons = selected.running
-    ? `<button class="iconly" type="button" data-restart="${escapeHtml(selected.name)}" title="Restart this tmux session (recreate it)" aria-label="Restart tmux session">${icon('restart')}<span>Restart</span></button><button class="warn" type="button" data-stop="${escapeHtml(selected.name)}" title="Terminate this tmux session and hide it from the dashboard" aria-label="Terminate tmux session">${icon('power')}<span>Terminate</span></button>`
-    : '';
+  // Offline: Start (no prompt) + Remove. Running: New tmux / Restart / Terminate + attach helpers.
+  let actionButtons = '';
+  if (selected.running) {
+    actionButtons =
+      `<button type="button" ${createDisabled} data-create="${n}" title="Create another tmux session from this slot">${icon('plus')}<span>New tmux</span></button>` +
+      `<button class="iconly" type="button" data-restart="${n}" title="Restart this tmux session" aria-label="Restart tmux session">${icon('restart')}<span>Restart</span></button>` +
+      `<button class="warn" type="button" data-stop="${n}" title="Terminate this tmux session and hide it" aria-label="Terminate tmux session">${icon('power')}<span>Terminate</span></button>` +
+      `<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>` +
+      (selected.sshCommand
+        ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH attach command">${icon('terminal')}<span>SSH</span></button>`
+        : '');
+  } else {
+    const startBtn = selected.family === 'custom'
+      ? ''
+      : `<button class="primary" type="button" ${createDisabled} data-start="${n}" title="Start this offline session (create tmux now)">${icon('plus')}<span>Start</span></button>`;
+    const removeBtn = canRemoveClosedShell(selected)
+      ? `<button class="warn remove-closed-action" type="button" data-remove-closed="${n}" title="Hide this offline session from the list">${icon('trash')}<span>Remove</span></button>`
+      : '';
+    const offlineCount = sessions().filter((s) => !s.running).length;
+    const clearAll = offlineCount > 1
+      ? `<button class="warn" type="button" data-remove-all-offline title="Hide every offline session from the list">${icon('trash')}<span>Hide all offline</span></button>`
+      : '';
+    actionButtons = startBtn + removeBtn + clearAll;
+  }
   const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
   const displayLabel = shellDisplayLabel(selected.name, selected.label);
-  const sshButton = selected.sshCommand
-    ? `<button type="button" data-copy="${escapeHtml(selected.sshCommand)}" title="Copy SSH command to attach to this tmux session from another machine">${icon('terminal')}<span>SSH</span></button>`
-    : '';
   el.hidden = false;
   el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}${dangerButtons}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
-  // The toolbar width just changed — re-measure the floating-toolbar reservation.
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}">${actionButtons}</div>`;
   scheduleShellGridFit();
 }
 
@@ -91,44 +98,27 @@ function sessionTabFallback(session: SessionItem, state: { label: string }): str
 }
 
 function renderShellTabs(): void {
-  const modelSessions = typeof orderedVisibleSessions === 'function'
-    ? orderedVisibleSessions()
-    : orderSessionsByPins(sessions(), pinnedSessionNames());
-  const hiddenCount = hiddenClosedShellCount();
-  const pinSig = pinnedSessionNames().join(',');
-  const tabWidthTier = window.innerWidth >= 2400 ? 2 : window.innerWidth >= 1700 ? 1 : 0;
-  const signature = `${hiddenCount}|${pinSig}|` + modelSessions.map((session) => {
-    const state = sessionRuntime(session);
-    return `${tabWidthTier}:${hiddenCount}:${shellbarSummaryWords()}:${session.name}:${session.label}:${session.running ? 1 : 0}:${session.attached}:${session.activity || 0}:${state.label}:${shellbarSummary(session.name)}`;
-  }).join('|');
-  if (signature === shellTabsSignature) {
-    if (typeof renderSessionRail === 'function') renderSessionRail();
-    return;
+  // Live-center: conversation sidebar is the session list — top tabs are redundant noise.
+  const tabs = document.getElementById('shellTabs');
+  if (tabs) {
+    tabs.innerHTML = '';
+    tabs.hidden = true;
+    tabs.setAttribute('aria-hidden', 'true');
   }
-  shellTabsSignature = signature;
-  const restored = hiddenCount
-    ? `<button type="button" class="session-tab restore-hidden-tab" data-restore-hidden-closed title="Show ${hiddenCount} terminated session${hiddenCount === 1 ? '' : 's'} again">${icon('plus')}<span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">Show terminated</span></span><span class="session-tab-summary">${hiddenCount} hidden</span></span></button>`
-    : '';
-  q('#shellTabs').innerHTML = modelSessions.map((session) => {
-    const state = sessionRuntime(session);
-    const timeShort = fmtTime(session.activity).replace(/\s*ago$/, '').replace('just now', 'now').replace('never', '');
-    const workTitle = sessionWorkTitle(session.name);
-    const workBrief = workTitle || shellbarSummary(session.name);
-    const briefText = workBrief || sessionTabFallback(session, state);
-    const labelText = sessionTabLabel(session);
-    const titleText = labelText || briefText;
-    const summaryText = labelText && workBrief && workBrief !== labelText ? workBrief : '';
-    const showSummary = Boolean(summaryText);
-    const summaryBlock = showSummary
-      ? `<span class="session-tab-summary">${escapeHtml(summaryText)}</span>`
-      : '';
-    const pinned = isSessionPinned(session.name, pinnedSessionNames());
-    return `<button type="button" class="session-tab ${escapeHtml(session.family)} ${state.className}${showSummary ? '' : ' no-summary'}${labelText ? '' : ' no-label'}${pinned ? ' pinned' : ''}" data-select-session="${escapeHtml(session.name)}" data-shell-tab="${escapeHtml(session.name)}" title="${escapeHtml(workTitle || labelText || session.name)}"><span class="badge">${escapeHtml(session.badge)}</span><i class="dot ${state.dotClass}" aria-hidden="true"></i><span class="session-tab-body"><span class="session-tab-top"><span class="session-tab-label">${escapeHtml(titleText)}</span><span class="session-tab-time">${escapeHtml(timeShort)}</span></span>${summaryBlock}</span></button>`;
-  }).join('') + restored;
+  document.getElementById('shellTipBar')?.remove();
+  document.getElementById('legend')?.remove();
   markSelectedShell();
   if (typeof renderSessionRail === 'function') renderSessionRail();
   renderSelectedSessionActions();
-  buildLegend();
+  // "Show terminated" lives on the conversation panel when any are hidden.
+  const restore = document.getElementById('restoreHiddenSessions');
+  const hiddenCount = hiddenClosedShellCount();
+  if (restore) {
+    restore.hidden = hiddenCount === 0;
+    restore.textContent = hiddenCount
+      ? `Show ${hiddenCount} hidden session${hiddenCount === 1 ? '' : 's'}`
+      : '';
+  }
 }
 
 // One-time collapsible legend explaining the composer buttons + status dots, inserted

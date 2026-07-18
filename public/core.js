@@ -16,38 +16,9 @@ function selectSession(name) {
     if (selectedSession && shellUnlocked && typeof openTerminal === 'function' && targetReady(selectedSession)) {
         openTerminal(selectedSession);
     }
-    else {
+    else if (typeof showLiveStageIdle === 'function') {
         showLiveStageIdle(selectedSession);
     }
-}
-function showLiveStageIdle(name) {
-    // Hide any docked terminal while showing the offline / empty prompt.
-    if (typeof termWindows !== 'undefined') {
-        termWindows.forEach((tw) => {
-            if (tw.el.classList.contains('term-docked')) {
-                tw.el.hidden = true;
-                tw.minimized = true;
-            }
-        });
-    }
-    const empty = document.getElementById('liveStageEmpty');
-    if (empty)
-        empty.removeAttribute('hidden');
-    const title = document.getElementById('liveStageTitle');
-    const hint = document.getElementById('liveStageHint');
-    if (!name) {
-        if (title)
-            title.textContent = 'Live terminal';
-        if (hint)
-            hint.textContent = 'Select a session on the left to attach.';
-        return;
-    }
-    if (title)
-        title.textContent = `${name} · offline`;
-    if (hint)
-        hint.textContent = shellUnlocked
-            ? 'Session is not running. Use New tmux (toolbar) to start it, then it attaches here.'
-            : 'Unlock shells first, then start or select a running session.';
 }
 function inputFor(name) {
     return document.querySelector(`[data-command="${selectorEscape(name)}"]`);
