@@ -65,8 +65,12 @@ async function unlockShells(password) {
     if (Array.isArray(payload.shells))
         renderShells({ shells: payload.shells });
     startShellStream();
-    if (selectedSession && typeof openTerminal === 'function')
+    if (selectedSession && typeof openTerminal === 'function' && targetReady(selectedSession)) {
         openTerminal(selectedSession);
+    }
+    else if (selectedSession && typeof showLiveStageIdle === 'function') {
+        showLiveStageIdle(selectedSession);
+    }
     document.getElementById('shellSection')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     toast(payload.message || 'Unlocked');
     await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);

@@ -26,6 +26,9 @@ function hideClosedShell(name: string): void {
 }
 
 function terminateShellInDashboard(name: string): void {
+  // Close any docked live terminal for this session so the stage returns to empty.
+  const tw = typeof termWindows !== 'undefined' ? termWindows.get(name) : null;
+  if (tw && typeof closeWindow === 'function') closeWindow(tw);
   hideClosedShell(name);
   toast('Terminated session');
 }

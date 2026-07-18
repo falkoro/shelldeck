@@ -41,6 +41,10 @@ function renderSelectedSessionActions(): void {
   const removeButton = canRemoveClosedShell(selected)
     ? `<button class="warn remove-closed-action" type="button" data-remove-closed="${escapeHtml(selected.name)}" title="Remove this closed session from the dashboard">${icon('trash')}<span>Remove</span></button>`
     : '';
+  // Live-center: shell cards are hidden, so Terminate/Restart must live here (not only on cards).
+  const dangerButtons = selected.running
+    ? `<button class="iconly" type="button" data-restart="${escapeHtml(selected.name)}" title="Restart this tmux session (recreate it)" aria-label="Restart tmux session">${icon('restart')}<span>Restart</span></button><button class="warn" type="button" data-stop="${escapeHtml(selected.name)}" title="Terminate this tmux session and hide it from the dashboard" aria-label="Terminate tmux session">${icon('power')}<span>Terminate</span></button>`
+    : '';
   const attached = selected.attached > 0 ? `<span class="session-chip">${selected.attached} attached</span>` : '';
   const displayLabel = shellDisplayLabel(selected.name, selected.label);
   const sshButton = selected.sshCommand
@@ -48,7 +52,7 @@ function renderSelectedSessionActions(): void {
     : '';
   el.hidden = false;
   el.title = `${displayLabel}: ${state.label}${attached ? `, ${selected.attached} attached` : ''}`;
-  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
+  el.innerHTML = `<div class="session-action-meta"><span class="badge">${escapeHtml(selected.badge)}</span><div><b>${escapeHtml(displayLabel)}</b><small><i class="dot ${state.dotClass}"></i>${escapeHtml(state.label)} · <span data-act-epoch="${selected.activity ?? ''}">${escapeHtml(fmtTime(selected.activity))}</span>${attached}</small></div></div><div class="session-action-buttons" aria-label="Actions for ${escapeHtml(displayLabel)}"><button type="button" ${createDisabled} data-create="${escapeHtml(selected.name)}" title="${escapeHtml(createReason)}">${icon('plus')}<span>New tmux</span></button>${removeButton}${dangerButtons}<button type="button" data-copy="${escapeHtml(selected.command)}" title="Copy tmux attach command">${icon('help')}<span>Attach</span></button>${sshButton}</div>`;
   // The toolbar width just changed — re-measure the floating-toolbar reservation.
   scheduleShellGridFit();
 }

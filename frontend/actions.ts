@@ -58,7 +58,11 @@ async function unlockShells(password: string): Promise<void> {
   if (payload.model) render({ ...payload.model, unlocked: true });
   if (Array.isArray(payload.shells)) renderShells({ shells: payload.shells });
   startShellStream();
-  if (selectedSession && typeof openTerminal === 'function') openTerminal(selectedSession);
+  if (selectedSession && typeof openTerminal === 'function' && targetReady(selectedSession)) {
+    openTerminal(selectedSession);
+  } else if (selectedSession && typeof showLiveStageIdle === 'function') {
+    showLiveStageIdle(selectedSession);
+  }
   document.getElementById('shellSection')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   toast(payload.message || 'Unlocked');
   await Promise.allSettled([refresh({ preserveUnlock: true }), loadSummary()]);

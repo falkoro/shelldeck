@@ -8,12 +8,37 @@ function selectSession(name: string | undefined): void {
   renderSelectedSessionActions();
   markSelectedShell();
   updateUnlockState();
-  // Live-center layout: selecting a session attaches the real tmux terminal in the main stage.
-  if (selectedSession && shellUnlocked && typeof openTerminal === 'function') {
+  // Live-center: attach real tmux only when the session is actually running (avoid WSS 400 on offline).
+  if (selectedSession && shellUnlocked && typeof openTerminal === 'function' && targetReady(selectedSession)) {
     openTerminal(selectedSession);
-  } else if (!selectedSession) {
-    document.getElementById('liveStageEmpty')?.removeAttribute('hidden');
+  } else {
+    showLiveStageIdle(selectedSession);
   }
+}
+
+function showLiveStageIdle(name: string): void {
+  // Hide any docked terminal while showing the offline / empty prompt.
+  if (typeof termWindows !== 'undefined') {
+    termWindows.forEach((tw: TermWindow) => {
+      if (tw.el.classList.contains('term-docked')) {
+        tw.el.hidden = true;
+        tw.minimized = true;
+      }
+    });
+  }
+  const empty = document.getElementById('liveStageEmpty');
+  if (empty) empty.removeAttribute('hidden');
+  const title = document.getElementById('liveStageTitle');
+  const hint = document.getElementById('liveStageHint');
+  if (!name) {
+    if (title) title.textContent = 'Live terminal';
+    if (hint) hint.textContent = 'Select a session on the left to attach.';
+    return;
+  }
+  if (title) title.textContent = `${name} · offline`;
+  if (hint) hint.textContent = shellUnlocked
+    ? 'Session is not running. Use New tmux (toolbar) to start it, then it attaches here.'
+    : 'Unlock shells first, then start or select a running session.';
 }
 
 function inputFor(name: string): HTMLTextAreaElement | null {
