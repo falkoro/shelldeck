@@ -42,6 +42,8 @@ function renderShells(payload: { shells?: ShellPreview[]; fromCache?: boolean })
   });
   markSelectedShell();
   renderShellTabs();
+  if (typeof noteUnreadFromShells === 'function') noteUnreadFromShells(visibleShells);
+  if (typeof renderSessionRail === 'function') renderSessionRail();
   updateUnlockState();
   scheduleShellGridFit();
 }
