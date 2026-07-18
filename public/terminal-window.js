@@ -38,12 +38,13 @@ function closeWindow(tw) {
     const hasDocked = Array.from(termWindows.values()).some((w) => w.el.classList.contains('term-docked') && !w.el.hidden);
     if (stage && !hasDocked) {
         document.getElementById('liveStageEmpty')?.removeAttribute('hidden');
+        document.getElementById('liveStageTools')?.replaceChildren();
         const title = document.getElementById('liveStageTitle');
         const hint = document.getElementById('liveStageHint');
         if (title)
             title.textContent = 'Live terminal';
         if (hint)
-            hint.textContent = 'Select a session on the left to attach.';
+            hint.textContent = 'Pick a session to attach';
     }
 }
 function toggleMaximize(tw) {

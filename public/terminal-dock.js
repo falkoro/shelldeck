@@ -17,10 +17,11 @@ function showLiveStageIdle(name) {
         if (title)
             title.textContent = 'Live terminal';
         if (hint)
-            hint.textContent = 'Select a session on the left to attach.';
+            hint.textContent = 'Pick a session to attach';
         if (empty) {
-            empty.innerHTML = 'No session selected. Choose one from Conversation on the left — the live tmux attach opens here.';
+            empty.innerHTML = '<div class="live-stage-cta"><p class="muted">Pick a session from the left</p></div>';
         }
+        document.getElementById('liveStageTools')?.replaceChildren();
         return;
     }
     if (title)
@@ -38,13 +39,61 @@ function showLiveStageIdle(name) {
         return;
     }
     empty.innerHTML = `<div class="live-stage-cta">
-    <p><b>${n}</b> is not running.</p>
-    <p class="muted">Start a tmux session here, or remove this dead slot from the list.</p>
+    <p><b>${n}</b></p>
+    <p class="muted">Session offline</p>
     <div class="live-stage-cta-actions">
       <button type="button" class="primary" data-start="${n}">${icon('plus')}<span>Start</span></button>
       <button type="button" class="warn" data-remove-closed="${n}">${icon('trash')}<span>Remove</span></button>
     </div>
   </div>`;
+    document.getElementById('liveStageTools')?.replaceChildren();
+}
+function ensureLiveStageTools() {
+    const header = document.querySelector('.live-stage-header .shell-tools')
+        || document.querySelector('.live-stage-header');
+    if (!header)
+        return null;
+    let tools = document.getElementById('liveStageTools');
+    if (!tools) {
+        tools = document.createElement('div');
+        tools.id = 'liveStageTools';
+        tools.className = 'live-stage-tools';
+        tools.setAttribute('aria-label', 'Terminal tools');
+        header.appendChild(tools);
+    }
+    return tools;
+}
+function syncLiveStageTools(tw) {
+    const tools = ensureLiveStageTools();
+    if (!tools)
+        return;
+    // Lift copy / image / detach into the panel header so the stage has no window chrome.
+    const src = tw.el.querySelector('.term-controls');
+    if (!src)
+        return;
+    tools.innerHTML = '';
+    ['copy', 'copyall', 'upload', 'close'].forEach((act) => {
+        const btn = src.querySelector(`[data-act="${act}"]`);
+        if (!btn)
+            return;
+        const clone = btn.cloneNode(true);
+        if (act === 'close') {
+            const label = clone.querySelector('.term-detach-label');
+            if (label)
+                label.textContent = 'Detach';
+            clone.title = 'Detach view (tmux keeps running)';
+            clone.setAttribute('aria-label', 'Detach terminal view');
+        }
+        clone.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (act === 'close')
+                closeWindow(tw);
+            else
+                btn.click();
+        });
+        tools.appendChild(clone);
+    });
 }
 function dockTermWindow(tw) {
     const stage = document.getElementById('liveStage');
@@ -70,14 +119,28 @@ function dockTermWindow(tw) {
     tw.el.style.top = '0';
     tw.el.style.width = '100%';
     tw.el.style.height = '100%';
-    // Detach / float chrome is noise in the main stage.
     tw.el.querySelector('.term-resize-handle')?.setAttribute('hidden', '');
     const title = document.getElementById('liveStageTitle');
     const hint = document.getElementById('liveStageHint');
     if (title)
-        title.textContent = `${tw.name} · live`;
-    if (hint)
-        hint.textContent = 'tmux attach in the center — session keeps running if you switch away';
+        title.textContent = tw.name;
+    if (hint) {
+        const st = tw.statusEl?.textContent?.trim() || 'live';
+        hint.textContent = st;
+    }
+    syncLiveStageTools(tw);
+    // Keep status text mirrored into the panel subtitle while connected.
+    if (tw.statusEl && !tw.statusEl.dataset.liveHintBound) {
+        tw.statusEl.dataset.liveHintBound = '1';
+        const mo = new MutationObserver(() => {
+            if (!tw.el.classList.contains('term-docked') || tw.el.hidden)
+                return;
+            const h = document.getElementById('liveStageHint');
+            if (h)
+                h.textContent = tw.statusEl?.textContent?.trim() || 'live';
+        });
+        mo.observe(tw.statusEl, { childList: true, characterData: true, subtree: true });
+    }
     if (tw.el.parentElement !== stage)
         stage.appendChild(tw.el);
     setTimeout(() => {

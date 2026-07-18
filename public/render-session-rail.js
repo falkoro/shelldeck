@@ -24,7 +24,7 @@ function conversationSessionRows() {
         : model;
     const offlineCount = ordered.filter((s) => !s.running).length;
     const bulk = offlineCount > 1
-        ? `<div class="conversation-bulk"><button type="button" class="warn conversation-bulk-btn" data-remove-all-offline title="Hide every offline session from this list">${icon('trash')}<span>Hide ${offlineCount} offline</span></button></div>`
+        ? `<div class="conversation-bulk"><button type="button" class="warn conversation-bulk-btn" data-remove-all-offline title="Hide every offline session">${icon('trash')}<span>Clear ${offlineCount} offline</span></button></div>`
         : '';
     const rows = ordered.map((session) => {
         const state = sessionRuntime(session);
@@ -35,12 +35,15 @@ function conversationSessionRows() {
         const title = label || session.name;
         const workLine = work && work !== title ? work : '';
         const n = escapeHtml(session.name);
-        // Offline rows need Start / Remove on the card — selecting alone felt useless.
+        // Icon-only row actions (labels via title=) — no fat Start/Remove pills.
         const rowActions = !session.running
             ? `<div class="conversation-row-actions">
-          ${session.family === 'custom' || !shellUnlocked ? '' : `<button type="button" class="primary conversation-row-btn" data-start="${n}" title="Start this offline session">${icon('plus')}<span>Start</span></button>`}
-          <button type="button" class="warn conversation-row-btn" data-remove-closed="${n}" title="Hide offline session">${icon('trash')}<span>Remove</span></button>
+          ${session.family === 'custom' || !shellUnlocked ? '' : `<button type="button" class="primary conversation-row-btn" data-start="${n}" title="Start" aria-label="Start ${escapeHtml(title)}">${icon('plus')}<span>Start</span></button>`}
+          <button type="button" class="warn conversation-row-btn" data-remove-closed="${n}" title="Remove" aria-label="Remove ${escapeHtml(title)}">${icon('trash')}<span>Remove</span></button>
         </div>`
+            : '';
+        const workHtml = workLine
+            ? `<span class="conversation-session-work" title="${escapeHtml(workLine)}">${escapeHtml(workLine)}</span>`
             : '';
         return `<li class="conversation-session ${state.className}${session.name === selectedSession ? ' selected' : ''}${unread ? ' unread' : ''}" data-select-session="${escapeHtml(session.name)}">
       <button type="button" class="conversation-session-btn" data-select-session="${escapeHtml(session.name)}" title="${escapeHtml(title)}">
@@ -48,10 +51,9 @@ function conversationSessionRows() {
           <span class="badge">${escapeHtml(session.badge)}</span>
           <i class="dot ${state.dotClass}" aria-hidden="true"></i>
           <b class="conversation-session-name">${escapeHtml(title)}</b>
-          ${pinned ? '<span class="conversation-pin-mark" title="Pinned">▾</span>' : ''}
           <span class="conversation-session-state">${escapeHtml(state.label)}</span>
         </span>
-        ${workLine ? `<span class="conversation-session-work">${escapeHtml(workLine)}</span>` : `<span class="conversation-session-work muted">${session.running ? 'No summary yet' : 'Offline — Start or Remove'}</span>`}
+        ${workHtml}
       </button>
       <div class="conversation-session-side">
         ${rowActions}
