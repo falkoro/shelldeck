@@ -98,7 +98,7 @@ let dashboardSettings: DashboardSettings = {
 const SHELL_LABEL_ALIASES_KEY = 'sdShellLabelAliases';
 const HOST_ALIAS_KEY = 'sdHostAlias';
 const BRAND_ICON_KEY = 'sdBrandIcon';
-const DEFAULT_BRAND_ICON = '/assets/lf-icon.svg';
+const DEFAULT_BRAND_ICON = '/assets/shelldeck-logo.svg';
 const BRAND_ICON_MAX_BYTES = 512 * 1024;
 const SHELL_AUTO_TITLES_KEY = 'sdShellAutoTitles';
 const SHELL_PREVIEW_CACHE_KEY = 'sdShellPreviewCache';
@@ -198,6 +198,9 @@ const ICONS: Record<string, string> = {
   sidebar: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>',
   chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
   chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  bot: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/><path d="M8 20v2"/><path d="M16 20v2"/>',
+  sessions: '<rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/>',
 };
 
 function icon(name: string): string {
@@ -543,9 +546,12 @@ function selectSession(name: string | undefined): void {
   selectedSession = String(name || '');
   if (selectedSession) localStorage.setItem('sdSelectedSession', selectedSession);
   renderShellTabs();
+  if (typeof renderSessionRail === 'function') renderSessionRail();
   renderSelectedSessionActions();
   markSelectedShell();
   updateUnlockState();
+  // Close the mobile session drawer after picking a session so the shell is front-and-center.
+  if (typeof setSessionRailOpen === 'function' && window.innerWidth <= 760) setSessionRailOpen(false);
 }
 
 function inputFor(name: string): HTMLTextAreaElement | null {

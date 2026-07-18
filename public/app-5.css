@@ -1,0 +1,98 @@
+/* Left session rail (app-style navigator) + mobile drawer.
+   Primary session switcher lives here; #shellTabs stays as a secondary strip. */
+
+.session-nav{
+  position:sticky;top:14px;display:flex;flex-direction:column;gap:8px;min-width:0;
+  width:min(220px,100%);max-height:calc(100svh - 28px);align-self:start;
+  border:1px solid var(--line,#21323f);background:#0a1119;border-radius:8px;padding:8px;
+  z-index:6;
+}
+.session-nav-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 4px}
+.session-nav-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.session-nav-close{display:none;min-height:36px;min-width:36px;padding:6px}
+.session-rail{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.session-rail-group{display:flex;flex-direction:column;gap:4px;min-width:0}
+.session-rail-group-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:2px 6px;opacity:.9}
+.session-rail-list{display:flex;flex-direction:column;gap:3px}
+.session-rail-item{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:2px;
+  border:1px solid transparent;border-radius:7px;background:transparent;min-height:44px;min-width:0;
+}
+.session-rail-item:hover{background:rgba(139,246,255,.05)}
+.session-rail-item.selected{border-color:rgba(139,246,255,.55);background:#10202b;box-shadow:inset 0 0 0 1px rgba(139,246,255,.16)}
+.session-rail-item.waiting{border-color:rgba(255,200,87,.28)}
+.session-rail-item.offline{opacity:.72}
+.session-rail-item.pinned .session-rail-pin{color:var(--amber,#ffc857)}
+.session-rail-select{
+  display:grid;grid-template-columns:28px 8px minmax(0,1fr);align-items:center;column-gap:6px;
+  min-width:0;min-height:44px;padding:6px 4px 6px 5px;border:0;background:transparent;color:inherit;
+  text-align:left;border-radius:6px;cursor:pointer;font:inherit;
+}
+.session-rail-badge{width:28px;height:28px;min-width:28px;max-width:28px;font-size:11px;padding:0}
+.session-rail-badge .ic{width:14px;height:14px;color:var(--cyan)}
+.session-rail-body{min-width:0;display:flex;flex-direction:column;gap:1px}
+.session-rail-label{font-size:12.5px;font-weight:700;color:#eaf6ff;overflow-wrap:anywhere;line-height:1.25}
+.session-rail-summary{font-size:11px;color:var(--muted);overflow-wrap:anywhere;line-height:1.2}
+.session-rail-pin{
+  align-self:center;width:34px;min-width:34px;min-height:34px;padding:0;border:0;background:transparent;
+  color:var(--muted);border-radius:6px;opacity:.55;
+}
+.session-rail-pin:hover,.session-rail-pin.active{opacity:1;color:var(--amber,#ffc857);background:rgba(255,200,87,.08)}
+.session-rail-pin .ic{width:14px;height:14px}
+.session-rail-empty{padding:8px 6px;font-size:12px}
+.session-rail-restore{
+  display:flex;align-items:center;gap:6px;width:100%;min-height:40px;margin-top:2px;
+  border-color:rgba(255,200,87,.35);color:#ffe2a0;background:rgba(255,200,87,.07);
+}
+.session-rail-backdrop{display:none}
+
+/* Desktop: three-column workspace — sessions | optional panels | shells */
+.workspace{
+  grid-template-columns:minmax(168px,220px) minmax(260px,320px) minmax(0,1fr);
+}
+body.sidebar-hidden .workspace{
+  grid-template-columns:minmax(168px,220px) minmax(0,1fr);
+}
+body.sidebar-hidden .sidebar{display:none}
+.session-nav{flex:0 0 auto}
+
+/* Sessions open button is mobile-only; desktop always shows the rail */
+.session-rail-open-btn{display:none}
+
+/* Secondary tab strip stays available but less dominant when the rail is present */
+@media (min-width:761px){
+  .shell-tabs{opacity:.92}
+  .session-tab.pinned .session-tab-label::before{content:"▾ ";color:var(--amber);font-size:10px}
+}
+
+/* ≤760px: rail becomes a safe-area drawer; top Sessions control opens it */
+@media (max-width:760px){
+  .workspace{grid-template-columns:1fr}
+  .session-nav{
+    position:fixed;left:0;top:0;bottom:0;width:min(86vw,300px);max-height:none;height:100%;
+    border-radius:0;border-left:0;border-top:0;border-bottom:0;
+    padding:max(10px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+    transform:translateX(-105%);transition:transform .18s ease;z-index:70;
+    box-shadow:0 0 40px rgba(0,0,0,.55);
+  }
+  body.session-rail-open .session-nav{transform:translateX(0)}
+  .session-nav-close{display:inline-flex}
+  .session-rail-open-btn{display:inline-flex;min-height:40px;min-width:40px}
+  .session-rail-backdrop{
+    display:none;position:fixed;inset:0;z-index:65;background:rgba(0,0,0,.48);border:0;padding:0;margin:0;
+  }
+  body.session-rail-open .session-rail-backdrop{display:block}
+  .session-rail-item,.session-rail-select{min-height:48px}
+  .session-rail-pin{width:40px;min-width:40px;min-height:40px}
+  /* Keep sticky secondary tabs as a backup switcher while the drawer is closed */
+  .shell-tabs{position:sticky;top:0;z-index:6}
+}
+
+@media (min-width:1900px){
+  .workspace{grid-template-columns:minmax(190px,240px) minmax(300px,360px) minmax(0,1fr)}
+  body.sidebar-hidden .workspace{grid-template-columns:minmax(190px,240px) minmax(0,1fr)}
+}
+@media (min-width:2600px){
+  .workspace{grid-template-columns:minmax(200px,260px) minmax(320px,380px) minmax(0,1fr)}
+  body.sidebar-hidden .workspace{grid-template-columns:minmax(200px,260px) minmax(0,1fr)}
+}

@@ -137,12 +137,15 @@ function updateShellGridViewportFit() {
 }
 window.addEventListener('resize', scheduleShellGridFit);
 function markSelectedShell() {
-    document.querySelectorAll('.terminal-card,.session-tab').forEach((item) => {
-        item.classList.toggle('selected', item.dataset.selectSession === selectedSession);
+    document.querySelectorAll('.terminal-card,.session-tab,[data-session-rail-item]').forEach((item) => {
+        const name = item.dataset.selectSession || item.dataset.sessionRailItem || item.dataset.shellCard || '';
+        item.classList.toggle('selected', name === selectedSession);
     });
     document.querySelectorAll('[data-shell-tab]').forEach((item) => {
         item.classList.toggle('selected', item.dataset.shellTab === selectedSession);
     });
+    if (typeof markSessionRailSelected === 'function')
+        markSessionRailSelected();
     const cards = document.querySelectorAll('[data-shell-card]');
     // Focus mode hides every non-selected card; if the selection points at a session
     // with no pane card, fall back to the first card so the panel never goes blank.
