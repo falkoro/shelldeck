@@ -19,9 +19,12 @@ function renderShells(payload) {
     if (typeof renderSessionRail === 'function')
         renderSessionRail();
     updateUnlockState();
-    // Keep the selected session's live terminal open / focused after refresh.
-    if (selectedSession && shellUnlocked && typeof openTerminal === 'function') {
+    // Keep the selected session's live terminal open only while it is still running.
+    if (selectedSession && shellUnlocked && typeof openTerminal === 'function' && targetReady(selectedSession)) {
         openTerminal(selectedSession);
+    }
+    else if (selectedSession && typeof showLiveStageIdle === 'function') {
+        showLiveStageIdle(selectedSession);
     }
 }
 function applyShellCardOrder(grid, ordered) {
